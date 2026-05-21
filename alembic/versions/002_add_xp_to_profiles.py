@@ -1,4 +1,4 @@
-"""Add xp column to profiles
+"""Add xp column to profiles (idempotent — xp may already exist from migration 001)
 
 Revision ID: 002
 Revises: 001
@@ -16,7 +16,20 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("profiles", sa.Column("xp", sa.Integer(), nullable=False, server_default="0"))
+    # Use raw SQL with IF NOT EXISTS so this is safe to run even if xp
+    # was already created by migration 001's CREATE TABLE statement.
+    op.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'profiles' AND column_name = 'xp'
+            ) THEN
+                ALTER TABLE profiles ADD COLUMN xp INTEGER NOT NULL DEFAULT 0;
+            END IF;
+        END
+        $$;
+    """)
 
 
 def downgrade() -> None:
