@@ -23,13 +23,22 @@ if settings.SENTRY_DSN:
 # ── Lifespan (startup / shutdown) ─────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
-    if settings.is_development:
-        await create_tables()   # Auto-create in dev; use Alembic in production
+    # Run Alembic migrations on every startup — safe to run repeatedly
+    try:
+        import subprocess, sys
+        result = subprocess.run(
+            [sys.executable, "-m", "alembic", "upgrade", "head"],
+            capture_output=True, text=True
+        )
+        print(f"[Alembic] {result.stdout.strip() or 'No output'}")
+        if result.returncode != 0:
+            print(f"[Alembic ERROR] {result.stderr.strip()}")
+    except Exception as e:
+        print(f"[Alembic] Could not run migrations: {e}")
+
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
     print(f"🚀 FitCoach API running — {settings.ENVIRONMENT}")
     yield
-    # Shutdown
     print("👋 FitCoach API shutting down")
 
 
@@ -58,11 +67,12 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 # ── Global exception handler ───────────────────────────────────────────────────
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    if settings.is_development:
-        raise exc
+    import traceback
+    tb = traceback.format_exc()
+    print(f"[500 ERROR] {request.method} {request.url}\n{tb}")
     return JSONResponse(
         status_code=500,
-        content={"ok": False, "error": "An unexpected error occurred. Please try again."},
+        content={"ok": False, "error": str(exc), "detail": tb[-500:]},
     )
 
 

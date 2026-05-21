@@ -40,7 +40,7 @@ class Profile(Base):
     bowling_type: Mapped[str | None] = mapped_column(String(50))    # cricket-specific
 
     # XP / Gamification
-    xp: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    xp: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
 
     # Onboarding state
     onboarding_complete: Mapped[bool] = mapped_column(Boolean, default=False)
