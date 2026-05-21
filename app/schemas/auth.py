@@ -66,3 +66,7 @@ class RefreshRequest(BaseModel):
 class OTPLoginRequest(BaseModel):
     email: EmailStr
     otp: str
+
+
+class OTPSendRequest(BaseModel):
+    email: EmailStr

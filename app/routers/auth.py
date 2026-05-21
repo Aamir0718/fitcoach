@@ -9,7 +9,7 @@ from app.models.profile import Profile
 from sqlalchemy.orm import selectinload
 from app.schemas.auth import (
     SignupRequest, LoginRequest, SendOTPRequest, VerifyOTPRequest,
-    ResetPasswordRequest, TokenResponse, RefreshRequest, OTPLoginRequest,
+    ResetPasswordRequest, TokenResponse, RefreshRequest, OTPLoginRequest, OTPSendRequest,
 )
 from app.core.security import (
     hash_password, verify_password, generate_otp, hash_otp, verify_otp,
@@ -79,7 +79,7 @@ async def signup(body: SignupRequest, db: AsyncSession = Depends(get_db)):
     user = Auth(
         email=body.email,
         password_hash=hash_password(body.password),
-        email_verified=True,   # auto-verify for now; OTP email is still sent as optional step
+        is_verified=True,   # auto-verify; OTP email sent as welcome
     )
     db.add(user)
     await db.flush()  # get user.id before commit
@@ -172,7 +172,7 @@ async def verify_otp_route(body: VerifyOTPRequest, db: AsyncSession = Depends(ge
         result = await db.execute(select(Auth).where(Auth.email == body.email))
         user = result.scalar_one_or_none()
         if user:
-            user.email_verified = True
+            user.is_verified = True
             await db.commit()
         return {"message": "Email verified"}
 
@@ -191,6 +191,38 @@ async def verify_otp_route(body: VerifyOTPRequest, db: AsyncSession = Depends(ge
         return await _issue_tokens(user, db)
 
     return {"message": "OTP verified"}
+
+
+@router.post("/otp-login")
+async def otp_login(body: OTPSendRequest, db: AsyncSession = Depends(get_db)):
+    """Step 1: send OTP to email — creates account if doesn't exist."""
+    if not _check_rate(f"otp-login:{body.email}", 5, 60):
+        raise HTTPException(status_code=429, detail="Too many requests. Wait a minute.")
+
+    # Create account if doesn't exist
+    result = await db.execute(select(Auth).where(Auth.email == body.email))
+    user = result.scalar_one_or_none()
+    if not user:
+        user = Auth(email=body.email, is_verified=True)
+        db.add(user)
+        await db.flush()
+        db.add(Profile(user_id=user.id))
+        await db.commit()
+        await db.refresh(user)
+
+    # Invalidate old OTPs
+    await db.execute(delete(OTPCode).where(OTPCode.email == body.email, OTPCode.purpose == "login"))
+
+    otp = generate_otp()
+    db.add(OTPCode(
+        email=body.email,
+        otp_hash=hash_otp(otp),
+        purpose="login",
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
+    ))
+    await db.commit()
+    await send_otp_email(body.email, otp, "login")
+    return {"message": "OTP sent to your email"}
 
 
 @router.post("/reset-password")
