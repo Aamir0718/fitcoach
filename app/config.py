@@ -26,7 +26,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
-    # Email
+    # Email — Resend (preferred) or SMTP fallback
+    RESEND_API_KEY: str = ""          # get free at resend.com (100/day free)
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
