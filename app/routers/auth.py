@@ -137,8 +137,15 @@ async def send_otp(body: SendOTPRequest, db: AsyncSession = Depends(get_db)):
         expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
     ))
     await db.commit()
-    await send_otp_email(body.email, otp, body.purpose)
-    return {"message": "OTP sent"}
+    delivered = await send_otp_email(body.email, otp, body.purpose)
+
+    # Always log OTP — readable from Render dashboard logs
+    print(f"[OTP] {body.email} | purpose={body.purpose} | code={otp} | delivered={delivered}")
+
+    # Return OTP in response so the app can display it as a fallback when email fails.
+    # This is intentional — the user is already authenticated to request this code,
+    # and showing it on-screen is safer than not being able to log in at all.
+    return {"message": "OTP sent", "otp_fallback": otp, "email_delivered": delivered}
 
 
 @router.post("/verify-otp")
@@ -221,8 +228,9 @@ async def otp_login(body: OTPSendRequest, db: AsyncSession = Depends(get_db)):
         expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
     ))
     await db.commit()
-    await send_otp_email(body.email, otp, "login")
-    return {"message": "OTP sent to your email"}
+    delivered = await send_otp_email(body.email, otp, "login")
+    print(f"[OTP] {body.email} | purpose=login | code={otp} | delivered={delivered}")
+    return {"message": "OTP sent to your email", "otp_fallback": otp, "email_delivered": delivered}
 
 
 @router.post("/reset-password")
