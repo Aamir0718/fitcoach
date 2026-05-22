@@ -1097,6 +1097,90 @@ def get_todays_slot(plan: dict) -> dict | None:
     return days[today_idx] if today_idx < len(days) else None
 
 
+# ── Label helpers exposed to AI service ───────────────────────────────────────
+MUSCLE_TO_SLOT: dict[str, str] = {
+    # Generic gym/home
+    "chest":      "push",
+    "push":       "push",
+    "back":       "pull",
+    "pull":       "pull",
+    "biceps":     "pull",
+    "triceps":    "push",
+    "legs":       "legs",
+    "quads":      "legs",
+    "hamstrings": "legs",
+    "calves":     "legs",
+    "shoulders":  "push",
+    "delts":      "push",
+    "arms":       "upper_body",
+    "upper body": "upper_body",
+    "upper":      "upper_body",
+    "lower body": "lower_body",
+    "lower":      "lower_body",
+    "glutes":     "glutes",
+    "booty":      "glutes",
+    "hip thrust": "glutes",
+    "core":       "core_cardio",
+    "abs":        "core_cardio",
+    "full body":  "full_body",
+    "full":       "full_body",
+    "cardio":     "cardio",
+    "run":        "cardio",
+    "hiit":       "cardio",
+    # Sport
+    "batting":    "batting_power",
+    "bowling":    "bowling_strength",
+    "fielding":   "fielding_agility",
+    "cricket":    "cricket_conditioning",
+    "football":   "football_conditioning",
+    "speed":      "football_speed",
+    "agility":    "football_agility",
+    "running":    "easy_run",
+    "tempo":      "tempo_run",
+    "intervals":  "track_intervals",
+    "long run":   "long_run",
+}
+
+
+def swap_today_slot(plan: dict, new_slot_key: str) -> dict:
+    """
+    Replace today's slot with new_slot_key.
+    The displaced workout (if non-rest) is placed on the next rest day so
+    nothing is permanently lost from the weekly plan.
+    """
+    days = [dict(d) for d in plan.get("days", [])]
+    today_idx = date.today().weekday()
+
+    if today_idx >= len(days):
+        return plan
+
+    old_slot = days[today_idx]
+
+    # Build the new slot for today
+    new_label = SESSION_LABELS.get(new_slot_key, new_slot_key.replace("_", " ").title())
+    days[today_idx] = {
+        "day":       old_slot["day"],
+        "day_index": today_idx,
+        "label":     new_label,
+        "db_key":    new_slot_key,
+        "rest":      new_slot_key == "rest",
+        "muscle":    new_slot_key if new_slot_key != "rest" else None,
+    }
+
+    # If old slot was a real workout, bump it to the next rest day
+    if not old_slot.get("rest"):
+        for i in range(today_idx + 1, len(days)):
+            if days[i].get("rest"):
+                days[i] = {
+                    **old_slot,
+                    "day":       days[i]["day"],
+                    "day_index": i,
+                }
+                break
+
+    return {**plan, "days": days}
+
+
 def get_exercises_for_slot(slot, profile: Profile, zone: str) -> list[dict]:
     """Accept either a slot dict or a plain session-key string."""
     if isinstance(slot, str):
