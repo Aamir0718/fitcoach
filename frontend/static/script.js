@@ -2,7 +2,11 @@
 // FITCOACH AI — script.js v4.0
 // Sport Mode + Recovery Intelligence
 // ================================================
-const API = "";
+// Backend now lives on Render (separate service) instead of same-origin Flask.
+// TODO: replace with the actual Render service URL once it's deployed.
+const API = (location.hostname === "localhost" || location.hostname === "127.0.0.1")
+  ? "http://localhost:8000"
+  : "https://fitcoach-backend.onrender.com";
 let authToken    = localStorage.getItem("fc_token") || null;
 let currentUser  = null;
 let workoutMode  = localStorage.getItem("fc_workout_mode") || "gym";
