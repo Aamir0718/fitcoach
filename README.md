@@ -1,137 +1,112 @@
-# ⚡ FitCoach AI — Full Stack Setup Guide
+# ⚡ FitCoach AI
 
-## Project Structure
+AI-powered fitness coaching platform — chat-driven onboarding, personalized workout plans, recovery tracking, and nutrition analysis.
+
+## Project structure
+
 ```
 fitcoach/
-├── backend/           ← Flask API + Web App
-│   ├── app.py
-│   ├── db.py
-│   ├── models.py
-│   ├── requirements.txt
-│   ├── static/
-│   │   ├── style.css
-│   │   └── script.js
-│   └── templates/
-│       └── index.html
+├── frontend/           ← Static web app (plain HTML/CSS/JS, no build step)
+│   ├── index.html
+│   └── static/
+│       ├── style.css
+│       ├── script.js
+│       └── js/
 │
-└── mobile/            ← React Native (Expo)
-    ├── App.js
-    ├── app.json
-    ├── package.json
-    └── src/
-        ├── screens/
-        │   ├── AuthScreen.js
-        │   ├── ChatScreen.js
-        │   ├── ProgressScreen.js
-        │   └── ProfileScreen.js
-        ├── services/
-        │   └── api.js
-        └── theme.js
+└── backend/            ← FastAPI API
+    ├── app/
+    │   ├── main.py
+    │   ├── config.py
+    │   ├── database.py
+    │   ├── models/
+    │   ├── routers/
+    │   ├── schemas/
+    │   ├── services/
+    │   └── core/
+    ├── alembic/         ← DB migrations
+    └── requirements.txt
 ```
 
----
+## Prerequisites
 
-## 🖥️ Backend Setup
+- Python 3.11.9 (see `backend/.python-version`)
+- A Postgres database — easiest free option: create a project at [supabase.com](https://supabase.com) and use its connection string (the **session pooler** string works on any network, including IPv4-only ones)
+- A free [Groq API key](https://console.groq.com) (used for the AI coach chat)
+- A free [Brevo API key](https://app.brevo.com) with a verified sender (used to send OTP emails) — or a Resend key, or Gmail SMTP as fallbacks
 
-### 1. Create `.env` file in backend/
-```
-GROQ_API_KEY=your_groq_api_key_here
-JWT_SECRET=any_random_long_string_here
-```
+## Backend setup
 
-### 2. Install dependencies
 ```bash
 cd backend
-pip install -r requirements.txt
+python -m venv venv
+
+# Windows
+venv\Scripts\python.exe -m pip install -r requirements.txt
+# macOS/Linux
+venv/bin/python -m pip install -r requirements.txt
 ```
 
-### 3. Run the server
+Copy `.env.example` to `.env` and fill in real values:
+
 ```bash
-python app.py
+cp .env.example .env
 ```
-Server starts at: `http://localhost:5000`
 
----
+| Variable | Required | Notes |
+|---|---|---|
+| `DATABASE_URL` | Yes | Async Postgres URL, e.g. `postgresql+asyncpg://user:pass@host:5432/postgres` |
+| `DATABASE_URL_SYNC` | Yes | Same DB, sync driver, used by Alembic — `postgresql://user:pass@host:5432/postgres` |
+| `JWT_SECRET` | Yes | Any long random string for local dev; must be 32+ chars in production |
+| `GROQ_API_KEY` | Yes | Powers the AI coach chat and plan generation |
+| `BREVO_API_KEY` | Recommended | `xkeysib-...` key from Brevo → Settings → SMTP & API → API Keys. Needs a verified sender email. |
+| `RESEND_API_KEY` | Optional | Fallback if Brevo isn't set — note: unverified Resend accounts can only send to their own account email |
+| `SMTP_USER` / `SMTP_PASS` / `SMTP_HOST` / `SMTP_PORT` | Optional | Last-resort email fallback |
+| `ALLOWED_ORIGINS` | Yes | JSON array of allowed frontend origins, e.g. `["http://localhost:5000"]` |
 
-## 📱 Mobile App Setup
+If no email provider is configured, OTP codes are printed to the server console and returned in the API response as `otp_fallback` — the app still works end-to-end for local testing.
 
-### 1. Install Expo CLI
+Run migrations, then start the server:
+
 ```bash
-npm install -g expo-cli
+venv/Scripts/python.exe -m alembic upgrade head
+venv/Scripts/python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-### 2. Install dependencies
+API docs: `http://localhost:8000/docs`
+
+**Windows note:** if you see a `UnicodeEncodeError` on startup (from an emoji in a log line), run with `-X utf8`:
 ```bash
-cd mobile
-npm install
+venv/Scripts/python.exe -X utf8 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-### 3. Set your server IP
-Edit `src/services/api.js`:
-```js
-export const BASE_URL = "http://YOUR_LOCAL_IP:5000";
-// Example: "http://192.168.1.100:5000"
-```
-Find your IP with: `ipconfig` (Windows) or `ifconfig` (Mac/Linux)
+## Frontend setup
 
-### 4. Start the app
+No build step — any static file server works:
+
 ```bash
-npx expo start
+cd frontend
+python -m http.server 5000
 ```
-Scan the QR code with the **Expo Go** app on your phone.
 
----
+Open `http://localhost:5000`. `frontend/static/script.js` auto-detects `localhost` and points API calls at `http://localhost:8000`; in production it points at the deployed backend URL (update the `API` constant near the top of the file if your backend URL changes).
 
-## ✨ Features
+## Deployment
 
-### Web App
-- 🔐 JWT Auth (login / signup)
-- 🤖 AI Personal Coach powered by Groq (Llama 3.3 70B)
-- 🎤 Voice Input (Web Speech API) + Voice Output (TTS)
-- 💪 Full workout flow: start → sets → feedback → log
-- ⏱️ Animated rest timer between sets
-- 🏋️ Exercise demo cards with muscle group indicators
-- 📊 Progress dashboard: weight trend, weekly workouts, heatmap, muscle distribution
-- 🏆 Badge system (1, 7, 30, 50, 100 workouts)
-- 🎉 Confetti animation on workout completion
-- 👤 Profile editor with goal/level/injury tracking
+- **Frontend** → static hosting (Vercel). `vercel.json` at the repo root serves `frontend/` directly, no build step.
+- **Backend** → needs a persistent server, not serverless (it uses background DB connections and is designed for Render — see `backend/render.yaml`). Vercel's serverless functions won't work for this backend as-is.
 
-### Mobile App (React Native)
-- Everything above, native feel
-- Haptic feedback on set completion
-- Push-to-speak voice control
-- Native charts (react-native-gifted-charts)
-- Offline-ready navigation
-
----
-
-## 🏗️ API Endpoints
+## API endpoints (selected)
 
 | Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| POST | /api/signup | No | Create account |
-| POST | /api/login | No | Get JWT token |
-| GET  | /api/me | Yes | Current user info |
-| POST | /api/chat | Yes | Send message to coach |
-| GET  | /api/progress | Yes | Full analytics data |
-| GET  | /api/profile | Yes | Get profile |
-| PUT  | /api/profile | Yes | Update profile |
-| GET  | /health | No | Server health check |
+|---|---|---|---|
+| POST | `/api/auth/signup` | No | Create account |
+| POST | `/api/auth/login` | No | Get access + refresh tokens |
+| POST | `/api/auth/send-otp` | No | Send OTP for verify/login/reset |
+| POST | `/api/auth/verify-otp` | No | Verify an OTP code |
+| GET/PUT | `/api/profile/me` | Yes | Get/update profile |
+| POST | `/api/coach/chat` | Yes | Main AI coach chat — drives onboarding, workouts, and plan generation |
+| GET | `/api/progress/` | Yes | Analytics: streaks, badges, weight trend, heatmap |
+| POST | `/api/nutrition/analyze` | Yes | AI food/nutrition analysis |
+| GET | `/health` | No | Health check |
 
----
-
-## 💼 Selling to Fitness Chains (Cult, etc.)
-
-The architecture is white-label ready:
-1. Change logo/colors in `style.css` (CSS variables in `:root`)
-2. Update `GROQ_API_KEY` and trainer prompts per brand
-3. Deploy backend to any cloud (Railway, Render, AWS)
-4. Publish React Native app under their brand name
-
-**Premium features to pitch:**
-- Real-time AI that remembers every workout
-- Voice-controlled coaching (hands-free)
-- Gender-aware exercise demos
-- Streak + badge gamification
-- Full analytics dashboard
-- Works on web + iOS + Android
+Full interactive list at `/docs` once the backend is running.
