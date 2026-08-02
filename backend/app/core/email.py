@@ -1,8 +1,9 @@
 """
-Email sending — tries Resend first (most reliable from cloud), falls back to SMTP.
-In dev mode (no keys set) prints OTP to console/logs.
+Email sending — tries Brevo first (verified single sender, no domain needed),
+then Resend, then SMTP. In dev mode (no keys set) prints OTP to console/logs.
 """
 import aiosmtplib
+import httpx
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -43,9 +44,30 @@ def _otp_html(otp: str, purpose: str) -> str:
 
 
 async def send_otp_email(to_email: str, otp: str, purpose: str) -> bool:
-    """Send OTP email. Tries Resend → SMTP → dev-mode log."""
+    """Send OTP email. Tries Brevo → Resend → SMTP → dev-mode log."""
     subject = f"FitCoach AI — Your code: {otp}"
     html = _otp_html(otp, purpose)
+
+    # ── Brevo (verified single sender, no domain needed — preferred) ──────────
+    if settings.BREVO_API_KEY:
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.post(
+                    "https://api.brevo.com/v3/smtp/email",
+                    headers={"api-key": settings.BREVO_API_KEY, "Content-Type": "application/json"},
+                    json={
+                        "sender": {"name": "FitCoach AI", "email": "infoatfitcoachai@gmail.com"},
+                        "to": [{"email": to_email}],
+                        "subject": subject,
+                        "htmlContent": html,
+                    },
+                )
+            if resp.status_code in (200, 201):
+                print(f"[Brevo] OTP sent to {to_email} ({purpose})")
+                return True
+            print(f"[Brevo ERROR] {resp.status_code} {resp.text} — falling back")
+        except Exception as e:
+            print(f"[Brevo ERROR] {e} — falling back")
 
     # ── Resend (preferred for cloud deployments) ──────────────────────────────
     if settings.RESEND_API_KEY:

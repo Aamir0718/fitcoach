@@ -190,7 +190,7 @@ async function loadHome() {
  
     // 4. Load progress stats
     try {
-      const data = await apiFetch("/api/progress");
+      const data = await apiFetch("/api/progress/");
       const workouts = data.total_workouts || 0;
       const streak   = data.current_streak || 0;
       const badges   = data.badges?.length || 0;
@@ -211,7 +211,7 @@ async function loadHome() {
  
     // 5. Recovery banner
     try {
-      const rec = await apiFetch("/api/recovery/latest");
+      const rec = await apiFetch("/api/recovery/latest").catch(()=>null);
       const bar  = document.getElementById("home-recovery-bar");
       const dot  = document.getElementById("home-recovery-dot");
       const txt  = document.getElementById("home-recovery-text");
@@ -320,7 +320,7 @@ window.onload = async () => {
   initThemeEngine();
   if (authToken) {
     try {
-      const res = await apiFetch("/api/me");
+      const res = await apiFetch("/api/profile/me");
       if (res.onboarded) {
         currentUser = res.profile;
         showApp();
@@ -391,13 +391,18 @@ function showLoginForm() {
 }
 
 // ── OTP FLOWS ─────────────────────────────────────────────────────────
+function _storeTokens(d) {
+  authToken = d.access_token;
+  localStorage.setItem("fc_token", authToken);
+  if (d.refresh_token) localStorage.setItem("fc_refresh", d.refresh_token);
+}
 async function sendSignupOTP() {
   const email = document.getElementById("signup-email").value.trim();
   if (!email) return showAuthError("Enter your email first");
   try {
-    const res = await fetch(`${API}/api/send-otp`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,purpose:"verify"})});
+    const res = await fetch(`${API}/api/auth/send-otp`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,purpose:"verify"})});
     const d = await res.json();
-    if (!res.ok) return showAuthError(d.error || "Failed");
+    if (!res.ok) return showAuthError(d.detail || "Failed");
     document.getElementById("signup-otp-section").classList.remove("hidden");
     document.getElementById("signup-send-otp-btn").textContent = "✅ OTP Sent";
     showToast("📧 OTP sent to "+email);
@@ -407,9 +412,9 @@ async function sendLoginOTP() {
   const email = document.getElementById("login-email").value.trim();
   if (!email) return showAuthError("Enter your email");
   try {
-    const res = await fetch(`${API}/api/send-otp`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,purpose:"login"})});
+    const res = await fetch(`${API}/api/auth/send-otp`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,purpose:"login"})});
     const d = await res.json();
-    if (!res.ok) return showAuthError(d.error || "Failed");
+    if (!res.ok) return showAuthError(d.detail || "Failed");
     document.getElementById("login-otp-input-wrap").classList.remove("hidden");
     showToast("📧 OTP sent to "+email);
   } catch { showAuthError("Connection error"); }
@@ -419,10 +424,10 @@ async function doLoginOTP() {
   const code  = document.getElementById("login-otp-code").value.trim();
   if (!code) return showAuthError("Enter the OTP");
   try {
-    const res = await fetch(`${API}/api/verify-otp`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,code,purpose:"login"})});
+    const res = await fetch(`${API}/api/auth/verify-otp`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,otp:code,purpose:"login"})});
     const d = await res.json();
-    if (!res.ok) return showAuthError(d.error || "Invalid OTP");
-    authToken = d.token; localStorage.setItem("fc_token",authToken);
+    if (!res.ok) return showAuthError(d.detail || "Invalid OTP");
+    _storeTokens(d);
     showApp(); loadChat();
   } catch { showAuthError("Connection error"); }
 }
@@ -430,7 +435,7 @@ async function sendResetOTP() {
   const email = document.getElementById("forgot-email").value.trim();
   if (!email) return showAuthError("Enter your email");
   try {
-    const res = await fetch(`${API}/api/send-otp`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,purpose:"reset"})});
+    const res = await fetch(`${API}/api/auth/send-otp`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,purpose:"reset"})});
     if (!res.ok) return showAuthError("Failed to send OTP");
     document.getElementById("forgot-step1").classList.add("hidden");
     document.getElementById("forgot-step2").classList.remove("hidden");
@@ -445,16 +450,16 @@ async function doResetPassword() {
   if (newPass.length < 6) return showAuthError("Min 6 characters");
   try {
     // Step 1: verify OTP — backend returns a short-lived reset_token
-    const vRes  = await fetch(`${API}/api/verify-otp`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,code:otp,purpose:"reset"})});
+    const vRes  = await fetch(`${API}/api/auth/verify-otp`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,otp,purpose:"reset"})});
     const vData = await vRes.json();
-    if (!vRes.ok) return showAuthError(vData.error || "Invalid OTP");
+    if (!vRes.ok) return showAuthError(vData.detail || "Invalid OTP");
     const resetToken = vData.reset_token;
     if (!resetToken) return showAuthError("OTP verification failed — try again");
 
     // Step 2: reset password using the token (server verifies it server-side)
-    const rRes  = await fetch(`${API}/api/reset-password`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email, new_password:newPass, reset_token:resetToken})});
+    const rRes  = await fetch(`${API}/api/auth/reset-password`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email, new_password:newPass, reset_token:resetToken})});
     const rData = await rRes.json();
-    if (!rRes.ok) return showAuthError(rData.error || "Reset failed");
+    if (!rRes.ok) return showAuthError(rData.detail || "Reset failed");
     showToast("Password reset! Sign in now.");
     showLoginForm();
   } catch { showAuthError("Connection error"); }
@@ -465,10 +470,10 @@ async function doLogin() {
   if (!email||!password) return showAuthError("Fill in all fields");
   _btnLock("login-btn", true);
   try {
-    const res = await fetch(`${API}/api/login`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password})});
+    const res = await fetch(`${API}/api/auth/login`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password})});
     const d = await res.json();
-    if (!res.ok) { _btnLock("login-btn", false); return showAuthError(d.error||"Login failed"); }
-    authToken = d.token; localStorage.setItem("fc_token",authToken);
+    if (!res.ok) { _btnLock("login-btn", false); return showAuthError(d.detail||"Login failed"); }
+    _storeTokens(d);
     currentUser = d; showApp(); loadChat();
   } catch (e) { _btnLock("login-btn", false); showAuthError("Connection error"); }
 }
@@ -480,12 +485,12 @@ async function doSignup() {
   if (!otp) return showAuthError("Verify email with OTP first");
   _btnLock("signup-btn", true);
   try {
-    const vRes = await fetch(`${API}/api/verify-otp`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,code:otp,purpose:"verify"})});
+    const vRes = await fetch(`${API}/api/auth/verify-otp`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,otp,purpose:"verify"})});
     if (!vRes.ok) { _btnLock("signup-btn", false); return showAuthError("Invalid OTP"); }
-    const res = await fetch(`${API}/api/signup`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password})});
+    const res = await fetch(`${API}/api/auth/signup`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password})});
     const d = await res.json();
-    if (!res.ok) { _btnLock("signup-btn", false); return showAuthError(d.error||"Signup failed"); }
-    authToken = d.token; localStorage.setItem("fc_token",authToken);
+    if (!res.ok) { _btnLock("signup-btn", false); return showAuthError(d.detail||"Signup failed"); }
+    _storeTokens(d);
     showApp(); loadChat();
   } catch (e) { _btnLock("signup-btn", false); showAuthError("Connection error"); }
 }
@@ -983,7 +988,7 @@ async function callServer(message) {
   const inOnboarding = !document.getElementById("onboarding-overlay").classList.contains("hidden");
   if (!inOnboarding) showTyping();
   try {
-    const res = await fetch(`${API}/api/chat`,{
+    const res = await fetch(`${API}/api/coach/chat`,{
       method:"POST",
       headers:{"Content-Type":"application/json","Authorization":`Bearer ${authToken}`},
       body: JSON.stringify({message, mode: workoutMode})
@@ -999,14 +1004,22 @@ async function callServer(message) {
 
 // ── RESPONSE HANDLER ──────────────────────────────────────────────────
 function handleResponse(data) {
+  // Backend nests type-specific fields under ChatResponse.data — flatten
+  // them onto the top level so the rest of this function (and the handlers
+  // it calls) can keep reading e.g. data.field / data.profile / data.plan.
+  if (data && data.data && typeof data.data === "object") {
+    data = {...data, ...data.data};
+  }
   // GENERAL ONBOARDING
   if (data.type==="onboarding") { showOnboardingStep(data); return; }
 
   if (data.type==="onboarding_complete") {
     hideOnboarding();
-    currentUser = data.profile;
-    onboardingGender = data.profile?.gender || "male";
-    updateCoachHeader(data.profile?.name, data.profile?.gender);
+    apiFetch("/api/profile/me").then(profile => {
+      currentUser = profile;
+      onboardingGender = profile?.gender || "male";
+      updateCoachHeader(profile?.name, profile?.gender);
+    }).catch(()=>{});
     addMessage(data.reply,"bot");
     showQuickActions();
     return;
@@ -1031,7 +1044,7 @@ function handleResponse(data) {
   if (data.type==="sport_onboarding") { showSportOnboardingStep(data); return; }
 
   // SPORT MODE GUARD — backend tells us user needs sport onboarding first
-  if (data.type==="sport_onboarding_prompt") {
+  if (data.type==="sport_onboarding_prompt" || data.type==="sport_onboarding_required") {
     addMessage(data.reply, "bot");
     if (data.start_sport_onboard) {
       setTimeout(() => startSportOnboarding(), 600);
@@ -1100,7 +1113,7 @@ function handleResponse(data) {
 }
 
 // ── GENERAL ONBOARDING ────────────────────────────────────────────────
-const GENERAL_FIELD_ORDER = ["name","dob","gender","height","weight","goal","level","workout_place","days_per_week","injuries","plays_sport"];
+const GENERAL_FIELD_ORDER = ["name","date_of_birth","gender","height","weight","goal","level","workout_place","days_per_week","injuries","plays_sport"];
 const GENERAL_QUESTIONS_MAP = {
   name:{reply:"Hey! 👋 What should I call you?",input_type:"text"},
   dob:{reply:"What's your date of birth?",input_type:"dob"},
@@ -1128,15 +1141,15 @@ function showOnboardingStep(data) {
   document.getElementById("ob-question").textContent = data.reply;
   document.getElementById("ob-error").classList.add("hidden");
 
-  renderObInput("ob-input-area", data.input_type, data.gender || onboardingGender);
+  renderObInput("ob-input-area", data.field, data.gender || onboardingGender);
 }
 
-function renderObInput(areaId, inputType, gender) {
+function renderObInput(areaId, field, gender) {
   const area = document.getElementById(areaId);
   area.innerHTML = "";
 
-  switch(inputType) {
-    case "text":
+  switch(field) {
+    case "name":
       area.innerHTML=`<input class="ob-text-input" id="ob-val" type="text" placeholder="Type your name…"/>`;
       setTimeout(()=>{
         const el=document.getElementById("ob-val");
@@ -1144,7 +1157,7 @@ function renderObInput(areaId, inputType, gender) {
       },100);
       break;
 
-    case "dob": {
+    case "date_of_birth": {
       const months=["January","February","March","April","May","June","July","August","September","October","November","December"];
       const yr=new Date().getFullYear();
       area.innerHTML=`<div class="ob-dob-row">
@@ -1197,14 +1210,14 @@ function renderObInput(areaId, inputType, gender) {
       </div>`;
       break;
 
-    case "place":
+    case "workout_place":
       area.innerHTML=`<div class="ob-options">
         <button class="ob-option" onclick="selectObOption(this,'gym')">🏋️ Gym</button>
         <button class="ob-option" onclick="selectObOption(this,'home')">🏠 Home</button>
       </div>`;
       break;
 
-    case "days":
+    case "days_per_week":
       area.innerHTML=`<div class="ob-options">
         <button class="ob-option" onclick="selectObOption(this,'3')">3 days / week</button>
         <button class="ob-option" onclick="selectObOption(this,'4')">4 days / week</button>
@@ -1255,11 +1268,11 @@ function selectInjury(choice) {
   document.getElementById("ob-injury-detail")?.classList.toggle("hidden", choice!=="yes");
 }
 
-function getObValue(inputType, areaId) {
+function getObValue(field, areaId) {
   const area = areaId || "ob-input-area";
-  switch(inputType) {
-    case "text": return (document.getElementById("ob-val")?.value||"").trim();
-    case "dob": {
+  switch(field) {
+    case "name": return (document.getElementById("ob-val")?.value||"").trim();
+    case "date_of_birth": {
       const d=document.getElementById("ob-dob-day")?.value;
       const m=document.getElementById("ob-dob-month")?.value;
       const y=document.getElementById("ob-dob-year")?.value;
@@ -1282,10 +1295,10 @@ function getObValue(inputType, areaId) {
 }
 
 async function onboardingNext() {
-  const value = getObValue(onboardingInputType, "ob-input-area");
+  const value = getObValue(onboardingField, "ob-input-area");
   if (!value) {
     const e=document.getElementById("ob-error");
-    e.textContent = onboardingInputType==="text" ? "Please type your name" : "Please make a selection";
+    e.textContent = onboardingField==="name" ? "Please type your name" : "Please make a selection";
     e.classList.remove("hidden"); return;
   }
   document.getElementById("ob-error").classList.add("hidden");
@@ -1294,7 +1307,7 @@ async function onboardingNext() {
   const btn=document.getElementById("ob-next-btn");
   btn.disabled=true; btn.textContent="…";
   try {
-    const res=await fetch(`${API}/api/chat`,{
+    const res=await fetch(`${API}/api/coach/chat`,{
       method:"POST",
       headers:{"Content-Type":"application/json","Authorization":`Bearer ${authToken}`},
       body:JSON.stringify({message:value})
@@ -1464,16 +1477,24 @@ async function sportOnboardingNext() {
     const btn=document.getElementById("sob-next-btn");
     btn.disabled=true; btn.textContent="Saving…";
     try {
-      const res = await fetch(`${API}/api/sport-onboard`,{
+      const res = await fetch(`${API}/api/profile/sport-onboard`,{
         method:"POST",
         headers:{"Content-Type":"application/json","Authorization":`Bearer ${authToken}`},
-        body: JSON.stringify({sport, profile: sportObState.profile})
+        body: JSON.stringify({
+          sport,
+          role: sportObState.profile.role,
+          position: sportObState.profile.position,
+          focus: sportObState.profile.primary_focus,
+          match_frequency: sportObState.profile.match_frequency,
+          bowling_type: sportObState.profile.bowling_type,
+          injuries: sportObState.profile.sport_injuries,
+        })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error||"Failed");
+      if (!res.ok) throw new Error(data.detail||"Failed");
       hideSportOnboarding();
-      currentUser = {...(currentUser||{}), plays_sport:true, sport:data.sport, sport_profile:data.sport_profile};
-      addMessage(data.reply,"bot");
+      currentUser = {...(currentUser||{}), ...data};
+      addMessage(`Awesome! Your ${sport} profile is set up. Let's get training! 🏆`,"bot");
       showToast(`🏆 ${sport.charAt(0).toUpperCase()+sport.slice(1)} mode activated!`);
       setWorkoutMode("sport");
       updateProfileSportBadge();
@@ -1538,7 +1559,7 @@ async function submitRecovery() {
   const btn=document.getElementById("recovery-submit-btn");
   btn.disabled=true; btn.querySelector("span").textContent="Calculating…";
   try {
-    const data = await apiFetch("/api/recovery",{
+    const data = await apiFetch("/api/recovery/",{
       method:"POST",
       body:JSON.stringify({
         sleep_hours:parseFloat(r.sleep),
@@ -1920,8 +1941,8 @@ async function analyzeCalories() {
   if(!food) return showToast("⚠️ Describe what you ate");
   showCalLoading(true);
   try{
-    const data=await apiFetch("/api/calories",{method:"POST",body:JSON.stringify({food})});
-    showCalResult(data.nutrition || data.analysis);
+    const data=await apiFetch("/api/nutrition/analyze",{method:"POST",body:JSON.stringify({food})});
+    showCalResult(_adaptNutritionResult(data));
   }catch{showToast("❌ Failed. Try again.");}
   finally{showCalLoading(false);}
 }
@@ -1935,8 +1956,8 @@ async function analyzePhotoCalories() {
   if(!foodPhotoBase64)return showToast("⚠️ Upload a photo first");
   showCalLoading(true);
   try{
-    const data=await apiFetch("/api/calories",{method:"POST",body:JSON.stringify({food:"uploaded food image",image_data:foodPhotoBase64})});
-    showCalResult(data.nutrition || data.analysis);
+    const data=await apiFetch("/api/nutrition/analyze",{method:"POST",body:JSON.stringify({food:"uploaded food image",image_base64:foodPhotoBase64.split(",").pop()})});
+    showCalResult(_adaptNutritionResult(data));
   }catch{showToast("❌ Failed.");}
   finally{showCalLoading(false);}
 }
@@ -1972,6 +1993,16 @@ function nutrientBar(label,value,target,unit){
       <div class="nutrient-row-top"><span>${escapeHtml(label)}</span><strong>${escapeHtml(String(value))}${escapeHtml(unit)}</strong></div>
       <div class="nutrient-track"><i style="width:${pct}%"></i></div>
     </div>`;
+}
+function _adaptNutritionResult(raw){
+  // Backend returns a flat {calories, protein_g, carbs_g, fats_g, fibre_g, fitness_rating, advice, best_timing}
+  // — adapt it into the richer shape showCalResult renders.
+  if (!raw || typeof raw !== "object") return raw;
+  return {
+    macros: { calories: raw.calories, protein: raw.protein_g, carbs: raw.carbs_g, fats: raw.fats_g, fiber: raw.fibre_g },
+    meal_quality: raw.fitness_rating,
+    recommendation: { advice: raw.advice, best_timing: raw.best_timing },
+  };
 }
 function showCalResult(result){
   const r=document.getElementById("cal-result");
@@ -2079,7 +2110,7 @@ function showCalResult(result){
 // ── PROGRESS ──────────────────────────────────────────────────────────
 async function loadProgress() {
   try{
-    const data=await apiFetch("/api/progress");
+    const data=await apiFetch("/api/progress/");
     document.getElementById("stat-weight-lost").textContent=data.total_weight_lost??"-";
     document.getElementById("stat-workouts").textContent=data.total_workouts??"-";
     document.getElementById("stat-streak").textContent=data.current_streak??"-";
@@ -2138,7 +2169,7 @@ function chartOpts(beginAtZero=false){
 // ── PROFILE ───────────────────────────────────────────────────────────
 async function loadProfile() {
   try{
-    const data=await apiFetch("/api/profile");
+    const data=await apiFetch("/api/profile/me");
     document.getElementById("pf-name").value   =data.name||"";
     document.getElementById("pf-age").value    =data.age||"";
     document.getElementById("pf-gender").value =data.gender||"male";
@@ -2203,7 +2234,7 @@ async function saveProfile() {
     injuries:document.getElementById("pf-injuries").value
   };
   try{
-    await apiFetch("/api/profile",{method:"PUT",body:JSON.stringify(body)});
+    await apiFetch("/api/profile/me",{method:"PUT",body:JSON.stringify(body)});
     currentUser={...(currentUser||{}),...body};
     showToast("✅ Profile saved!");
     document.getElementById("profile-name-display").textContent=body.name;

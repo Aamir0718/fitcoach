@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 import bcrypt
 from jose import JWTError, jwt
+from werkzeug.security import check_password_hash as _werkzeug_check
 
 from app.config import settings
 
@@ -12,17 +13,32 @@ from app.config import settings
 # ── Password ──────────────────────────────────────────────────────────────────
 # Using bcrypt directly — passlib is incompatible with bcrypt>=4.0 on Python 3.11.
 # bcrypt has a hard 72-byte limit; we slice before encoding to stay safe.
+#
+# Legacy support: accounts migrated from the old Flask backend have Werkzeug
+# hashes (scrypt:... or pbkdf2:...) instead of bcrypt. verify_password()
+# accepts both; needs_rehash() tells the caller to upgrade to bcrypt after a
+# successful legacy verification.
 
 def hash_password(password: str) -> str:
     pw_bytes = password.encode("utf-8")[:72]
     return bcrypt.hashpw(pw_bytes, bcrypt.gensalt(rounds=12)).decode("utf-8")
 
 
+def _is_legacy_hash(hashed: str) -> bool:
+    return hashed.startswith("scrypt:") or hashed.startswith("pbkdf2:")
+
+
 def verify_password(plain: str, hashed: str) -> bool:
     try:
+        if _is_legacy_hash(hashed):
+            return _werkzeug_check(hashed, plain)
         return bcrypt.checkpw(plain.encode("utf-8")[:72], hashed.encode("utf-8"))
     except Exception:
         return False
+
+
+def needs_rehash(hashed: str) -> bool:
+    return _is_legacy_hash(hashed)
 
 
 # ── OTP ───────────────────────────────────────────────────────────────────────

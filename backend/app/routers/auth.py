@@ -12,7 +12,7 @@ from app.schemas.auth import (
     ResetPasswordRequest, TokenResponse, RefreshRequest, OTPLoginRequest, OTPSendRequest,
 )
 from app.core.security import (
-    hash_password, verify_password, generate_otp, hash_otp, verify_otp,
+    hash_password, verify_password, needs_rehash, generate_otp, hash_otp, verify_otp,
     create_access_token, generate_refresh_token, hash_refresh_token,
     refresh_token_expires,
 )
@@ -115,6 +115,10 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
 
     if not user or not user.password_hash or not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    if needs_rehash(user.password_hash):
+        user.password_hash = hash_password(body.password)
+        await db.commit()
 
     return await _issue_tokens(user, db)
 
