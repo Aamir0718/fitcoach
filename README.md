@@ -1,112 +1,370 @@
 # ⚡ FitCoach AI
 
-AI-powered fitness coaching platform — chat-driven onboarding, personalized workout plans, recovery tracking, and nutrition analysis.
+An AI-powered fitness coaching platform that provides personalized workouts, nutrition analysis, recovery tracking, and intelligent food recognition using Computer Vision and AI.
 
-## Project structure
+---
+
+# 🚀 Features
+
+### 🏋️ AI Fitness Coach
+- AI-powered fitness assistant using Groq LLM
+- Personalized workout recommendations
+- Chat-driven onboarding
+- Goal-based workout generation
+- Beginner, Intermediate and Advanced plans
+
+### 🥗 Smart Nutrition Analysis
+- Upload meal images
+- YOLOv8 food detection
+- USDA FoodData Central nutrition lookup
+- Automatic macro calculation
+- Calories
+- Protein
+- Carbohydrates
+- Fat
+- Fiber
+- Sugar
+- Health score
+- Nutrition tips
+
+### 🤖 AI Food Verification
+To improve accuracy, the application verifies uncertain food detections.
+
+Workflow:
 
 ```
+Image
+    ↓
+YOLOv8 Detection
+    ↓
+Confidence Check
+    ↓
+High Confidence
+    ↓
+USDA Nutrition
+
+OR
+
+Low Confidence
+    ↓
+AI Food Verification Popup
+    ↓
+User Confirmation
+    ↓
+USDA Nutrition
+```
+
+This prevents visually similar foods (Paneer, Cheese, Pizza, etc.) from producing incorrect nutrition reports.
+
+### 📈 Progress Tracking
+- Workout streaks
+- Weight tracking
+- XP system
+- Badges
+- Progress analytics
+
+### 💪 Recovery Tracking
+- Recovery score
+- Sleep tracking
+- Fatigue analysis
+- Soreness tracking
+- Readiness insights
+
+### 🔐 Authentication
+- JWT Authentication
+- OTP Email Verification
+- Password Reset
+- Secure Login
+
+---
+
+# 📂 Project Structure
+
+```text
 fitcoach/
-├── frontend/           ← Static web app (plain HTML/CSS/JS, no build step)
+│
+├── frontend/
 │   ├── index.html
 │   └── static/
 │       ├── style.css
 │       ├── script.js
+│       ├── assets/
 │       └── js/
 │
-└── backend/            ← FastAPI API
-    ├── app/
-    │   ├── main.py
-    │   ├── config.py
-    │   ├── database.py
-    │   ├── models/
-    │   ├── routers/
-    │   ├── schemas/
-    │   ├── services/
-    │   └── core/
-    ├── alembic/         ← DB migrations
-    └── requirements.txt
+├── backend/
+│   ├── app/
+│   │   ├── core/
+│   │   ├── database.py
+│   │   ├── config.py
+│   │   ├── main.py
+│   │   ├── models/
+│   │   ├── routers/
+│   │   ├── schemas/
+│   │   ├── services/
+│   │   │   ├── ai_service.py
+│   │   │   ├── nutrition_service.py
+│   │   │   ├── food_detector.py
+│   │   │   └── ...
+│   │   └── utils/
+│   │
+│   ├── models/
+│   │   └── best.pt
+│   │
+│   ├── uploads/
+│   ├── alembic/
+│   └── requirements.txt
+│
+└── README.md
 ```
 
-## Prerequisites
+---
 
-- Python 3.11.9 (see `backend/.python-version`)
-- A Postgres database — easiest free option: create a project at [supabase.com](https://supabase.com) and use its connection string (the **session pooler** string works on any network, including IPv4-only ones)
-- A free [Groq API key](https://console.groq.com) (used for the AI coach chat)
-- A free [Brevo API key](https://app.brevo.com) with a verified sender (used to send OTP emails) — or a Resend key, or Gmail SMTP as fallbacks
+# 🛠 Tech Stack
 
-## Backend setup
+### Frontend
+- HTML5
+- CSS3
+- JavaScript
+- Chart.js
+
+### Backend
+- FastAPI
+- SQLAlchemy
+- PostgreSQL
+- Alembic
+
+### AI
+- Groq API
+- YOLOv8 (Ultralytics)
+- USDA FoodData Central API
+
+### Authentication
+- JWT
+- OTP Email Verification
+- Brevo / Resend / SMTP
+
+---
+
+# 📋 Prerequisites
+
+- Python 3.11+
+- PostgreSQL
+- Groq API Key
+- USDA FoodData Central API Key
+- Brevo API Key (recommended)
+
+---
+
+# ⚙ Backend Setup
 
 ```bash
 cd backend
-python -m venv venv
+
+python -m venv .venv
 
 # Windows
-venv\Scripts\python.exe -m pip install -r requirements.txt
-# macOS/Linux
-venv/bin/python -m pip install -r requirements.txt
+.venv\Scripts\activate
+
+# Linux/macOS
+source .venv/bin/activate
+
+pip install -r requirements.txt
 ```
 
-Copy `.env.example` to `.env` and fill in real values:
+Copy
+
+```text
+.env.example
+```
+
+to
+
+```text
+.env
+```
+
+---
+
+# 🔑 Required Environment Variables
+
+| Variable | Description |
+|-----------|-------------|
+| DATABASE_URL | PostgreSQL Async URL |
+| DATABASE_URL_SYNC | PostgreSQL Sync URL |
+| JWT_SECRET | JWT Secret |
+| GROQ_API_KEY | AI Coach |
+| USDA_API_KEY | USDA Nutrition API |
+| BREVO_API_KEY | OTP Email |
+| ALLOWED_ORIGINS | Frontend URLs |
+
+---
+
+# 🧠 YOLO Food Detection
+
+The application uses a custom trained YOLOv8 model.
+
+Current supported classes include:
+
+- Apple
+- Banana
+- Burger
+- Chapathi
+- Chicken Gravy
+- Fries
+- Idli
+- Pizza
+- Rice
+- Soda
+- Tomato
+- Vada
+
+Model location:
+
+```text
+backend/models/best.pt
+```
+
+---
+
+# 🥗 USDA Nutrition Integration
+
+Detected food names are mapped to USDA FoodData Central.
+
+Returned nutrients include:
+
+- Calories
+- Protein
+- Carbohydrates
+- Fat
+- Fiber
+- Sugar
+
+Nutrition values are calculated automatically and displayed in the dashboard.
+
+---
+
+# ▶ Run Backend
 
 ```bash
-cp .env.example .env
+python -m alembic upgrade head
+
+python -m uvicorn app.main:app --reload
 ```
 
-| Variable | Required | Notes |
-|---|---|---|
-| `DATABASE_URL` | Yes | Async Postgres URL, e.g. `postgresql+asyncpg://user:pass@host:5432/postgres` |
-| `DATABASE_URL_SYNC` | Yes | Same DB, sync driver, used by Alembic — `postgresql://user:pass@host:5432/postgres` |
-| `JWT_SECRET` | Yes | Any long random string for local dev; must be 32+ chars in production |
-| `GROQ_API_KEY` | Yes | Powers the AI coach chat and plan generation |
-| `BREVO_API_KEY` | Recommended | `xkeysib-...` key from Brevo → Settings → SMTP & API → API Keys. Needs a verified sender email. |
-| `RESEND_API_KEY` | Optional | Fallback if Brevo isn't set — note: unverified Resend accounts can only send to their own account email |
-| `SMTP_USER` / `SMTP_PASS` / `SMTP_HOST` / `SMTP_PORT` | Optional | Last-resort email fallback |
-| `ALLOWED_ORIGINS` | Yes | JSON array of allowed frontend origins, e.g. `["http://localhost:5000"]` |
+API
 
-If no email provider is configured, OTP codes are printed to the server console and returned in the API response as `otp_fallback` — the app still works end-to-end for local testing.
-
-Run migrations, then start the server:
-
-```bash
-venv/Scripts/python.exe -m alembic upgrade head
-venv/Scripts/python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+http://localhost:8000
 ```
 
-API docs: `http://localhost:8000/docs`
+Swagger Docs
 
-**Windows note:** if you see a `UnicodeEncodeError` on startup (from an emoji in a log line), run with `-X utf8`:
-```bash
-venv/Scripts/python.exe -X utf8 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+http://localhost:8000/docs
 ```
 
-## Frontend setup
+---
 
-No build step — any static file server works:
+# ▶ Run Frontend
 
 ```bash
 cd frontend
+
 python -m http.server 5000
 ```
 
-Open `http://localhost:5000`. `frontend/static/script.js` auto-detects `localhost` and points API calls at `http://localhost:8000`; in production it points at the deployed backend URL (update the `API` constant near the top of the file if your backend URL changes).
+Open
 
-## Deployment
+```
+http://localhost:5000
+```
 
-- **Frontend** → static hosting (Vercel). `vercel.json` at the repo root serves `frontend/` directly, no build step.
-- **Backend** → needs a persistent server, not serverless (it uses background DB connections and is designed for Render — see `backend/render.yaml`). Vercel's serverless functions won't work for this backend as-is.
+---
 
-## API endpoints (selected)
+# 📡 Important API Endpoints
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| POST | `/api/auth/signup` | No | Create account |
-| POST | `/api/auth/login` | No | Get access + refresh tokens |
-| POST | `/api/auth/send-otp` | No | Send OTP for verify/login/reset |
-| POST | `/api/auth/verify-otp` | No | Verify an OTP code |
-| GET/PUT | `/api/profile/me` | Yes | Get/update profile |
-| POST | `/api/coach/chat` | Yes | Main AI coach chat — drives onboarding, workouts, and plan generation |
-| GET | `/api/progress/` | Yes | Analytics: streaks, badges, weight trend, heatmap |
-| POST | `/api/nutrition/analyze` | Yes | AI food/nutrition analysis |
-| GET | `/health` | No | Health check |
+| Method | Endpoint | Description |
+|----------|---------------------------|-------------------------|
+| POST | /api/auth/signup | Create account |
+| POST | /api/auth/login | Login |
+| POST | /api/auth/send-otp | Send OTP |
+| POST | /api/auth/verify-otp | Verify OTP |
+| GET | /api/profile/me | User profile |
+| PUT | /api/profile/me | Update profile |
+| POST | /api/coach/chat | AI Coach |
+| POST | /api/nutrition/analyze | AI Nutrition Analysis |
+| GET | /api/progress | Progress Dashboard |
+| GET | /api/recovery/latest | Latest Recovery |
+| GET | /health | Health Check |
 
-Full interactive list at `/docs` once the backend is running.
+---
+
+# 🚀 Deployment
+
+### Frontend
+- Vercel
+- Netlify
+- GitHub Pages
+
+### Backend
+- Render
+- Railway
+- VPS
+- Docker
+
+---
+
+# ✨ Highlights
+
+- AI Fitness Coach
+- YOLOv8 Food Detection
+- USDA Nutrition Analysis
+- AI Food Verification
+- Recovery Tracking
+- Progress Analytics
+- JWT Authentication
+- OTP Email Verification
+- Responsive UI
+- FastAPI Backend
+- PostgreSQL Database
+- Computer Vision + AI Integration
+
+---
+
+# 📸 Workflow
+
+```
+User Uploads Meal
+        │
+        ▼
+YOLOv8 Food Detection
+        │
+        ▼
+Confidence Evaluation
+        │
+ ┌──────┴────────┐
+ │               │
+ ▼               ▼
+High         Low Confidence
+Confidence         │
+ │                 ▼
+ ▼         AI Food Verification
+ │                 │
+ ▼                 ▼
+USDA Nutrition Lookup
+        │
+        ▼
+Nutrition Analysis
+        │
+        ▼
+Calories • Protein • Carbs • Fat • Fiber • Sugar
+        │
+        ▼
+Health Report
+```
+
+---
+
+# 👨‍💻 Contributors
+
+Developed collaboratively as part of the **FitCoach AI** project with ongoing enhancements in AI nutrition analysis, food detection, workout intelligence, and user experience.
