@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://fitcoach:password@localhost:5432/fitcoach_db"
     DATABASE_URL_SYNC: str = "postgresql://fitcoach:password@localhost:5432/fitcoach_db"
 
+    # USDA API
+    USDA_API_KEY: str = ""
+
     # Security
     JWT_SECRET: str = "change-this-in-production"
     JWT_ALGORITHM: str = "HS256"
@@ -38,13 +41,22 @@ class Settings(BaseSettings):
     # AI
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
-
+    GROQ_VISION_MODEL: str = "llama-3.2-11b-vision-preview"  # Vision-capable model for image analysis
+    USDA_API_KEY: str = ""  # USDA FoodData Central API key for nutrition data
+    
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
 
     # App
     ENVIRONMENT: str = "development"
-    ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000"]
+    ALLOWED_ORIGINS: List[str] = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5000",
+    "http://127.0.0.1:5000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    ]
     SENTRY_DSN: str = ""
 
     # Storage

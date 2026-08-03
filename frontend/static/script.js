@@ -175,83 +175,60 @@ function animateTextNumber(id, value, suffix = "") {
 async function loadHome() {
   try {
     // 1. Greeting
-    const hour = new Date().getHours();
     document.getElementById("home-greeting").textContent = timeGreeting();
- 
-    // 2. User name
-    const name = currentUser?.name || "Athlete";
-    document.getElementById("home-name").textContent = name;
- 
-    // 3. Random quote (changes daily)
+
+    // 2. Random quote (changes daily)
     const dayIndex = new Date().getDate() % HOME_QUOTES.length;
     const q = HOME_QUOTES[dayIndex];
     document.getElementById("home-quote-text").textContent = q.text;
     document.getElementById("home-quote-author").textContent = "— " + q.author;
- 
-    // 4. Load progress stats
+
+    // 3. Load progress stats
     try {
       const data = await apiFetch("/api/progress/");
       const workouts = data.total_workouts || 0;
       const streak   = data.current_streak || 0;
       const badges   = data.badges?.length || 0;
-      const lastWeight = data.weight?.values?.slice(-1)[0] || null;
- 
-      animateTextNumber("hs-workouts", workouts);
-      animateTextNumber("hs-streak", streak);
-      animateTextNumber("hs-badges", badges);
-      document.getElementById("hs-weight").textContent   = lastWeight ? lastWeight + "kg" : "—";
+
+      // Update metrics
+      animateTextNumber("metric-calories", workouts * 280);
+      setTxt("metric-time", workouts * 45 + "m");
+      setTxt("metric-steps", workouts * 5000);
+      setTxt("metric-active", workouts * 30 + "m");
+
+      // Update streak
       animateTextNumber("home-streak-count", streak);
-      animateTextNumber("home-footer-streak", streak);
-      setTxt("home-perf-calories", workouts ? `${workouts * 280} kcal` : "Scan");
-      setTxt("home-perf-consistency", workouts ? `${workouts}` : "Start");
- 
-      // Weekly heatmap strip (last 7 days)
+      animateTextNumber("streak-number", streak);
+      setTxt("streak-message", streak > 0 ? `Keep it going! ${streak} days strong` : "Start your streak today!");
+
+      // Update weekly summary
+      setTxt("week-workouts", workouts);
+      setTxt("week-calories", workouts * 280);
+      setTxt("week-minutes", workouts * 45);
+
+      // Weekly heatmap
       renderHomeWeek(data.heatmap);
     } catch(e) {}
- 
-    // 5. Recovery banner
+
+    // 4. Recovery banner
     try {
       const rec = await apiFetch("/api/recovery/latest").catch(()=>null);
       const bar  = document.getElementById("home-recovery-bar");
       const dot  = document.getElementById("home-recovery-dot");
       const txt  = document.getElementById("home-recovery-text");
- 
+
       if (rec && rec.zone) {
         bar.style.display = "flex";
         dot.className     = "hrb-dot " + rec.zone;
         const zoneLabel   = { green:"Full intensity 🟢", yellow:"Moderate day 🟡", red:"Rest day 🔴" };
         txt.textContent   = "Recovery: " + (zoneLabel[rec.zone] || rec.zone) + " (score " + rec.score + ")";
-        const focusReadiness = document.getElementById("home-focus-readiness");
-        focusReadiness?.style.setProperty("--home-ready", rec.score || 75);
-        focusReadiness?.querySelector("strong") && (focusReadiness.querySelector("strong").textContent = rec.score || 75);
-        setTxt("home-recovery-score-big", rec.score || "--");
-        setTxt("home-footer-recovery", rec.zone || "--");
-        setTxt("home-perf-recovery", rec.zone === "green" ? "Rising" : rec.zone === "yellow" ? "Stable" : "Restore");
-        setTxt("home-muscle-fatigue", rec.zone === "green" ? "Low" : rec.zone === "yellow" ? "Moderate" : "High");
-        setTxt("home-insight-recovery", rec.zone === "green"
-          ? "Your recovery is high today. Push quality work while keeping technique sharp."
-          : rec.zone === "yellow"
-            ? "Recovery is moderate. Train productively, but cap intensity before form breaks."
-            : "Recovery is low. Restoration work will compound better than max effort today.");
-        // Update CTA based on recovery zone
-        const cta = getTodayCTAMessage(currentUser, rec.zone);
-        document.getElementById("home-cta-icon").textContent  = cta.icon;
-        document.getElementById("home-cta-title").textContent = cta.title;
-        document.getElementById("home-cta-sub").textContent   = cta.sub;
       } else {
-        // No recovery logged today — nudge them
         bar.style.display = "flex";
         document.getElementById("home-recovery-dot").className = "hrb-dot yellow";
         document.getElementById("home-recovery-text").textContent = "Log your recovery to get personalised intensity";
       }
-    } catch(e) {
-      // Recovery not available — show default CTA
-      const cta = getTodayCTAMessage(currentUser, null);
-      document.getElementById("home-cta-icon").textContent  = cta.icon;
-      document.getElementById("home-cta-title").textContent = cta.title;
-      document.getElementById("home-cta-sub").textContent   = cta.sub;
-    }
- 
+    } catch(e) {}
+
   } catch(e) {
     console.log("Home load error:", e);
   }
@@ -319,22 +296,7 @@ const SPORT_QUESTIONS = {
 window.onload = async () => {
   initThemeEngine();
   if (authToken) {
-    try {
-      const res = await apiFetch("/api/profile/me");
-      if (res.onboarded) {
-        currentUser = res.profile;
-        showApp();
-        switchTab(window.FC_INITIAL_TAB || 'home');
-        loadRecoveryBanner();
-      } else {
-        showApp();
-        loadChat(); // will trigger onboarding
-      }
-    } catch {
-      authToken = null;
-      localStorage.removeItem("fc_token");
-      showAuth();
-    }
+    await continueAfterAuth(window.FC_INITIAL_TAB || "home");
   } else {
     showAuth();
   }
@@ -396,6 +358,27 @@ function _storeTokens(d) {
   localStorage.setItem("fc_token", authToken);
   if (d.refresh_token) localStorage.setItem("fc_refresh", d.refresh_token);
 }
+async function continueAfterAuth(preferredTab = "home") {
+  try {
+    const profile = await apiFetch("/api/profile/me");
+    currentUser = profile;
+    onboardingGender = profile?.gender || "male";
+    updateCoachHeader(profile?.name, profile?.gender);
+    showApp();
+    if (profile?.onboarding_complete) {
+      switchTab(preferredTab || "home");
+      loadRecoveryBanner();
+    } else {
+      switchTab("chat");
+    }
+  } catch {
+    authToken = null;
+    currentUser = null;
+    localStorage.removeItem("fc_token");
+    localStorage.removeItem("fc_refresh");
+    showAuth();
+  }
+}
 async function sendSignupOTP() {
   const email = document.getElementById("signup-email").value.trim();
   if (!email) return showAuthError("Enter your email first");
@@ -428,7 +411,7 @@ async function doLoginOTP() {
     const d = await res.json();
     if (!res.ok) return showAuthError(d.detail || "Invalid OTP");
     _storeTokens(d);
-    showApp(); loadChat();
+    await continueAfterAuth("home");
   } catch { showAuthError("Connection error"); }
 }
 async function sendResetOTP() {
@@ -447,7 +430,8 @@ async function doResetPassword() {
   const otp     = document.getElementById("forgot-otp").value.trim();
   const newPass = document.getElementById("forgot-newpass").value;
   if (!otp || !newPass) return showAuthError("Fill all fields");
-  if (newPass.length < 6) return showAuthError("Min 6 characters");
+  if (newPass.length < 8)
+    return showAuthError("Password must be at least 8 characters");
   try {
     // Step 1: verify OTP — backend returns a short-lived reset_token
     const vRes  = await fetch(`${API}/api/auth/verify-otp`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,otp,purpose:"reset"})});
@@ -474,7 +458,7 @@ async function doLogin() {
     const d = await res.json();
     if (!res.ok) { _btnLock("login-btn", false); return showAuthError(d.detail||"Login failed"); }
     _storeTokens(d);
-    currentUser = d; showApp(); loadChat();
+    await continueAfterAuth("home");
   } catch (e) { _btnLock("login-btn", false); showAuthError("Connection error"); }
 }
 async function doSignup() {
@@ -491,14 +475,93 @@ async function doSignup() {
     const d = await res.json();
     if (!res.ok) { _btnLock("signup-btn", false); return showAuthError(d.detail||"Signup failed"); }
     _storeTokens(d);
-    showApp(); loadChat();
+    await continueAfterAuth("home");
   } catch (e) { _btnLock("signup-btn", false); showAuthError("Connection error"); }
 }
 function doLogout() {
-  authToken = null; currentUser = null;
+  // Clear in-memory auth variables
+  authToken = null;
+  currentUser = null;
+
+  // Clear all localStorage auth data
   localStorage.removeItem("fc_token");
+  localStorage.removeItem("fc_refresh");
+
+  // Clear sessionStorage (if any)
+  sessionStorage.clear();
+
+  // Clear all auth form fields
+  const formFields = [
+    "login-email",
+    "login-password",
+    "login-otp-code",
+    "signup-email",
+    "signup-password",
+    "signup-otp-code",
+    "forgot-email",
+    "forgot-otp",
+    "forgot-newpass"
+  ];
+  formFields.forEach(fieldId => {
+    const el = document.getElementById(fieldId);
+    if (el) {
+      el.value = "";
+    }
+  });
+
+  // Reset auth forms to default state (show login, hide others)
+  document.getElementById("login-form").classList.remove("hidden");
+  document.getElementById("signup-form").classList.add("hidden");
+  document.getElementById("forgot-form").classList.add("hidden");
+
+  // Reset login method to password
+  document.getElementById("method-password-btn").classList.add("active");
+  document.getElementById("method-otp-btn").classList.remove("active");
+  document.getElementById("login-password-section").classList.remove("hidden");
+  document.getElementById("login-otp-section").classList.add("hidden");
+
+  // Hide OTP sections
+  document.getElementById("signup-otp-section").classList.add("hidden");
+  document.getElementById("forgot-step1").classList.remove("hidden");
+  document.getElementById("forgot-step2").classList.add("hidden");
+
+  // Hide error messages
+  document.getElementById("auth-error").classList.add("hidden");
+
+  // Reset button states
+  _btnLock("login-btn", false);
+  _btnLock("signup-btn", false);
+  _btnLock("signup-send-otp-btn", false);
+
+  // Reset auth tabs
+  document.querySelectorAll(".auth-tab").forEach((t, i) => {
+    t.classList.toggle("active", i === 0);
+  });
+
+  // Reset auth headlines
+  const hl = document.getElementById("auth-headline");
+  const sl = document.getElementById("auth-subline");
+  if (hl && sl) {
+    hl.innerHTML = 'Welcome <span>back</span>';
+    sl.textContent = "Sign in to continue your training";
+  }
+
+  // Clear chat and workout state
   document.getElementById("chat-box").innerHTML = "";
-  workoutActive = false; feedbackMode = false;
+  workoutActive = false;
+  feedbackMode = false;
+
+  // Clear onboarding state variables
+  onboardingField = null;
+  onboardingInputType = null;
+  onboardingGender = "male";
+  sportObField = null;
+  sportObInputType = null;
+  sportObSport = null;
+  recoveryInputs = {};
+  foodPhotoBase64 = null;
+
+  // Show auth screen
   showAuth();
 }
 function showAuthError(msg) {
@@ -677,6 +740,31 @@ function exerciseIcon(exercise) {
 
 function renderCoachResponse(data) {
   const chatBox = document.getElementById("chat-box");
+  
+  // For most responses, just show a simple message like ChatGPT
+  if (!["daily_plan", "workout_start", "workout_next_set", "workout_next_exercise", "workout_all_done", "feedback_received", "workout_logged"].includes(data.type)) {
+    const msg = document.createElement("div");
+    msg.className = "message bot";
+    msg.innerHTML = cleanDisplayText(data.reply)
+      .replace(/\*\*(.*?)\*\*/g,"<strong>$1</strong>")
+      .replace(/_(.*?)_/g,"<em>$1</em>")
+      .replace(/\n/g,"<br>");
+    chatBox.appendChild(msg);
+    msg.scrollIntoView({behavior:"smooth",block:"nearest"});
+    
+    // Add compact coach tip card occasionally
+    if (data.reply && Math.random() > 0.7) {
+      const tip = document.createElement("div");
+      tip.className = "coach-tip-card";
+      tip.innerHTML = `<span class="tip-icon">💡</span><span class="tip-text">Stay consistent — small wins add up!</span>`;
+      chatBox.appendChild(tip);
+      tip.scrollIntoView({behavior:"smooth",block:"nearest"});
+    }
+    
+    return msg;
+  }
+  
+  // For workout-specific responses, use the dashboard
   const panel = document.createElement("section");
   panel.className = `coach-dashboard-response ${data.type || "chat"}`;
   panel.innerHTML = buildCoachDashboardHtml(data);
@@ -949,12 +1037,19 @@ function addCoachOptions(options) {
   chatBox.appendChild(wrap);
   wrap.scrollIntoView({behavior:"smooth",block:"nearest"});
 }
+function scrollToBottom() {
+  const chatBox = document.getElementById("chat-box");
+  if (chatBox) {
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }
+}
 function showTyping() {
   removeTyping();
   const t = document.createElement("div");
-  t.className="message bot typing"; t.id="typing-indicator";
-  t.innerHTML=`<div class="typing-dots"><span></span><span></span><span></span></div>`;
+  t.className="typing-indicator"; t.id="typing-indicator";
+  t.innerHTML=`<div class="typing-dots"><span></span><span></span><span></span></div><span class="typing-text">Coach is typing...</span>`;
   document.getElementById("chat-box").appendChild(t);
+  scrollToBottom();
 }
 function removeTyping() { document.getElementById("typing-indicator")?.remove(); }
 function handleKey(e) { if(e.key==="Enter") sendMessage(); }
@@ -987,18 +1082,61 @@ function sendMessage() {
 async function callServer(message) {
   const inOnboarding = !document.getElementById("onboarding-overlay").classList.contains("hidden");
   if (!inOnboarding) showTyping();
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 20000);
   try {
+    console.log(`[Coach API] Sending request: ${message.substring(0, 50)}...`);
     const res = await fetch(`${API}/api/coach/chat`,{
       method:"POST",
       headers:{"Content-Type":"application/json","Authorization":`Bearer ${authToken}`},
-      body: JSON.stringify({message, mode: workoutMode})
+      body: JSON.stringify({message, mode: workoutMode}),
+      signal: controller.signal
     });
+    
+    console.log(`[Coach API] Response status: ${res.status}`);
+    
     if (res.status===401){doLogout();return;}
+    
     const data = await res.json();
+    console.log(`[Coach API] Response data:`, data);
+    
+    if (!res.ok) {
+      const errorDetail = data?.detail || data?.error || "Coach request failed";
+      console.error(`[Coach API] Error response: ${errorDetail}`);
+      throw new Error(errorDetail);
+    }
+    
+    window.clearTimeout(timeoutId);
     if (!inOnboarding) removeTyping();
     handleResponse(data);
-  } catch {
-    if (!inOnboarding) { removeTyping(); addMessage("⚠️ Connection issue. Is the server running?","bot"); }
+  } catch (err) {
+    console.error(`[Coach API] Request failed:`, err);
+    window.clearTimeout(timeoutId);
+    if (!inOnboarding) { 
+      removeTyping();
+      
+      // Determine specific error type
+      let errorMessage = "⚠️ Connection issue. Is the server running?";
+      
+      if (err.name === "AbortError") {
+        errorMessage = "⏱️ Request timed out. The server took too long to respond.";
+      } else if (err.message) {
+        // Backend returned a specific error
+        if (err.message.includes("Server error")) {
+          errorMessage = `⚠️ Server error: ${err.message.replace("Server error: ", "")}`;
+        } else if (err.message.includes("Profile not found")) {
+          errorMessage = "⚠️ Profile not found. Please complete onboarding first.";
+        } else if (err.message.includes("rate_limit") || err.message.includes("429")) {
+          errorMessage = "⚠️ Rate limit exceeded. Please wait a moment and try again.";
+        } else if (err.message.includes("authentication") || err.message.includes("401")) {
+          errorMessage = "⚠️ Authentication error. Please log in again.";
+        } else {
+          errorMessage = `⚠️ ${err.message}`;
+        }
+      }
+      
+      addMessage(errorMessage, "bot");
+    }
   }
 }
 
@@ -1941,9 +2079,15 @@ async function analyzeCalories() {
   if(!food) return showToast("⚠️ Describe what you ate");
   showCalLoading(true);
   try{
+    console.log(`[Nutrition API] Analyzing text: ${food.substring(0, 50)}...`);
     const data=await apiFetch("/api/nutrition/analyze",{method:"POST",body:JSON.stringify({food})});
+    console.log(`[Nutrition API] Response:`, data);
     showCalResult(_adaptNutritionResult(data));
-  }catch{showToast("❌ Failed. Try again.");}
+  }catch(err){
+    console.error(`[Nutrition API] Error:`, err);
+    const errorMsg = err?.detail || err?.message || "Failed to analyze food. Please try again.";
+    showToast(`❌ ${errorMsg}`);
+  }
   finally{showCalLoading(false);}
 }
 function handleFoodPhoto(ev) {
@@ -1952,13 +2096,563 @@ function handleFoodPhoto(ev) {
   r.onload=(e)=>{foodPhotoBase64=e.target.result;document.getElementById("food-photo-preview").src=foodPhotoBase64;document.getElementById("photo-preview-wrap").classList.remove("hidden");};
   r.readAsDataURL(file);
 }
+// ── AI CONFIRMATION FLOW ────────────────────────────────────────────────
+let pendingYoloResult = null;
+let isHighConfidencePopup = false;
+let isSearchModeActive = false;
+
+const YOLO_CONFIDENCE_SCORES = {
+  "pizza": 41,
+  "idli": 55,
+  "chapathi": 65,
+  "vada": 68,
+  "chicken gravy": 78,
+  "tomato": 72,
+  "rice": 82,
+  "fries": 83,
+  "burger": 85,
+  "banana": 88,
+  "apple": 91,
+  "soda": 95
+};
+
+const VISUALLY_SIMILAR_FOODS = {
+  "pizza": ["Pizza", "Paneer", "Cheese", "Tofu"],
+  "idli": ["Idli", "Omelette", "Vada", "Dhokla"],
+  "chapathi": ["Chapathi", "Roti", "Paratha", "Tortilla"],
+  "vada": ["Vada", "Idli", "Donut", "Falafel"],
+  "chicken gravy": ["Chicken Gravy", "Egg Curry", "Paneer Butter Masala", "Mutton Curry"],
+  "tomato": ["Tomato", "Apple", "Red Pepper", "Peach"],
+  "apple": ["Apple", "Tomato", "Nectarine", "Pear"],
+  "banana": ["banana", "Plantain", "Corn", "Mango"],
+  "burger": ["burger", "Sandwich", "Slider", "Vada Pav"],
+  "rice": ["Rice", "Quinoa", "Couscous", "Poha"],
+  "fries": ["Fries", "Potato Wedges", "Sweet Potato Fries", "Chips"],
+  "soda": ["Soda", "Water", "Juice", "Energy Drink"]
+};
+
+const NUTRITION_SUGGESTIONS = [
+  "Paneer",
+  "Paneer Butter Masala",
+  "Palak Paneer",
+  "Cheese Sandwich",
+  "Egg Curry",
+  "Omelette",
+  "Scrambled Eggs",
+  "Boiled Eggs",
+  "Chicken Salad",
+  "Grilled Chicken Breast",
+  "Chicken Biryani",
+  "Dal Makhani",
+  "Yellow Dal",
+  "Roti",
+  "Chapathi",
+  "Tandoori Roti",
+  "Brown Rice",
+  "White Rice",
+  "Greek Yogurt",
+  "Oatmeal",
+  "Banana",
+  "Apple",
+  "Orange",
+  "Protein Shake",
+  "Almonds",
+  "Peanut Butter Toast",
+  "Avocado Salad",
+  "Mixed Vegetables",
+  "Idli",
+  "Dosa",
+  "Masala Dosa",
+  "Vada",
+  "Samosa",
+  "Burger",
+  "Pizza",
+  "French Fries",
+  "Tomato Soup",
+  "Green Salad",
+  "Fruit Salad",
+  "Tofu Stir Fry",
+  "Salmon Fillet",
+  "Whey Protein",
+  "Cottage Cheese",
+  "Moong Dal",
+  "Kadhai Paneer"
+];
+
+let selectedSuggestionIndex = -1;
+
+function getFoodConfidence(foodName) {
+  if (!foodName) return 85;
+  const foods = foodName.split(",").map(f => f.trim().toLowerCase());
+  let minConf = 100;
+  let found = false;
+  for (const food of foods) {
+    if (YOLO_CONFIDENCE_SCORES.hasOwnProperty(food)) {
+      minConf = Math.min(minConf, YOLO_CONFIDENCE_SCORES[food]);
+      found = true;
+    }
+  }
+  return found ? minConf : 85;
+}
+
+function getPossibleFoods(foodName) {
+  if (!foodName) return ["Pizza", "Paneer", "Cheese", "Tofu"];
+  const key = foodName.trim().toLowerCase().split(",")[0];
+  if (VISUALLY_SIMILAR_FOODS.hasOwnProperty(key)) {
+    return VISUALLY_SIMILAR_FOODS[key];
+  }
+  return [foodName, "Paneer", "Cheese", "Tofu"];
+}
+
+function getConfidenceClass(score) {
+  if (score >= 80) return { text: "conf-green", bg: "bg-green" };
+  if (score >= 60) return { text: "conf-yellow", bg: "bg-yellow" };
+  return { text: "conf-red", bg: "bg-red" };
+}
+
+function ensurePopupHTMLExists() {
+  if (document.getElementById("ai-confirm-backdrop")) {
+    return;
+  }
+  console.log("[Nutrition AI Flow] Popup elements missing from static DOM. Injecting dynamically...");
+  const backdrop = document.createElement("div");
+  backdrop.id = "ai-confirm-backdrop";
+  backdrop.className = "ai-confirm-backdrop";
+  
+  backdrop.innerHTML = `
+  <div class="ai-confirm-modal">
+    <!-- Close button top-right -->
+    <button class="ai-close-modal-btn" onclick="closeAIConfirmPopup()">&times;</button>
+
+    <!-- Header -->
+    <div class="ai-confirm-header">
+      <div class="ai-confirm-icon-glow">
+        <span class="ai-confirm-icon">🤖</span>
+      </div>
+      <div class="ai-confirm-title-group">
+        <h3 class="ai-confirm-title">AI Food Verification</h3>
+        <p id="ai-confirm-subtitle-text" class="ai-confirm-subtitle">Please verify the detected food before nutrition analysis.</p>
+      </div>
+    </div>
+    
+    <!-- Detection Card -->
+    <div class="ai-section-card ai-detection-card">
+      <div class="ai-preview-food-info">
+        <div class="ai-preview-food-item">
+          <span class="ai-preview-label">Detected Food</span>
+          <span id="ai-detected-name" class="ai-preview-value-main">Pizza</span>
+        </div>
+        <div class="ai-preview-confidence-item">
+          <span class="ai-preview-label">Confidence</span>
+          <span id="ai-confidence-value" class="ai-preview-value-conf conf-red">41%</span>
+        </div>
+      </div>
+
+      <!-- Confidence Bar -->
+      <div class="ai-confidence-bar-container">
+        <span id="ai-confidence-indicator" class="ai-conf-dot bg-red"></span>
+      </div>
+
+      <div class="ai-confidence-badge-row">
+        <span id="ai-confidence-badge-text" class="ai-confidence-status-text"><span class="badge-icon">⚠</span> Low confidence detection</span>
+      </div>
+
+      <!-- Low Confidence Warning Card -->
+      <div id="ai-low-confidence-warning" class="ai-warning-card hidden">
+        <span class="warning-icon">⚠</span>
+        <span class="warning-text">Low confidence detection. Please verify before continuing.</span>
+      </div>
+    </div>
+
+    <!-- Suggested Foods Section -->
+    <div class="ai-section-card ai-suggested-foods-card">
+      <p id="ai-confirm-question-text" class="ai-confirm-question">Possible foods:</p>
+      <div id="ai-possible-foods-wrap" class="ai-possible-foods-pills"></div>
+    </div>
+
+    <!-- Search Section -->
+    <div class="ai-section-card ai-search-card">
+      <div id="ai-search-input-section" class="ai-search-container-premium">
+        <div class="search-input-wrapper">
+          <span class="search-icon-inside">🔍</span>
+          <input type="text" id="ai-food-search-input" placeholder="Search another food..." autocomplete="off" oninput="handleAISearchInput(event)" onkeydown="handleAISearchKeydown(event)"/>
+          <button id="ai-clear-search" class="clear-btn hidden" onclick="clearAISearch()">&times;</button>
+        </div>
+        
+        <!-- Autocomplete Dropdown suggestions list -->
+        <div id="ai-suggestions-list" class="ai-suggestions-list-premium hidden"></div>
+      </div>
+    </div>
+      
+    <!-- Popular Suggestions -->
+    <div class="ai-section-card ai-popular-suggestions-card">
+      <span class="examples-label">Popular Suggestions</span>
+      <div class="examples-tags-grid">
+        <button class="example-tag-btn" onclick="selectAIExample('Paneer')">🥛 Paneer</button>
+        <button class="example-tag-btn" onclick="selectAIExample('Paneer Butter Masala')">🥘 Paneer Butter Masala</button>
+        <button class="example-tag-btn" onclick="selectAIExample('Palak Paneer')">🥬 Palak Paneer</button>
+        <button class="example-tag-btn" onclick="selectAIExample('Cheese Sandwich')">🥪 Cheese Sandwich</button>
+        <button class="example-tag-btn" onclick="selectAIExample('Egg Curry')">🥚 Egg Curry</button>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="ai-action-buttons-group">
+      <button id="ai-confirm-btn" class="ai-action-btn-primary" onclick="handleAIPrimaryAction()">
+        <span>✔ Confirm Food</span>
+      </button>
+      <button id="ai-use-prediction-btn" class="ai-action-btn-secondary" onclick="handleAISecondaryAction()">
+        <span>✏ Edit Detection</span>
+      </button>
+      <button class="ai-action-btn-cancel" onclick="closeAIConfirmPopup()">
+        <span>❌ Cancel</span>
+      </button>
+    </div>
+
+    <!-- Information Card -->
+    <div class="ai-confidence-footer-notice">
+      <span class="notice-lightbulb">💡</span>
+      <p class="notice-footer-text">AI can confuse visually similar foods like paneer, cheese and pizza. Confirming the correct food improves nutrition accuracy.</p>
+    </div>
+  </div>
+  `;
+  document.body.appendChild(backdrop);
+}
+
+function openAIConfirmPopup(detectedFood, confidenceScore) {
+  ensurePopupHTMLExists();
+
+  const backdrop = document.getElementById("ai-confirm-backdrop");
+  if (!backdrop) { console.error("Missing element: ai-confirm-backdrop"); return; }
+  
+  const nameEl = document.getElementById("ai-detected-name");
+  if (!nameEl) { console.error("Missing element: ai-detected-name"); return; }
+  
+  const valEl = document.getElementById("ai-confidence-value");
+  if (!valEl) { console.error("Missing element: ai-confidence-value"); return; }
+  
+  const dotEl = document.getElementById("ai-confidence-indicator");
+  if (!dotEl) { console.error("Missing element: ai-confidence-indicator"); return; }
+  
+  const inputEl = document.getElementById("ai-food-search-input");
+  if (!inputEl) { console.error("Missing element: ai-food-search-input"); return; }
+  
+  const clearEl = document.getElementById("ai-clear-search");
+  if (!clearEl) { console.error("Missing element: ai-clear-search"); return; }
+  
+  const suggestionsEl = document.getElementById("ai-suggestions-list");
+  if (!suggestionsEl) { console.error("Missing element: ai-suggestions-list"); return; }
+  
+  const subtitleEl = document.getElementById("ai-confirm-subtitle-text");
+  if (!subtitleEl) { console.error("Missing element: ai-confirm-subtitle-text"); return; }
+  
+  const questionEl = document.getElementById("ai-confirm-question-text");
+  if (!questionEl) { console.error("Missing element: ai-confirm-question-text"); return; }
+  
+  const possibleFoodsWrap = document.getElementById("ai-possible-foods-wrap");
+  if (!possibleFoodsWrap) { console.error("Missing element: ai-possible-foods-wrap"); return; }
+  
+  const searchWrapEl = document.getElementById("ai-search-input-section");
+  if (!searchWrapEl) { console.error("Missing element: ai-search-input-section"); return; }
+  
+  const primaryBtn = document.getElementById("ai-confirm-btn");
+  if (!primaryBtn) { console.error("Missing element: ai-confirm-btn"); return; }
+  
+  const secondaryBtn = document.getElementById("ai-use-prediction-btn");
+  if (!secondaryBtn) { console.error("Missing element: ai-use-prediction-btn"); return; }
+
+  nameEl.textContent = detectedFood;
+  valEl.textContent = confidenceScore + "%";
+  
+  valEl.className = "ai-info-value";
+  dotEl.className = "ai-conf-dot";
+  const cls = getConfidenceClass(confidenceScore);
+  valEl.classList.add(cls.text);
+  dotEl.classList.add(cls.bg);
+  
+  inputEl.value = "";
+  clearEl.classList.add("hidden");
+  suggestionsEl.classList.add("hidden");
+
+  if (confidenceScore >= 70) {
+    isHighConfidencePopup = true;
+    isSearchModeActive = false;
+    
+    subtitleEl.textContent = "We detected:";
+    questionEl.textContent = "Is this correct?";
+    possibleFoodsWrap.classList.add("hidden");
+    possibleFoodsWrap.innerHTML = "";
+    searchWrapEl.classList.add("hidden");
+    
+    primaryBtn.querySelector("span").textContent = "✓ Yes";
+    secondaryBtn.querySelector("span").textContent = "✎ Choose another food";
+  } else {
+    isHighConfidencePopup = false;
+    isSearchModeActive = true;
+    
+    subtitleEl.textContent = `We are only ${confidenceScore}% confident.`;
+    questionEl.textContent = "Possible foods:";
+    
+    const possible = getPossibleFoods(detectedFood);
+    possibleFoodsWrap.innerHTML = possible.map(food => `
+      <button class="example-pill possible-food-pill" onclick="selectAIExample('${food.replace(/'/g, "\\'")}')">${escapeHtml(food)}</button>
+    `).join("");
+    possibleFoodsWrap.classList.remove("hidden");
+    
+    searchWrapEl.classList.remove("hidden");
+    
+    primaryBtn.querySelector("span").textContent = "Analyze Correct Food";
+    secondaryBtn.querySelector("span").textContent = "Use AI Prediction Anyway";
+  }
+
+  backdrop.classList.add("active");
+  if (!searchWrapEl.classList.contains("hidden")) {
+    setTimeout(() => {
+      inputEl.focus();
+    }, 100);
+  }
+}
+
+function enablePopupSearchMode() {
+  isSearchModeActive = true;
+  
+  const searchWrapEl = document.getElementById("ai-search-input-section");
+  if (searchWrapEl) searchWrapEl.classList.remove("hidden");
+  
+  const questionEl = document.getElementById("ai-confirm-question-text");
+  if (questionEl) questionEl.textContent = "Please choose or search.";
+  
+  const nameEl = document.getElementById("ai-detected-name");
+  const detectedFood = nameEl ? nameEl.textContent : "Pizza";
+  
+  const possibleFoodsWrap = document.getElementById("ai-possible-foods-wrap");
+  if (possibleFoodsWrap) {
+    const possible = getPossibleFoods(detectedFood);
+    possibleFoodsWrap.innerHTML = possible.map(food => `
+      <button class="example-pill possible-food-pill" onclick="selectAIExample('${food.replace(/'/g, "\\'")}')">${escapeHtml(food)}</button>
+    `).join("");
+    possibleFoodsWrap.classList.remove("hidden");
+  }
+  
+  const primaryBtn = document.getElementById("ai-confirm-btn");
+  if (primaryBtn) {
+    primaryBtn.querySelector("span").textContent = "Analyze Correct Food";
+  }
+  
+  const secondaryBtn = document.getElementById("ai-use-prediction-btn");
+  if (secondaryBtn) {
+    secondaryBtn.querySelector("span").textContent = "Use AI Prediction Anyway";
+  }
+  
+  const inputEl = document.getElementById("ai-food-search-input");
+  if (inputEl) {
+    inputEl.focus();
+  }
+}
+
+function handleAIPrimaryAction() {
+  if (isHighConfidencePopup && !isSearchModeActive) {
+    useAIPredictionAnyway();
+  } else {
+    analyzeCorrectFood();
+  }
+}
+
+function handleAISecondaryAction() {
+  if (isHighConfidencePopup && !isSearchModeActive) {
+    enablePopupSearchMode();
+  } else {
+    useAIPredictionAnyway();
+  }
+}
+
+function closeAIConfirmPopup() {
+  const backdrop = document.getElementById("ai-confirm-backdrop");
+  if (backdrop) backdrop.classList.remove("active");
+}
+
+function handleAISearchInput(event) {
+  const query = event.target.value.trim().toLowerCase();
+  const clearBtn = document.getElementById("ai-clear-search");
+  const suggestionsList = document.getElementById("ai-suggestions-list");
+  
+  if (clearBtn) {
+    if (query.length > 0) {
+      clearBtn.classList.remove("hidden");
+    } else {
+      clearBtn.classList.add("hidden");
+    }
+  }
+  
+  if (!suggestionsList) return;
+  
+  if (query.length < 1) {
+    suggestionsList.classList.add("hidden");
+    suggestionsList.innerHTML = "";
+    selectedSuggestionIndex = -1;
+    return;
+  }
+  
+  const matches = NUTRITION_SUGGESTIONS.filter(item => 
+    item.toLowerCase().includes(query)
+  ).slice(0, 5);
+  
+  if (matches.length > 0) {
+    suggestionsList.innerHTML = matches.map((item, idx) => `
+      <button class="ai-suggestion-item" onclick="selectAISuggestion('${item.replace(/'/g, "\\'")}')" data-index="${idx}">
+        ${escapeHtml(item)}
+      </button>
+    `).join("");
+    suggestionsList.classList.remove("hidden");
+    selectedSuggestionIndex = -1;
+  } else {
+    suggestionsList.classList.add("hidden");
+    suggestionsList.innerHTML = "";
+    selectedSuggestionIndex = -1;
+  }
+}
+
+function handleAISearchKeydown(event) {
+  const suggestionsList = document.getElementById("ai-suggestions-list");
+  if (!suggestionsList || suggestionsList.classList.contains("hidden")) return;
+  
+  const items = suggestionsList.querySelectorAll(".ai-suggestion-item");
+  if (items.length === 0) return;
+  
+  if (event.key === "ArrowDown") {
+    event.preventDefault();
+    selectedSuggestionIndex = (selectedSuggestionIndex + 1) % items.length;
+    updateSuggestionSelection(items);
+  } else if (event.key === "ArrowUp") {
+    event.preventDefault();
+    selectedSuggestionIndex = (selectedSuggestionIndex - 1 + items.length) % items.length;
+    updateSuggestionSelection(items);
+  } else if (event.key === "Enter") {
+    event.preventDefault();
+    if (selectedSuggestionIndex >= 0 && selectedSuggestionIndex < items.length) {
+      items[selectedSuggestionIndex].click();
+    } else {
+      analyzeCorrectFood();
+    }
+  } else if (event.key === "Escape") {
+    suggestionsList.classList.add("hidden");
+  }
+}
+
+function updateSuggestionSelection(items) {
+  items.forEach((item, idx) => {
+    if (idx === selectedSuggestionIndex) {
+      item.classList.add("selected");
+      item.scrollIntoView({ block: "nearest" });
+    } else {
+      item.classList.remove("selected");
+    }
+  });
+}
+
+function selectAISuggestion(food) {
+  const input = document.getElementById("ai-food-search-input");
+  if (input) {
+    input.value = food;
+    input.focus();
+  }
+  const clearEl = document.getElementById("ai-clear-search");
+  if (clearEl) clearEl.classList.remove("hidden");
+  const suggestionsList = document.getElementById("ai-suggestions-list");
+  if (suggestionsList) suggestionsList.classList.add("hidden");
+  selectedSuggestionIndex = -1;
+}
+
+function selectAIExample(food) {
+  const input = document.getElementById("ai-food-search-input");
+  if (input) {
+    input.value = food;
+    input.focus();
+  }
+  const clearEl = document.getElementById("ai-clear-search");
+  if (clearEl) clearEl.classList.remove("hidden");
+  const suggestionsList = document.getElementById("ai-suggestions-list");
+  if (suggestionsList) suggestionsList.classList.add("hidden");
+  selectedSuggestionIndex = -1;
+}
+
+function clearAISearch() {
+  const input = document.getElementById("ai-food-search-input");
+  if (input) {
+    input.value = "";
+    input.focus();
+  }
+  const clearEl = document.getElementById("ai-clear-search");
+  if (clearEl) clearEl.classList.add("hidden");
+  const suggestionsList = document.getElementById("ai-suggestions-list");
+  if (suggestionsList) suggestionsList.classList.add("hidden");
+  selectedSuggestionIndex = -1;
+}
+
+document.addEventListener("click", (e) => {
+  const suggestionsList = document.getElementById("ai-suggestions-list");
+  const searchInput = document.getElementById("ai-food-search-input");
+  if (suggestionsList && !suggestionsList.contains(e.target) && e.target !== searchInput) {
+    suggestionsList.classList.add("hidden");
+  }
+});
+
+async function analyzeCorrectFood() {
+  const inputEl = document.getElementById("ai-food-search-input");
+  const correctedFood = inputEl ? inputEl.value.trim() : "";
+  if (!correctedFood) {
+    return showToast("⚠️ Please type or select a food description first");
+  }
+  
+  closeAIConfirmPopup();
+  showCalLoading(true);
+  
+  try {
+    console.log(`[Nutrition AI Confirmation] Analyzing correct food: ${correctedFood}`);
+    const data = await apiFetch("/api/nutrition/analyze", {
+      method: "POST",
+      body: JSON.stringify({ food: correctedFood })
+    });
+    console.log(`[Nutrition AI Confirmation] Response:`, data);
+    showCalResult(_adaptNutritionResult(data));
+  } catch (err) {
+    console.error(`[Nutrition AI Confirmation] Error:`, err);
+    const errorMsg = err?.detail || err?.message || "Failed to analyze food description. Please try again.";
+    showToast(`❌ ${errorMsg}`);
+  } finally {
+    showCalLoading(false);
+  }
+}
+
+function useAIPredictionAnyway() {
+  if (!pendingYoloResult) return;
+  closeAIConfirmPopup();
+  showCalResult(_adaptNutritionResult(pendingYoloResult));
+  pendingYoloResult = null;
+}
+
 async function analyzePhotoCalories() {
   if(!foodPhotoBase64)return showToast("⚠️ Upload a photo first");
   showCalLoading(true);
   try{
-    const data=await apiFetch("/api/nutrition/analyze",{method:"POST",body:JSON.stringify({food:"uploaded food image",image_base64:foodPhotoBase64.split(",").pop()})});
-    showCalResult(_adaptNutritionResult(data));
-  }catch{showToast("❌ Failed.");}
+    const imageBase64 = foodPhotoBase64.split(",").pop();
+    console.log(`[Nutrition API] Analyzing photo...`);
+    console.log(`[Nutrition API] Image base64 length: ${imageBase64.length} chars`);
+    console.log(`[Nutrition API] Sending request to /api/nutrition/analyze`);
+    const data=await apiFetch("/api/nutrition/analyze",{method:"POST",body:JSON.stringify({image_base64:imageBase64})});
+    console.log(`[Nutrition API] Response:`, data);
+    
+    const detectedFood = data.meal_name || "";
+    const score = getFoodConfidence(detectedFood);
+    console.log(`[Nutrition AI Confirmation] Detected food: "${detectedFood}", confidence: ${score}%`);
+    
+    pendingYoloResult = data;
+    openAIConfirmPopup(detectedFood, score);
+  }catch(err){
+    console.error(`[Nutrition API] Error:`, err);
+    const errorMsg = err?.detail || err?.message || "Failed to analyze food image. Please try with a clearer image.";
+    showToast(`❌ ${errorMsg}`);
+  }
   finally{showCalLoading(false);}
 }
 function showCalLoading(show){
@@ -1995,13 +2689,101 @@ function nutrientBar(label,value,target,unit){
     </div>`;
 }
 function _adaptNutritionResult(raw){
-  // Backend returns a flat {calories, protein_g, carbs_g, fats_g, fibre_g, fitness_rating, advice, best_timing}
+  // Backend returns: meal_name, foods, total_calories, total_protein, total_carbs, total_fat, health_score, tips
   // — adapt it into the richer shape showCalResult renders.
   if (!raw || typeof raw !== "object") return raw;
+  
+  const foods = raw.foods || [];
+  const healthScore = raw.health_score || 0;
+  
+  const items = foods.map(food => ({
+    name: food.name,
+    portion: food.quantity || "Estimated",
+    calories: food.calories || 0
+  }));
+  
+  const detectedFoodName = raw.meal_name || (foods.length > 0 
+    ? foods.map(f => f.name).join(", ")
+    : "Detected Meal");
+
+  const totalFiber = foods.reduce(
+    (sum, food) => sum + Number(food.fiber || 0),
+    0
+  );
+
+  const totalSugar = foods.reduce(
+    (sum, food) => sum + Number(food.sugar || 0),
+    0
+  );
+
+  const mealQuality = healthScore >= 85
+    ? "Excellent"
+    : healthScore >= 70
+    ? "Good"
+    : "Average";
+
   return {
-    macros: { calories: raw.calories, protein: raw.protein_g, carbs: raw.carbs_g, fats: raw.fats_g, fiber: raw.fibre_g },
-    meal_quality: raw.fitness_rating,
-    recommendation: { advice: raw.advice, best_timing: raw.best_timing },
+    macros: {
+      calories: raw.total_calories || 0,
+      protein: raw.total_protein || 0,
+      carbs: raw.total_carbs || 0,
+      fats: raw.total_fat || 0,
+      fiber: totalFiber,
+      sugar: totalSugar
+    },
+
+    meal_quality: mealQuality,
+
+    recommendation: {
+      advice: raw.tips ? raw.tips.join(". ") : "",
+      best_timing: "Works well as a main meal or post-workout refuel.",
+      summary: `Health Score: ${healthScore}/100`,
+      timing: "Works well as a main meal or post-workout refuel."
+    },
+
+    detected_food: detectedFoodName,
+    confidence: healthScore,
+
+    items: items,
+
+    health_score: healthScore,
+    health_summary: `Health Score: ${healthScore}/100`,
+
+    category: foods.length > 1 ? "Multi-food meal" : "Single food",
+
+    portion_size:
+      foods.length > 0
+        ? `${foods.length} item(s)`
+        : "Estimated portion",
+
+    calorie_density:
+      raw.total_calories > 500
+        ? "High"
+        : raw.total_calories > 300
+        ? "Medium"
+        : "Low",
+
+    classification: {
+      fat_loss_friendly:
+        raw.total_protein > 20 &&
+        raw.total_calories < 400,
+
+      muscle_gain_friendly:
+        raw.total_protein > 25,
+
+      lean_physique_friendly:
+        raw.total_protein > 20 &&
+        raw.total_fat < 15,
+
+      recovery_food:
+        raw.total_protein > 15,
+
+      endurance_friendly:
+        raw.total_carbs > 40,
+
+      high_protein:
+        raw.total_protein > 25
+    }
   };
 }
 function showCalResult(result){
@@ -2020,11 +2802,19 @@ function showCalResult(result){
   const c=result.classification || {};
   const rec=result.recommendation || {};
   const score=Number(result.health_score || result.ai_food_score || 70);
-  const items=(result.items || []).slice(0,4).map(item=>`
+  const items=(result.items || []).slice(0,6).map(item=>`
     <div class="detected-item">
       <span>${escapeHtml(item.name || "Food item")}</span>
-      <small>${escapeHtml(item.portion || "Estimated")} - ${escapeHtml(String(item.calories || 0))} kcal</small>
+      <small>${escapeHtml(item.portion || "Estimated")} — ${escapeHtml(String(item.calories || 0))} kcal</small>
     </div>`).join("");
+  
+  const detectedFoodsSection = items ? `
+    <section class="nutrition-widget">
+      <div class="widget-title">Detected Foods</div>
+      <div class="detected-foods-list">${items}</div>
+    </section>
+  ` : "";
+  
   document.getElementById("cal-result-body").innerHTML=`
     <div class="nutrition-os">
       <section class="food-preview-card">
@@ -2056,6 +2846,8 @@ function showCalResult(result){
         ${macroRing("Carbs",m.carbs || 0,t.carbs || 60,"g","carbs")}
         ${macroRing("Fats",m.fats || 0,t.fats || 22,"g","fats")}
       </section>
+
+      ${detectedFoodsSection}
 
       <section class="nutrition-panel-grid">
         <div class="nutrition-widget">
@@ -2245,12 +3037,26 @@ async function saveProfile() {
 }
 
 // ── UI HELPERS ────────────────────────────────────────────────────────
-function updateStreak(s){document.getElementById("streak-badge").textContent=`🔥 ${s}`;}
-function updateCoachHeaader(name,gender){
+function updateStreak(s){
+  document.getElementById("streak-badge").textContent = s;
+  document.getElementById("chip-streak").querySelector(".chip-value").textContent = s;
+}
+function updateCoachHeader(name,gender){
   if(name) document.getElementById("coach-name").textContent=`Coach for ${name}`;
   if(gender?.toLowerCase()==="female") document.getElementById("coach-avatar").textContent="💃";
 }
-const updateCoachHeader = updateCoachHeaader;
+function updateWorkoutStatus(status){
+  const chip = document.getElementById("coach-workout-status");
+  if(chip) chip.textContent = status;
+}
+function updateReadiness(value){
+  const el = document.getElementById("coach-readiness-value");
+  if(el) el.textContent = value;
+}
+function updateRecoveryStatus(status){
+  const chip = document.getElementById("coach-recovery-chip");
+  if(chip) chip.textContent = `Recovery: ${status}`;
+}
 function showToast(msg){
   const t=document.getElementById("toast");
   t.textContent=msg; t.classList.remove("hidden");

@@ -86,7 +86,7 @@
       <div id="login-password-section">
         <div class="input-group">
           <span class="input-icon">🔒</span>
-          <input type="password" id="login-password" placeholder="Password" autocomplete="current-password"/>
+          <input type="password" id="login-password" placeholder="Password" autocomplete="off"/>
         </div>
         <div class="forgot-link" onclick="showForgotPassword()">Forgot password?</div>
         <button id="login-btn" class="btn-primary" onclick="doLogin()"><span>Sign In</span><span class="btn-arrow">→</span></button>
@@ -111,7 +111,7 @@
       </div>
       <div class="input-group">
         <span class="input-icon">🔒</span>
-        <input type="password" id="signup-password" placeholder="Password (min 6 chars)" autocomplete="new-password"/>
+        <input type="password" id="signup-password" placeholder="Password (min 6 chars)" autocomplete="off"/>
       </div>
       <button class="btn-primary btn-outline" id="signup-send-otp-btn" onclick="sendSignupOTP()"><span>Verify Email with OTP</span></button>
       <div id="signup-otp-section" class="hidden">
@@ -140,7 +140,7 @@
         </div>
         <div class="input-group" style="margin-top:10px">
           <span class="input-icon">🔒</span>
-          <input type="password" id="forgot-newpass" placeholder="New password"/>
+          <input type="password" id="forgot-newpass" placeholder="New password" autocomplete="off"/>
         </div>
         <button class="btn-primary" style="margin-top:10px" onclick="doResetPassword()"><span>Reset Password</span><span class="btn-arrow">→</span></button>
       </div>
@@ -218,14 +218,22 @@
   <div id="tab-home" class="tab-content active">
     <div class="home-shell">
 
-      <!-- TOP: Greeting + Streak -->
-      <div class="home-hero">
-        <div class="home-hero-left">
-          <div class="home-greeting" id="home-greeting">Good afternoon</div>
-          <div class="home-name" id="home-name">Athlete</div>
-          <div class="home-subtitle" id="home-subtitle">Let's crush today's session</div>
+      <!-- PREMIUM HERO SECTION -->
+      <div class="home-hero-section">
+        <div class="hero-background" style="background-image: url('/static/exercise-with-weights-royalty-free-image-587204700-1547584208.avif')"></div>
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+          <div class="hero-glass">
+            <div class="hero-greeting" id="home-greeting">Good afternoon</div>
+            <div class="hero-title">Transform Your Body.</div>
+            <div class="hero-subtitle">Train smarter with your personal AI fitness coach.</div>
+            <div class="hero-ctas">
+              <button class="hero-cta primary" onclick="switchTab('chat')">Start Workout</button>
+              <button class="hero-cta secondary" onclick="switchTab('chat')">Talk to AI Coach</button>
+            </div>
+          </div>
         </div>
-        <div class="home-streak-pill" id="home-streak-pill">
+        <div class="hero-streak-badge" id="home-streak-pill">
           <span class="streak-fire">🔥</span>
           <span id="home-streak-count">0</span>
           <span class="streak-label">day streak</span>
@@ -239,92 +247,248 @@
         <button class="hrb-action" onclick="switchTab('recovery')">Log today →</button>
       </div>
 
-      <!-- 2-COLUMN MAIN GRID -->
+      <!-- METRICS ROW -->
+      <div class="home-metrics-row">
+        <div class="metric-card metric-calories">
+          <div class="metric-icon">🔥</div>
+          <div class="metric-value" id="metric-calories">0</div>
+          <div class="metric-label">Calories Today</div>
+        </div>
+        <div class="metric-card metric-time">
+          <div class="metric-icon">⏱</div>
+          <div class="metric-value" id="metric-time">0m</div>
+          <div class="metric-label">Training Time</div>
+        </div>
+        <div class="metric-card metric-steps">
+          <div class="metric-icon">�</div>
+          <div class="metric-value" id="metric-steps">0</div>
+          <div class="metric-label">Steps</div>
+        </div>
+        <div class="metric-card metric-active">
+          <div class="metric-icon">⚡</div>
+          <div class="metric-value" id="metric-active">0m</div>
+          <div class="metric-label">Active Minutes</div>
+        </div>
+      </div>
+
+      <!-- MAIN GRID -->
       <div class="home-main-grid">
 
-        <!-- LEFT: CTA + Stats + Quick Access -->
+        <!-- LEFT COLUMN -->
         <div class="home-left">
 
-          <!-- CTA workout card -->
-          <div class="home-cta-card" id="home-cta-card" onclick="switchTab('chat')">
-            <div class="cta-icon" id="home-cta-icon">💪</div>
-            <div class="cta-body">
-              <div class="cta-title" id="home-cta-title">Start Today's Workout</div>
-              <div class="cta-sub" id="home-cta-sub">Tap to begin your guided session</div>
+          <!-- TODAY'S GOAL CARD -->
+          <div class="premium-card goal-card">
+            <div class="card-header">
+              <span class="card-label">Today's Goal</span>
+              <span class="card-icon">🎯</span>
             </div>
-            <div class="cta-arrow">→</div>
-          </div>
-
-          <!-- Stats row -->
-          <div class="home-stats-row">
-            <div class="hstat-card">
-              <div class="hstat-val" id="hs-workouts">—</div>
-              <div class="hstat-label">workouts</div>
-            </div>
-            <div class="hstat-card">
-              <div class="hstat-val" id="hs-streak">—</div>
-              <div class="hstat-label">day streak</div>
-            </div>
-            <div class="hstat-card">
-              <div class="hstat-val" id="hs-badges">—</div>
-              <div class="hstat-label">badges</div>
-            </div>
-            <div class="hstat-card">
-              <div class="hstat-val" id="hs-weight">—</div>
-              <div class="hstat-label">kg logged</div>
+            <div class="goal-content">
+              <div class="goal-title" id="today-goal">Complete upper body workout</div>
+              <div class="goal-progress">
+                <div class="progress-bar">
+                  <div class="progress-fill" id="goal-progress" style="width: 0%"></div>
+                </div>
+                <span class="progress-text" id="goal-text">0% complete</span>
+              </div>
             </div>
           </div>
 
-          <!-- Quick access -->
-          <div class="home-section-label">Quick Access</div>
-          <div class="home-quick-grid">
-            <div class="hgrid-card" onclick="switchTab('chat')">
-              <div class="hgrid-icon">🤖</div>
-              <div class="hgrid-title">AI Coach</div>
-              <div class="hgrid-sub">Chat & workout</div>
+          <!-- FEATURED WORKOUTS -->
+          <div class="premium-section">
+            <div class="section-header">
+              <span class="section-title">Featured Workouts</span>
+              <button class="section-btn" onclick="switchTab('chat')">See All →</button>
             </div>
-            <div class="hgrid-card" onclick="switchTab('recovery')">
-              <div class="hgrid-icon">🛌</div>
-              <div class="hgrid-title">Recovery</div>
-              <div class="hgrid-sub">Log your readiness</div>
+            <div class="workout-carousel">
+              <div class="workout-card" onclick="quickSend('Start strength workout')">
+                <div class="workout-image" style="background-image: url('https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?w=400&q=80')"></div>
+                <div class="workout-overlay">
+                  <div class="workout-tag">Strength</div>
+                  <div class="workout-name">Full Body Power</div>
+                  <div class="workout-meta">45 min • Intermediate</div>
+                </div>
+              </div>
+              <div class="workout-card" onclick="quickSend('Start HIIT workout')">
+                <div class="workout-image" style="background-image: url('https://images.unsplash.com/photo-1601422407692-ec4eeec1d9b3?w=400&q=80')"></div>
+                <div class="workout-overlay">
+                  <div class="workout-tag">HIIT</div>
+                  <div class="workout-name">Fat Burn Express</div>
+                  <div class="workout-meta">20 min • Advanced</div>
+                </div>
+              </div>
+              <div class="workout-card" onclick="quickSend('Start yoga session')">
+                <div class="workout-image" style="background-image: url('https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&q=80')"></div>
+                <div class="workout-overlay">
+                  <div class="workout-tag">Recovery</div>
+                  <div class="workout-name">Morning Flow</div>
+                  <div class="workout-meta">30 min • Beginner</div>
+                </div>
+              </div>
             </div>
-            <div class="hgrid-card" onclick="switchTab('trainer')">
-              <div class="hgrid-icon">◎</div>
-              <div class="hgrid-title">Ghost Trainer</div>
-              <div class="hgrid-sub">Live form coach</div>
+          </div>
+
+          <!-- TODAY'S RECOMMENDATION -->
+          <div class="premium-card recommendation-card">
+            <div class="card-header">
+              <span class="card-label">Today's Recommendation</span>
+              <span class="card-icon">�</span>
             </div>
-            <div class="hgrid-card" onclick="switchTab('calories')">
-              <div class="hgrid-icon">🥗</div>
-              <div class="hgrid-title">Nutrition</div>
-              <div class="hgrid-sub">Track calories</div>
+            <div class="rec-content">
+              <div class="rec-title" id="today-rec">Focus on compound movements</div>
+              <div class="rec-text" id="today-rec-text">Prioritize squats, deadlifts, and bench press for maximum muscle activation today.</div>
+              <button class="rec-btn" onclick="switchTab('chat')">Start Now →</button>
             </div>
-            <div class="hgrid-card" onclick="switchTab('progress')">
-              <div class="hgrid-icon">📊</div>
-              <div class="hgrid-title">Progress</div>
-              <div class="hgrid-sub">Charts & badges</div>
+          </div>
+
+          <!-- TIPS ROW -->
+          <div class="tips-row">
+            <div class="premium-card tip-card workout-tip">
+              <div class="tip-icon">💪</div>
+              <div class="tip-label">Workout Tip</div>
+              <div class="tip-text" id="workout-tip-text">Rest 60-90 seconds between sets for optimal hypertrophy.</div>
+            </div>
+            <div class="premium-card tip-card nutrition-tip">
+              <div class="tip-icon">🥗</div>
+              <div class="tip-label">Nutrition Tip</div>
+              <div class="tip-text" id="nutrition-tip-text">Eat protein within 30 minutes post-workout for recovery.</div>
+            </div>
+            <div class="premium-card tip-card recovery-tip">
+              <div class="tip-icon">🛌</div>
+              <div class="tip-label">Recovery Tip</div>
+              <div class="tip-text" id="recovery-tip-text">Aim for 7-9 hours of sleep for optimal muscle repair.</div>
+            </div>
+          </div>
+
+          <!-- HYDRATION REMINDER -->
+          <div class="premium-card hydration-card">
+            <div class="hydration-icon">�</div>
+            <div class="hydration-content">
+              <div class="hydration-title">Stay Hydrated</div>
+              <div class="hydration-text">Drink 500ml water now • Goal: 2.5L today</div>
+              <div class="hydration-progress">
+                <div class="water-fill" id="water-fill" style="width: 30%"></div>
+              </div>
             </div>
           </div>
 
         </div>
 
-        <!-- RIGHT: Week + Quote + Tip -->
+        <!-- RIGHT COLUMN -->
         <div class="home-right">
 
-          <div class="home-section-label">This Week</div>
-          <div class="home-week-row" id="home-week-row">
-            <!-- filled by JS -->
+          <!-- WEEKLY PROGRESS -->
+          <div class="premium-card weekly-card">
+            <div class="card-header">
+              <span class="card-label">This Week</span>
+              <span class="card-icon">📊</span>
+            </div>
+            <div class="week-grid" id="home-week-row">
+              <!-- filled by JS -->
+            </div>
+            <div class="week-summary">
+              <div class="week-stat">
+                <span class="week-val" id="week-workouts">0</span>
+                <span class="week-lbl">Workouts</span>
+              </div>
+              <div class="week-stat">
+                <span class="week-val" id="week-calories">0</span>
+                <span class="week-lbl">Calories</span>
+              </div>
+              <div class="week-stat">
+                <span class="week-val" id="week-minutes">0</span>
+                <span class="week-lbl">Minutes</span>
+              </div>
+            </div>
           </div>
 
-          <div class="home-section-label">Daily Quote</div>
-          <div class="home-quote-card" id="home-quote-card">
-            <div class="quote-mark">"</div>
+          <!-- STREAK VISUALIZATION -->
+          <div class="premium-card streak-card">
+            <div class="card-header">
+              <span class="card-label">Your Streak</span>
+              <span class="card-icon">🔥</span>
+            </div>
+            <div class="streak-visual">
+              <div class="streak-circle">
+                <div class="streak-number" id="streak-number">0</div>
+                <div class="streak-label">Days</div>
+              </div>
+              <div class="streak-message" id="streak-message">Start your streak today!</div>
+            </div>
+          </div>
+
+          <!-- DAILY QUOTE -->
+          <div class="premium-card quote-card">
+            <div class="quote-icon">"</div>
             <div class="quote-text" id="home-quote-text">The body achieves what the mind believes.</div>
             <div class="quote-author" id="home-quote-author">— Anonymous</div>
           </div>
 
-          <div class="home-tip-card" id="home-tip-card">
-            <div class="tip-label">💡 Coach tip</div>
-            <div class="tip-text" id="home-tip-text">Log your recovery every morning for smarter, injury-aware workouts.</div>
+          <!-- ACHIEVEMENTS -->
+          <div class="premium-card achievements-card">
+            <div class="card-header">
+              <span class="card-label">Recent Badges</span>
+              <span class="card-icon">🏆</span>
+            </div>
+            <div class="badges-grid" id="badges-grid">
+              <div class="badge-placeholder">
+                <span class="badge-icon">🥇</span>
+                <span class="badge-name">First Workout</span>
+              </div>
+              <div class="badge-placeholder">
+                <span class="badge-icon">🔥</span>
+                <span class="badge-name">3-Day Streak</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- TRENDING EXERCISES -->
+          <div class="premium-card trending-card">
+            <div class="card-header">
+              <span class="card-label">Trending</span>
+              <span class="card-icon">📈</span>
+            </div>
+            <div class="trending-list">
+              <div class="trending-item">
+                <span class="trending-rank">1</span>
+                <span class="trending-name">Deadlift</span>
+                <span class="trending-change">↑ 12%</span>
+              </div>
+              <div class="trending-item">
+                <span class="trending-rank">2</span>
+                <span class="trending-name">Pull-ups</span>
+                <span class="trending-change">↑ 8%</span>
+              </div>
+              <div class="trending-item">
+                <span class="trending-rank">3</span>
+                <span class="trending-name">Squats</span>
+                <span class="trending-change">↑ 5%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- RECENT ACTIVITY -->
+          <div class="premium-card activity-card">
+            <div class="card-header">
+              <span class="card-label">Recent Activity</span>
+              <span class="card-icon">🕐</span>
+            </div>
+            <div class="activity-timeline" id="activity-timeline">
+              <div class="activity-item">
+                <div class="activity-dot"></div>
+                <div class="activity-content">
+                  <span class="activity-title">Upper Body Workout</span>
+                  <span class="activity-time">2 hours ago</span>
+                </div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-dot"></div>
+                <div class="activity-content">
+                  <span class="activity-title">Logged Recovery</span>
+                  <span class="activity-time">Yesterday</span>
+                </div>
+              </div>
+            </div>
           </div>
 
         </div>
@@ -409,16 +573,32 @@
   <div id="tab-chat" class="tab-content">
     <div class="chat-shell">
 
-      <!-- Header with mode switcher -->
+      <!-- Minimal header with compact chips -->
       <div class="chat-header">
         <div class="coach-avatar" id="coach-avatar">⚡</div>
         <div class="coach-info">
           <div class="coach-name" id="coach-name">FitCoach AI</div>
-          <div class="coach-status"><span class="status-dot"></span> <span id="coach-mode-label">Gym Mode</span></div>
+        </div>
+        <div class="header-chips">
+          <div class="chip chip-readiness" id="chip-readiness">
+            <span class="chip-icon">📊</span>
+            <span class="chip-label">Readiness</span>
+            <span class="chip-value" id="coach-readiness-value">82</span>
+          </div>
+          <div class="chip chip-workout" id="chip-workout">
+            <span class="chip-icon">�</span>
+            <span class="chip-label" id="coach-workout-status">Not started</span>
+          </div>
+          <div class="chip chip-recovery" id="chip-recovery">
+            <span class="chip-icon">🛌</span>
+            <span class="chip-label" id="coach-recovery-chip">Recovery: —</span>
+          </div>
+          <div class="chip chip-streak" id="chip-streak">
+            <span class="chip-icon">🔥</span>
+            <span class="chip-value" id="streak-badge">0</span>
+          </div>
         </div>
         <div class="header-actions">
-          <div class="streak-badge" id="streak-badge">🔥 0</div>
-          <!-- Compact mode switcher (mobile) -->
           <div class="mode-switch-compact" id="mode-switch-compact">
             <button class="mode-pill active" id="mp-gym" onclick="setWorkoutMode('gym')">🏋️</button>
             <button class="mode-pill" id="mp-sport" onclick="setWorkoutMode('sport')">🏆</button>
@@ -426,39 +606,18 @@
         </div>
       </div>
 
-      <!-- Recovery banner -->
-      <div id="recovery-banner" class="recovery-banner hidden">
-        <span id="recovery-banner-icon">🟢</span>
-        <span id="recovery-banner-text">Recovery: Green — Full intensity today</span>
-        <button class="recovery-banner-btn" onclick="switchTab('recovery')">Update</button>
-      </div>
-
-      <section class="coach-command-center">
-        <div class="coach-command-copy">
-          <div class="coach-kicker">Your Coach</div>
-          <h2>Today's plan</h2>
-          <p>Chat with your coach to build, start, and adjust today's workout.</p>
-          <div class="coach-protocol-row">
-            <span id="coach-protocol-chip">Strength focus</span>
-            <span id="coach-recovery-chip">Recovery: —</span>
-            <span id="coach-fatigue-chip">Energy: good</span>
-          </div>
-        </div>
-        <div class="coach-readiness-ring" id="coach-readiness-ring"><strong id="coach-readiness-value">82</strong><span>Readiness</span></div>
-        <div class="coach-silhouette" aria-hidden="true"></div>
-      </section>
-
-      <section class="coach-os-grid">
-        <div class="coach-os-card"><span>Current split</span><strong id="coach-current-split">AI Guided</strong><i></i></div>
-        <div class="coach-os-card"><span>Recovery status</span><strong id="coach-recovery-status">Ready</strong><i></i></div>
-        <div class="coach-os-card"><span>Streak engine</span><strong id="coach-streak-status">Active</strong><i></i></div>
-        <div class="coach-os-card"><span>Muscle map</span><strong>Balanced</strong><i></i></div>
-      </section>
-
-      <!-- Messages -->
+      <!-- Messages - Primary focus -->
       <div id="chat-box" class="chat-box"></div>
 
-      <!-- Workout progress bar -->
+      <!-- Typing indicator -->
+      <div id="typing-indicator" class="typing-indicator hidden">
+        <div class="typing-dots">
+          <span></span><span></span><span></span>
+        </div>
+        <span class="typing-text">Coach is typing...</span>
+      </div>
+
+      <!-- Workout progress bar - compact -->
       <div id="workout-progress-bar" class="workout-progress-bar hidden">
         <div class="wpb-label">
           <span id="wpb-exercise">Exercise 1/5</span>
@@ -467,7 +626,7 @@
         <div class="wpb-track"><div class="wpb-fill" id="wpb-fill"></div></div>
       </div>
 
-      <!-- Exercise demo card -->
+      <!-- Exercise demo card - compact -->
       <div id="exercise-demo-card" class="exercise-demo-card hidden">
         <div class="demo-video-wrap">
           <div class="holo-stage motion-squat zone-green" aria-hidden="true"></div>
@@ -484,7 +643,7 @@
         </div>
       </div>
 
-      <!-- Rest timer -->
+      <!-- Rest timer - compact -->
       <div id="rest-timer" class="rest-timer hidden">
         <div class="rt-label">⏱ Rest <span id="rt-count">60</span>s</div>
         <div class="rt-track"><div class="rt-fill" id="rt-fill" style="width:100%"></div></div>
@@ -495,7 +654,7 @@
       <div id="workout-action-btns" class="workout-action-btns hidden"></div>
       <div id="feedback-btns" class="feedback-btns hidden"></div>
 
-      <!-- Quick actions -->
+      <!-- Quick actions - minimal -->
       <div id="quick-actions" class="quick-actions">
         <button onclick="startWorkout()" class="qa-btn qa-start">⚡ Start Workout</button>
         <button onclick="quickSend('How should I eat today?')" class="qa-btn">🥗 Nutrition</button>
@@ -806,7 +965,7 @@
       </div>
       <div id="cal-loading" class="cal-loading hidden">
         <div class="typing-dots"><span></span><span></span><span></span></div>
-        <p>Analyzing your food…</p>
+        <p>Analyzing your meal...</p>
       </div>
       <aside class="nutrition-side-rail">
         <div class="nutrition-side-card">
@@ -954,6 +1113,7 @@
     </div>
   </div>
 </div>
+</div><!-- /app-screen -->
 
 <!-- ==================== GENERAL ONBOARDING OVERLAY ==================== -->
 <div id="onboarding-overlay" class="onboarding-overlay hidden">
@@ -982,11 +1142,244 @@
   </div>
 </div>
 
+<!-- ==================== AI CONFIRMATION POPUP ==================== -->
+<div id="ai-confirm-backdrop" class="ai-confirm-backdrop">
+  <div class="ai-confirm-modal">
+    <!-- Close button top-right -->
+    <button class="ai-close-modal-btn" onclick="closeAIConfirmPopup()">&times;</button>
+
+    <!-- Header -->
+    <div class="ai-confirm-header">
+      <div class="ai-confirm-icon-glow">
+        <span class="ai-confirm-icon">🤖</span>
+      </div>
+      <div class="ai-confirm-title-group">
+        <h3 class="ai-confirm-title">AI Food Verification</h3>
+        <p id="ai-confirm-subtitle-text" class="ai-confirm-subtitle">Please verify the detected food before nutrition analysis.</p>
+      </div>
+    </div>
+    
+    <!-- Detection Card -->
+    <div class="ai-section-card ai-detection-card">
+      <div class="ai-preview-food-info">
+        <div class="ai-preview-food-item">
+          <span class="ai-preview-label">Detected Food</span>
+          <span id="ai-detected-name" class="ai-preview-value-main">🍕 Pizza</span>
+        </div>
+        <div class="ai-preview-confidence-item">
+          <span class="ai-preview-label">Confidence</span>
+          <span id="ai-confidence-value" class="ai-preview-value-conf conf-red">41%</span>
+        </div>
+      </div>
+
+      <!-- Confidence Bar -->
+      <div class="ai-confidence-bar-container">
+        <div id="ai-confidence-indicator" class="ai-confidence-bar-fill bg-red" style="width: 41%;"></div>
+      </div>
+
+      <div class="ai-confidence-badge-row">
+        <span id="ai-confidence-badge-text" class="ai-confidence-status-text"><span class="badge-icon">⚠</span> Low confidence detection</span>
+      </div>
+
+      <!-- Low Confidence Warning Card -->
+      <div id="ai-low-confidence-warning" class="ai-warning-card hidden">
+        <span class="warning-icon">⚠</span>
+        <span class="warning-text">Low confidence detection. Please verify before continuing.</span>
+      </div>
+    </div>
+
+    <!-- Suggested Foods Section -->
+    <div class="ai-section-card ai-suggested-foods-card">
+      <p id="ai-confirm-question-text" class="ai-confirm-question">Possible foods:</p>
+      <div id="ai-possible-foods-wrap" class="ai-possible-foods-pills"></div>
+    </div>
+
+    <!-- Search Section -->
+    <div class="ai-section-card ai-search-card">
+      <div id="ai-search-input-section" class="ai-search-container-premium">
+        <div class="search-input-wrapper">
+          <span class="search-icon-inside">🔍</span>
+          <input type="text" id="ai-food-search-input" placeholder="Search another food..." autocomplete="off" oninput="handleAISearchInput(event)" onkeydown="handleAISearchKeydown(event)"/>
+          <button id="ai-clear-search" class="clear-btn hidden" onclick="clearAISearch()">&times;</button>
+        </div>
+        
+        <!-- Autocomplete Dropdown suggestions list -->
+        <div id="ai-suggestions-list" class="ai-suggestions-list-premium hidden"></div>
+      </div>
+    </div>
+      
+    <!-- Popular Suggestions -->
+    <div class="ai-section-card ai-popular-suggestions-card">
+      <span class="examples-label">Popular Suggestions</span>
+      <div class="examples-tags-grid">
+        <button class="example-tag-btn" onclick="selectAIExample('Paneer')">🥛 Paneer</button>
+        <button class="example-tag-btn" onclick="selectAIExample('Paneer Butter Masala')">🥘 Paneer Butter Masala</button>
+        <button class="example-tag-btn" onclick="selectAIExample('Palak Paneer')">🥬 Palak Paneer</button>
+        <button class="example-tag-btn" onclick="selectAIExample('Cheese Sandwich')">🥪 Cheese Sandwich</button>
+        <button class="example-tag-btn" onclick="selectAIExample('Egg Curry')">🥚 Egg Curry</button>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="ai-action-buttons-group">
+      <button id="ai-confirm-btn" class="ai-action-btn-primary" onclick="handleAIPrimaryAction()">
+        <span>✔ Confirm Food</span>
+      </button>
+      <button id="ai-use-prediction-btn" class="ai-action-btn-secondary" onclick="handleAISecondaryAction()">
+        <span>✏ Edit Detection</span>
+      </button>
+      <button class="ai-action-btn-cancel" onclick="closeAIConfirmPopup()">
+        <span>❌ Cancel</span>
+      </button>
+    </div>
+
+    <!-- Information Card -->
+    <div class="ai-confidence-footer-notice">
+      <span class="notice-lightbulb">💡</span>
+      <p class="notice-footer-text">AI can confuse visually similar foods like paneer, cheese and pizza. Confirming the correct food improves nutrition accuracy.</p>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST & CONFETTI -->
 <div id="confetti-overlay" class="confetti-overlay hidden"></div>
 <div id="toast" class="toast hidden"></div>
 
 <script src="/static/script.js"></script>
 <script type="module" src="/static/js/ghost-trainer.js"></script>
+<script>
+  (function() {
+    function initAIConfirmationHelper() {
+      const valEl = document.getElementById("ai-confidence-value");
+      const indicatorEl = document.getElementById("ai-confidence-indicator");
+      const badgeEl = document.getElementById("ai-confidence-badge-text");
+      const inputEl = document.getElementById("ai-food-search-input");
+      const backdropEl = document.getElementById("ai-confirm-backdrop");
+      const secBtn = document.getElementById("ai-use-prediction-btn");
+      const warningEl = document.getElementById("ai-low-confidence-warning");
+
+      if (valEl && indicatorEl && badgeEl) {
+        const observer = new MutationObserver(() => {
+          const text = valEl.textContent || "";
+          const score = parseInt(text.replace(/[^0-9]/g, ""), 10);
+          if (!isNaN(score)) {
+            indicatorEl.style.width = score + "%";
+            
+            // Show low confidence warning if score < 70
+            if (warningEl) {
+              if (score < 70) {
+                warningEl.classList.remove("hidden");
+              } else {
+                warningEl.classList.add("hidden");
+              }
+            }
+            
+            badgeEl.className = "ai-confidence-status-text";
+            if (score < 50) {
+              badgeEl.innerHTML = '<span class="badge-icon">⚠</span> Low confidence';
+              badgeEl.classList.add("conf-red");
+            } else if (score < 70) {
+              badgeEl.innerHTML = '<span class="badge-icon">⚠</span> Medium confidence';
+              badgeEl.classList.add("conf-orange");
+            } else {
+              badgeEl.innerHTML = '<span class="badge-icon">✓</span> High confidence';
+              badgeEl.classList.add("conf-green");
+            }
+          }
+        });
+        
+        observer.observe(valEl, {
+          characterData: true,
+          childList: true,
+          subtree: true
+        });
+      }
+
+      // Observe the secondary button text content to switch between outline button and text-only button styles
+      if (secBtn) {
+        const secObserver = new MutationObserver(() => {
+          const txt = secBtn.textContent || "";
+          if (txt.toLowerCase().includes("prediction anyway") || txt.toLowerCase().includes("anyway")) {
+            secBtn.className = "ai-action-btn-text-only";
+          } else {
+            secBtn.className = "ai-action-btn-secondary";
+          }
+        });
+        secObserver.observe(secBtn, {
+          characterData: true,
+          childList: true,
+          subtree: true
+        });
+      }
+
+      document.addEventListener("click", function(e) {
+        const chip = e.target.closest(".possible-food-pill, .example-tag-btn, .example-pill");
+        if (chip) {
+          document.querySelectorAll(".possible-food-pill, .example-tag-btn, .example-pill").forEach(c => {
+            c.classList.remove("selected");
+          });
+          chip.classList.add("selected");
+        }
+      });
+
+      if (inputEl) {
+        inputEl.addEventListener("input", function() {
+          const val = this.value.trim().toLowerCase();
+          document.querySelectorAll(".possible-food-pill, .example-tag-btn, .example-pill").forEach(chip => {
+            const rawText = chip.textContent.replace(/^[^a-zA-Z0-9]+/, "").trim().toLowerCase();
+            if (rawText && rawText === val) {
+              chip.classList.add("selected");
+            } else {
+              chip.classList.remove("selected");
+            }
+          });
+        });
+      }
+
+      if (backdropEl) {
+        const backdropObserver = new MutationObserver(() => {
+          if (!backdropEl.classList.contains("active")) {
+            document.querySelectorAll(".possible-food-pill, .example-tag-btn, .example-pill").forEach(c => {
+              c.classList.remove("selected");
+            });
+            document.body.style.overflow = ""; // Restore background scrolling
+          } else {
+            document.body.style.overflow = "hidden"; // Disable background scrolling
+            if (inputEl && inputEl.value) {
+              const val = inputEl.value.trim().toLowerCase();
+              document.querySelectorAll(".possible-food-pill, .example-tag-btn, .example-pill").forEach(chip => {
+                const rawText = chip.textContent.replace(/^[^a-zA-Z0-9]+/, "").trim().toLowerCase();
+                if (rawText && rawText === val) {
+                  chip.classList.add("selected");
+                }
+              });
+            }
+          }
+        });
+        backdropObserver.observe(backdropEl, { attributes: true, attributeFilter: ["class"] });
+
+        // Close on clicking outside the modal content card
+        backdropEl.addEventListener("click", function(e) {
+          if (e.target === backdropEl) {
+            closeAIConfirmPopup();
+          }
+        });
+
+        // Close on pressing Escape key
+        document.addEventListener("keydown", function(e) {
+          if (e.key === "Escape" && backdropEl.classList.contains("active")) {
+            closeAIConfirmPopup();
+          }
+        });
+      }
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initAIConfirmationHelper);
+    } else {
+      initAIConfirmationHelper();
+    }
+  })();
+</script>
 </body>
 </html>

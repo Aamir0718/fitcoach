@@ -1,6 +1,7 @@
 """
 AI Coach router — handles the main chat endpoint + greeting endpoint.
 """
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -19,6 +20,7 @@ from app.services.ai_service import (
     _build_greeting,
 )
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/coach", tags=["ai_coach"])
 
 
@@ -72,40 +74,56 @@ async def coach_chat(
     current_user: Auth = Depends(get_current_verified_user),
     db: AsyncSession = Depends(get_db),
 ):
-    profile, zone = await _load_context(current_user, db)
+    try:
+        logger.info(f"Chat request from user {current_user.id}: {body.message[:50]}...")
+        profile, zone = await _load_context(current_user, db)
 
-    # If onboarding not complete → handle onboarding
-    if not profile.onboarding_complete:
-        return await handle_onboarding_message(
+        # If onboarding not complete → handle onboarding
+        if not profile.onboarding_complete:
+            logger.info(f"User {current_user.id} in onboarding flow")
+            return await handle_onboarding_message(
+                user_id=current_user.id,
+                message=body.message,
+                profile=profile,
+                db=db,
+            )
+
+        # Classify intent
+        intent = classify_intent(body.message)
+        logger.info(f"Intent classified as: {intent}")
+
+        # Route to workout handler for all workout-related intents
+        if intent in (
+            "start_workout", "next_set", "done_workout",
+            "easy", "hard", "show_plan", "swap_muscle", "greeting",
+        ):
+            logger.info(f"Routing to workout command handler")
+            return await handle_workout_command(
+                user_id=current_user.id,
+                message=body.message,
+                intent=intent,
+                profile=profile,
+                zone=zone,
+                mode=body.mode or profile.active_mode,
+                db=db,
+            )
+
+        # Default: free AI chat
+        logger.info(f"Routing to free chat handler")
+        return await handle_free_chat(
             user_id=current_user.id,
             message=body.message,
-            profile=profile,
-            db=db,
-        )
-
-    # Classify intent
-    intent = classify_intent(body.message)
-
-    # Route to workout handler for all workout-related intents
-    if intent in (
-        "start_workout", "next_set", "done_workout",
-        "easy", "hard", "show_plan", "swap_muscle", "greeting",
-    ):
-        return await handle_workout_command(
-            user_id=current_user.id,
-            message=body.message,
-            intent=intent,
             profile=profile,
             zone=zone,
-            mode=body.mode or profile.active_mode,
             db=db,
         )
-
-    # Default: free AI chat
-    return await handle_free_chat(
-        user_id=current_user.id,
-        message=body.message,
-        profile=profile,
-        zone=zone,
-        db=db,
-    )
+    except HTTPException as he:
+        # Re-raise HTTP exceptions as-is
+        logger.error(f"HTTP error in coach_chat: {he.status_code} - {he.detail}")
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in coach_chat: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Server error: {str(e)}"
+        )

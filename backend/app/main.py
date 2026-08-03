@@ -1,5 +1,8 @@
 import os
-import sentry_sdk
+try:
+    import sentry_sdk
+except ImportError:
+    sentry_sdk = None
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,7 +15,7 @@ from app.database import create_tables
 from app.routers import auth, profile, workouts, recovery, progress, nutrition, ai_coach
 
 # ── Sentry (production error tracking) ────────────────────────────────────────
-if settings.SENTRY_DSN:
+if settings.SENTRY_DSN and sentry_sdk:
     sentry_sdk.init(
         dsn=settings.SENTRY_DSN,
         traces_sample_rate=0.1,
@@ -80,6 +83,11 @@ async def global_exception_handler(request: Request, exc: Exception):
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
+# ── Frontend static files ─────────────────────────────────────────────────────
+frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend"))
+if os.path.exists(frontend_dir):
+    app.mount("/static", StaticFiles(directory=os.path.join(frontend_dir, "static")), name="static")
+
 
 # ── Routers ────────────────────────────────────────────────────────────────────
 app.include_router(auth.router)
@@ -100,3 +108,13 @@ async def health():
 @app.get("/")
 async def root():
     return {"message": "FitCoach AI API", "docs": "/docs"}
+
+# ── Serve frontend index.html for development ───────────────────────────────
+from fastapi.responses import FileResponse
+
+@app.get("/app")
+async def serve_frontend():
+    frontend_index = os.path.join(frontend_dir, "index.html")
+    if os.path.exists(frontend_index):
+        return FileResponse(frontend_index)
+    return {"message": "Frontend not found"}

@@ -4,11 +4,16 @@ Completely separated from routing.
 """
 import re
 import json
+import asyncio
+import logging
+import io
 from datetime import datetime
+from typing import Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from groq import AsyncGroq
-
+from app.services.food_detector import detect_foods
+from app.services.nutrition_service import get_food_nutrition
 from app.config import settings
 from app.models.profile import Profile
 from app.models.workout import AIMemory, WeeklyPlan, PlannedWorkout, Exercise
@@ -18,6 +23,7 @@ from app.services.plan_service import (
     swap_today_slot, MUSCLE_TO_SLOT, SESSION_LABELS,
 )
 
+logger = logging.getLogger(__name__)
 _groq = AsyncGroq(api_key=settings.GROQ_API_KEY)
 
 # ── Injection guard ────────────────────────────────────────────────────────────
@@ -96,22 +102,41 @@ def _extract_target_muscle(message: str) -> str | None:
 
 
 # ── AI call wrapper ────────────────────────────────────────────────────────────
-async def _ai(messages: list[dict], temperature: float = 0.7, max_tokens: int = 400) -> str:
+async def _ai(messages: list[dict], temperature: float = 0.7, max_tokens: int = 400, use_vision: bool = False) -> Tuple[str, str]:
+    """
+    Call Groq API and return (response, error_type).
+    error_type values: "none", "timeout", "rate_limit", "auth_error", "api_error", "json_error"
+    use_vision: if True, use vision-capable model for image analysis
+    """
     try:
-        resp = await _groq.chat.completions.create(
-            model=settings.GROQ_MODEL,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
+        model = settings.GROQ_VISION_MODEL if use_vision else settings.GROQ_MODEL
+        logger.info(f"Calling Groq API with model={model}, messages={len(messages)}, max_tokens={max_tokens}, use_vision={use_vision}")
+        resp = await asyncio.wait_for(
+            _groq.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            ),
+            timeout=15,  # Longer timeout for vision analysis
         )
-        return resp.choices[0].message.content.strip()
+        content = resp.choices[0].message.content.strip()
+        logger.info(f"Groq API response received: {len(content)} chars")
+        return content, "none"
+    except asyncio.TimeoutError:
+        logger.warning("Groq API timeout")
+        return "", "timeout"
     except Exception as e:
         err = str(e)
+        logger.error(f"Groq API error: {err}", exc_info=True)
+        
         if "429" in err or "rate_limit" in err.lower():
-            return "I'm getting a lot of requests right now — give me a few seconds and try again!"
-        if "401" in err:
-            return "AI configuration error. Please contact support."
-        return "I'm having a moment — try again in a few seconds."
+            return "I'm getting a lot of requests right now — give me a few seconds and try again!", "rate_limit"
+        if "401" in err or "403" in err or "authentication" in err.lower():
+            return "AI configuration error. Please contact support.", "auth_error"
+        if "json" in err.lower() or "parse" in err.lower():
+            return "AI response format error. Please try again.", "json_error"
+        return "I'm having a moment — try again in a few seconds.", "api_error"
 
 
 # ── Onboarding ────────────────────────────────────────────────────────────────
@@ -321,7 +346,7 @@ async def _handle_swap(
     if not target_slot:
         # Ask Groq to extract the muscle group
         if settings.GROQ_API_KEY:
-            slot_raw = await _ai([
+            slot_raw, error_type = await _ai([
                 {"role": "system", "content": (
                     "Extract the workout type the user wants to do. "
                     "Reply with ONLY one of: push, pull, legs, upper_body, lower_body, "
@@ -329,10 +354,14 @@ async def _handle_swap(
                 )},
                 {"role": "user", "content": message},
             ], temperature=0.1, max_tokens=10)
-            target_slot = slot_raw.strip().lower().replace(" ", "_")
-            # Validate it's a known slot
-            if target_slot not in SESSION_LABELS:
+            if error_type != "none":
+                logger.warning(f"Failed to extract muscle group via AI: {error_type}")
                 target_slot = "full_body"
+            else:
+                target_slot = slot_raw.strip().lower().replace(" ", "_")
+                # Validate it's a known slot
+                if target_slot not in SESSION_LABELS:
+                    target_slot = "full_body"
         else:
             target_slot = "full_body"
 
@@ -512,7 +541,7 @@ async def _start_workout(user_id: int, profile: Profile, zone: str, mode: str, d
 
     ex = exercises[0]
     intensity = {"green": "Full intensity 💚", "yellow": "Moderate intensity 💛", "red": "Light session 🔴"}[zone]
-    intro = await _set_intro(ex["name"], 1, profile.gender or "male")
+    intro = "Lock in. Every rep counts."
 
     return ChatResponse(
         reply=(
@@ -654,10 +683,14 @@ async def _set_intro(exercise_name: str, set_num: int, gender: str) -> str:
         idx = int(hashlib.md5(f"{exercise_name}{set_num}".encode()).hexdigest(), 16) % len(intros)
         return intros[idx]
     tone = "powerful and motivating" if gender == "male" else "encouraging and energetic"
-    return await _ai([
+    intro, error_type = await _ai([
         {"role": "system", "content": f"You are a fitness coach. Be {tone}. One short sentence only. No hashtags."},
         {"role": "user", "content": f"Set {set_num} of {exercise_name}. Give me a motivational cue."},
     ], temperature=0.9, max_tokens=40)
+    if error_type != "none":
+        logger.warning(f"Failed to generate intro via AI: {error_type}")
+        return "Lock in. Every rep counts."
+    return intro
 
 
 # ── Free chat ──────────────────────────────────────────────────────────────────
@@ -682,7 +715,7 @@ async def handle_free_chat(
     sport_note = f"Sport: {profile.sport} ({profile.sport_role or 'general'})." if profile.plays_sport and profile.sport else ""
     height_weight = f"{profile.height or '?'}cm, {profile.weight or '?'}kg." if profile.height or profile.weight else ""
 
-    system_prompt = f"""You are FitCoach AI — a professional personal trainer and sports scientist.
+    system_prompt = f"""You are FitCoach AI — a friendly, conversational gym coach. Talk like a real person, not a textbook.
 
 User profile:
 - Name: {profile.name} | Age: {profile.age or '?'} | Gender: {profile.gender or '?'}
@@ -695,16 +728,26 @@ User profile:
 - Recovery zone today: {zone} (green=train hard, yellow=moderate, red=light/rest)
 {f'- Recent training history: {memory_context}' if memory_context else ''}
 
-Guidelines:
-- Be direct, personal, and evidence-based. Address them by name.
-- Give specific advice tailored to their goal, level, and mode (gym/home/sport).
-- Respect their injuries — never suggest exercises they should avoid.
-- Max 3 short paragraphs. No generic filler. No hashtags."""
+CRITICAL RESPONSE GUIDELINES:
+- Default response: 2-5 short sentences (max 80-120 words)
+- Only go longer if user explicitly asks for detailed explanation
+- Use bullet points when listing items
+- Break into short, readable lines
+- Never write huge paragraphs
+- Be conversational and friendly like a real coach
+- Use their name occasionally to personalize
+- End with a follow-up question when appropriate
+- Use suitable emojis sparingly (💪🔥🥗🏃😄)
+- Practical advice only, no scientific jargon
+- Respect injuries — avoid suggesting harmful exercises"""
 
-    reply = await _ai([
+    reply, error_type = await _ai([
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": msg},
     ], temperature=0.7, max_tokens=350)
+    if error_type != "none" or not reply:
+        logger.warning(f"Free chat AI failed with error: {error_type}, falling back to rule-based")
+        reply = _rule_based_chat(msg, profile, zone)
 
     return ChatResponse(reply=reply, type="chat")
 
@@ -748,88 +791,120 @@ def _rule_based_chat(message: str, profile: Profile, zone: str) -> str:
     return f"Great question, {name}! 🤖\n\n{zone_msg}\n\nUse the Workout tab to start today's personalised session!"
 
 
-# ── Nutrition analysis ─────────────────────────────────────────────────────────
-async def analyze_food_ai(food_description: str, image_base64: str | None = None) -> dict:
-    """Analyze food and return fields that match the Flutter nutrition UI exactly."""
+# ── Nutrition analysis (YOLOv8 + USDA) ───────────────────────────────────────────
+async def analyze_food_ai(food_description: str = "", image_base64: str | None = None) -> dict:
+    """
+    Analyze food image using YOLOv8 for detection and USDA for nutrition data.
 
-    if not settings.GROQ_API_KEY:
-        return _estimate_food(food_description)
+    Args:
+        image_base64: Base64-encoded image string`
+        
+    Returns:
+        Nutrition analysis JSON with detected foods and USDA nutrition data
+    """
+    import base64
+    from app.services.food_detector import detect_foods
+    from app.services.nutrition_service import get_food_nutrition
+    
+    logger.info("Received image for nutrition analysis")
+    if not image_base64:
+        nutrition = get_food_nutrition(food_description)
 
-    prompt = f"""You are a nutrition expert. Analyze this food and return ONLY a valid JSON object with EXACTLY these keys (numbers only, no units):
-{{
-  "calories": 350,
-  "protein_g": 25,
-  "carbs_g": 40,
-  "fats_g": 10,
-  "fibre_g": 5,
-  "fitness_rating": "Good for muscle gain",
-  "advice": "One sentence of specific coaching advice for this meal.",
-  "best_timing": "Best eaten pre/post workout or at specific meal time."
-}}
+        if nutrition is None:
+            return {"error": "Food not found"}
 
-Food to analyze: {food_description}
-
-Return ONLY the JSON object. No markdown, no explanation, just the JSON."""
-
-    messages = [{"role": "user", "content": prompt}]
-    if image_base64:
-        messages = [{"role": "user", "content": [
-            {"type": "text", "text": prompt},
-            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}},
-        ]}]
-
-    raw = await _ai(messages, temperature=0.1, max_tokens=250)
+        return {
+            "meal_name": nutrition["name"],
+            "foods": [nutrition],
+            "total_calories": nutrition["calories"],
+            "total_protein": nutrition["protein"],
+            "total_carbs": nutrition["carbs"],
+            "total_fat": nutrition["fat"],
+            "health_score": 80,
+            "tips": [
+                "Drink enough water 💧",
+                "Eat a balanced diet 🥗"
+            ]
+        }
 
     try:
-        match = re.search(r'\{.*?\}', raw, re.DOTALL)
-        if match:
-            data = json.loads(match.group())
+        image_data = base64.b64decode(image_base64)
+        import os
+        os.makedirs("uploads", exist_ok=True)
+        image_path = "uploads/temp.jpg"
+        with open(image_path, "wb") as f:
+            f.write(image_data)
+
+        logger.info(f"Saved image to {image_path}")
+
+        # Detect foods
+        detected_foods = detect_foods(image_path)
+        
+        if not detected_foods:
+            logger.warning("No recognizable food detected")
             return {
-                "calories":      int(data.get("calories", 0)),
-                "protein_g":     float(data.get("protein_g", 0)),
-                "carbs_g":       float(data.get("carbs_g", 0)),
-                "fats_g":        float(data.get("fats_g", 0)),
-                "fibre_g":       float(data.get("fibre_g", 0)),
-                "fitness_rating": str(data.get("fitness_rating", "Good")),
-                "advice":        str(data.get("advice", "")),
-                "best_timing":   str(data.get("best_timing", "")),
+                "error": "No recognizable food detected."
             }
-    except (json.JSONDecodeError, AttributeError, ValueError):
-        pass
-
-    return _estimate_food(food_description)
-
-
-def _estimate_food(food_description: str) -> dict:
-    """Rule-based fallback when AI is unavailable."""
-    desc = food_description.lower()
-    calories = 400; protein_g = 20.0; carbs_g = 45.0; fats_g = 12.0; fibre_g = 4.0
-
-    if any(w in desc for w in ["chicken", "turkey", "fish", "tuna", "egg"]):
-        protein_g = 35.0; calories = 320; carbs_g = 5.0; fats_g = 10.0
-        rating = "Excellent — high protein, lean"
-    elif any(w in desc for w in ["rice", "pasta", "bread", "oat"]):
-        carbs_g = 60.0; calories = 380; protein_g = 10.0
-        rating = "Good — quality carbs for energy"
-    elif any(w in desc for w in ["salad", "vegetable", "broccoli", "spinach"]):
-        calories = 150; protein_g = 8.0; carbs_g = 15.0; fats_g = 5.0; fibre_g = 8.0
-        rating = "Excellent — nutrient-dense, low calorie"
-    elif any(w in desc for w in ["burger", "pizza", "fries", "chips"]):
-        calories = 650; fats_g = 30.0; carbs_g = 70.0; protein_g = 20.0
-        rating = "Poor — high calorie, eat in moderation"
-    elif any(w in desc for w in ["shake", "protein", "whey"]):
-        protein_g = 40.0; calories = 250; carbs_g = 20.0; fats_g = 4.0
-        rating = "Excellent — post-workout recovery"
-    else:
-        rating = "Good — balanced meal"
-
-    return {
-        "calories":      calories,
-        "protein_g":     protein_g,
-        "carbs_g":       carbs_g,
-        "fats_g":        fats_g,
-        "fibre_g":       fibre_g,
-        "fitness_rating": rating,
-        "advice":        "Add a GROQ API key in your .env for precise AI-powered analysis.",
-        "best_timing":   "Works well as a main meal or post-workout refuel.",
-    }
+        
+        logger.info(f"YOLO detected: {detected_foods}")
+        
+        # Get nutrition data from USDA
+        # Get nutrition from USDA
+        nutrition_data = []
+        for food in detected_foods:
+            nutrition = get_food_nutrition(food)
+            if nutrition:
+                nutrition_data.append(nutrition)
+        logger.info(f"USDA nutrition data: {nutrition_data}")
+        
+        # Calculate totals
+        total_calories = sum(f.get("calories", 0) for f in nutrition_data)
+        total_protein = sum(f.get("protein", 0) for f in nutrition_data)
+        total_carbs = sum(f.get("carbs", 0) for f in nutrition_data)
+        total_fat = sum(f.get("fat", 0) for f in nutrition_data)
+        
+        # Calculate health score and tips
+        health_score = 80
+        tips = [
+            "Drink enough water 💧",
+            "Add vegetables for a balanced meal 🥗",
+            "Include a good protein source 💪"
+        ]
+        
+        # Generate meal name from detected foods
+        meal_name = ", ".join(detected_foods)
+        
+        # Build response
+        foods_response = []
+        foods_response.append({
+            "name": nutrition["name"],
+            "quantity": nutrition["quantity"],
+            "calories": nutrition["calories"],
+            "protein": nutrition["protein"],
+            "carbs": nutrition["carbs"],
+            "fat": nutrition["fat"],
+            "fiber": nutrition["fiber"],
+            "sugar": nutrition["sugar"]
+        })
+        
+        result = {
+            "meal_name": meal_name,
+            "foods": foods_response,
+            "total_calories": total_calories,
+            "total_protein": total_protein,
+            "total_carbs": total_carbs,
+            "total_fat": total_fat,
+            "total_fiber": sum(f["fiber"] for f in nutrition_data),
+            "total_sugar": sum(f["sugar"] for f in nutrition_data),
+            "health_score": health_score,
+            "tips": tips
+        }
+        
+        logger.info(f"Final nutrition result: {result}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Nutrition analysis failed: {e}", exc_info=True)
+        return {
+            "error": f"Nutrition analysis failed: {str(e)}"
+        }
