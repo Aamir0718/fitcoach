@@ -7,6 +7,7 @@
 const API = (location.hostname === "localhost" || location.hostname === "127.0.0.1")
   ? "http://localhost:8000"
   : "https://fitcoach-backend.onrender.com";
+window.API = API;
 let authToken    = localStorage.getItem("fc_token") || null;
 let currentUser  = null;
 let workoutMode  = localStorage.getItem("fc_workout_mode") || "gym";
@@ -212,7 +213,7 @@ async function loadHome() {
 
     // 4. Recovery banner
     try {
-      const rec = await apiFetch("/api/recovery/latest").catch(()=>null);
+      const rec = await apiFetch("/api/recovery/latest", { ignore401: true }).catch(()=>null);
       const bar  = document.getElementById("home-recovery-bar");
       const dot  = document.getElementById("home-recovery-dot");
       const txt  = document.getElementById("home-recovery-text");
@@ -359,24 +360,34 @@ function _storeTokens(d) {
   if (d.refresh_token) localStorage.setItem("fc_refresh", d.refresh_token);
 }
 async function continueAfterAuth(preferredTab = "home") {
+  let profile;
   try {
-    const profile = await apiFetch("/api/profile/me");
+    profile = await apiFetch("/api/profile/me");
     currentUser = profile;
     onboardingGender = profile?.gender || "male";
     updateCoachHeader(profile?.name, profile?.gender);
-    showApp();
+  } catch (err) {
+    authToken = null;
+    currentUser = null;
+    localStorage.removeItem("fc_token");
+    localStorage.removeItem("fc_refresh");
+    showAuth();
+    showAuthError(err.message || "Session verification failed. Please sign in again.");
+    return;
+  }
+
+  // Navigation is now guaranteed to load the main dashboard view
+  showApp();
+
+  try {
     if (profile?.onboarding_complete) {
       switchTab(preferredTab || "home");
       loadRecoveryBanner();
     } else {
       switchTab("chat");
     }
-  } catch {
-    authToken = null;
-    currentUser = null;
-    localStorage.removeItem("fc_token");
-    localStorage.removeItem("fc_refresh");
-    showAuth();
+  } catch (err) {
+    console.warn("Optional dashboard initialization failed:", err);
   }
 }
 async function sendSignupOTP() {
@@ -478,7 +489,7 @@ async function doSignup() {
     await continueAfterAuth("home");
   } catch (e) { _btnLock("signup-btn", false); showAuthError("Connection error"); }
 }
-function doLogout() {
+function doLogout(clearInputs = true) {
   // Clear in-memory auth variables
   authToken = null;
   currentUser = null;
@@ -491,23 +502,25 @@ function doLogout() {
   sessionStorage.clear();
 
   // Clear all auth form fields
-  const formFields = [
-    "login-email",
-    "login-password",
-    "login-otp-code",
-    "signup-email",
-    "signup-password",
-    "signup-otp-code",
-    "forgot-email",
-    "forgot-otp",
-    "forgot-newpass"
-  ];
-  formFields.forEach(fieldId => {
-    const el = document.getElementById(fieldId);
-    if (el) {
-      el.value = "";
-    }
-  });
+  if (clearInputs) {
+    const formFields = [
+      "login-email",
+      "login-password",
+      "login-otp-code",
+      "signup-email",
+      "signup-password",
+      "signup-otp-code",
+      "forgot-email",
+      "forgot-otp",
+      "forgot-newpass"
+    ];
+    formFields.forEach(fieldId => {
+      const el = document.getElementById(fieldId);
+      if (el) {
+        el.value = "";
+      }
+    });
+  }
 
   // Reset auth forms to default state (show login, hide others)
   document.getElementById("login-form").classList.remove("hidden");
@@ -573,16 +586,22 @@ function showAuthError(msg) {
 // ── API ───────────────────────────────────────────────────────────────
 async function apiFetch(url, options={}) {
   let res;
+  const { ignore401, ...fetchOptions } = options;
   try {
     res = await fetch(`${API}${url}`, {
-      ...options,
-      headers:{"Content-Type":"application/json","Authorization":`Bearer ${authToken}`,...(options.headers||{})}
+      ...fetchOptions,
+      headers:{"Content-Type":"application/json","Authorization":`Bearer ${authToken}`,...(fetchOptions.headers||{})}
     });
   } catch (networkErr) {
     showToast("Connection error — check your internet.");
     throw networkErr;
   }
-  if (res.status === 401) { doLogout(); throw new Error("Unauthorized"); }
+  if (res.status === 401) { 
+    if (!ignore401) {
+      doLogout(false); 
+    }
+    throw new Error("Unauthorized"); 
+  }
   if (res.status === 429) {
     showToast("Too many requests — slow down a moment.");
     throw new Error("Rate limited");
@@ -693,7 +712,7 @@ function addMessage(text, sender) {
     .replace(/_(.*?)_/g,"<em>$1</em>")
     .replace(/\n/g,"<br>");
   chatBox.appendChild(msg);
-  msg.scrollIntoView({behavior:"smooth",block:"nearest"});
+  scrollToBottom();
   return msg;
 }
 
@@ -741,6 +760,19 @@ function exerciseIcon(exercise) {
 function renderCoachResponse(data) {
   const chatBox = document.getElementById("chat-box");
   
+  if (["workout_start", "workout_next_set", "workout_next_exercise"].includes(data.type)) {
+    transitionToWorkout(data);
+    if (data.reply) {
+      pushPopoverMessage(data.reply);
+    }
+    return null;
+  }
+  
+  if (["workout_all_done", "feedback_received", "workout_logged"].includes(data.type)) {
+    transitionToComplete(data);
+    return null;
+  }
+
   // For most responses, just show a simple message like ChatGPT
   if (!["daily_plan", "workout_start", "workout_next_set", "workout_next_exercise", "workout_all_done", "feedback_received", "workout_logged"].includes(data.type)) {
     const msg = document.createElement("div");
@@ -750,7 +782,6 @@ function renderCoachResponse(data) {
       .replace(/_(.*?)_/g,"<em>$1</em>")
       .replace(/\n/g,"<br>");
     chatBox.appendChild(msg);
-    msg.scrollIntoView({behavior:"smooth",block:"nearest"});
     
     // Add compact coach tip card occasionally
     if (data.reply && Math.random() > 0.7) {
@@ -758,9 +789,13 @@ function renderCoachResponse(data) {
       tip.className = "coach-tip-card";
       tip.innerHTML = `<span class="tip-icon">💡</span><span class="tip-text">Stay consistent — small wins add up!</span>`;
       chatBox.appendChild(tip);
-      tip.scrollIntoView({behavior:"smooth",block:"nearest"});
     }
     
+    if (data.reply) {
+      pushPopoverMessage(data.reply);
+    }
+
+    scrollToBottom();
     return msg;
   }
   
@@ -770,7 +805,7 @@ function renderCoachResponse(data) {
   panel.innerHTML = buildCoachDashboardHtml(data);
   chatBox.appendChild(panel);
   wireCoachDashboard(panel);
-  panel.scrollIntoView({behavior:"smooth",block:"start"});
+  scrollToBottom();
   return panel;
 }
 
@@ -1035,12 +1070,17 @@ function addCoachOptions(options) {
     wrap.appendChild(btn);
   });
   chatBox.appendChild(wrap);
-  wrap.scrollIntoView({behavior:"smooth",block:"nearest"});
+  scrollToBottom();
 }
 function scrollToBottom() {
-  const chatBox = document.getElementById("chat-box");
-  if (chatBox) {
-    chatBox.scrollTop = chatBox.scrollHeight;
+  const messagesContainer = document.getElementById("chat-box");
+  if (messagesContainer) {
+    setTimeout(() => {
+      messagesContainer.scrollTo({
+        top: messagesContainer.scrollHeight,
+        behavior: "smooth"
+      });
+    }, 50);
   }
 }
 function showTyping() {
@@ -1095,7 +1135,7 @@ async function callServer(message) {
     
     console.log(`[Coach API] Response status: ${res.status}`);
     
-    if (res.status===401){doLogout();return;}
+    if (res.status===401){doLogout(false);return;}
     
     const data = await res.json();
     console.log(`[Coach API] Response data:`, data);
@@ -1243,9 +1283,11 @@ function handleResponse(data) {
       updateStreak(data.streak||0);
       showToast(`🎉 Workout ${data.total_workouts} done! ${data.duration} min`);
       if (data.new_badge) setTimeout(()=>showToast(`🏆 ${data.new_badge.badge_icon} ${data.new_badge.badge_name}`),2500);
+      loadProgress();
       break;
     case "weight_logged":
       showToast(`✅ Weight: ${data.weight} kg logged`);
+      loadProgress();
       break;
   }
 }
@@ -1450,7 +1492,7 @@ async function onboardingNext() {
       headers:{"Content-Type":"application/json","Authorization":`Bearer ${authToken}`},
       body:JSON.stringify({message:value})
     });
-    if(res.status===401){doLogout();return;}
+    if(res.status===401){doLogout(false);return;}
     const data=await res.json();
     handleResponse(data);
   } catch {
@@ -1710,6 +1752,7 @@ async function submitRecovery() {
     showRecoveryScore(data);
     loadRecoveryBanner();
     showToast(`📊 Recovery: ${data.score}/100 — ${data.zone.toUpperCase()}`);
+    loadProgress();
   } catch { showToast("❌ Failed to save. Try again."); }
   finally { btn.disabled=false; btn.querySelector("span").textContent="Calculate Recovery Score"; }
 }
@@ -1777,7 +1820,7 @@ function updateRecoveryCockpitScore(data) {
 
 async function loadRecoveryLatest() {
   try {
-    const data = await apiFetch("/api/recovery/latest");
+    const data = await apiFetch("/api/recovery/latest", { ignore401: true });
     if (data.score) showRecoveryScore(data);
     const readiness = document.getElementById("coach-readiness-value");
     const ring = document.getElementById("coach-readiness-ring");
@@ -1797,7 +1840,7 @@ async function loadRecoveryLatest() {
 
 async function loadRecoveryBanner() {
   try {
-    const data = await apiFetch("/api/recovery/latest");
+    const data = await apiFetch("/api/recovery/latest", { ignore401: true });
     if (!data.zone) return;
     const banner = document.getElementById("recovery-banner");
     banner.classList.remove("hidden","yellow","red");
@@ -2005,26 +2048,52 @@ function showDoneButton() {
 function startRestTimer(restStr) {
   clearInterval(restInterval);
   if (!restStr) return;
-  const secs=parseInt(restStr)||60;
-  let rem=secs;
-  const timer=document.getElementById("rest-timer");
-  timer.classList.remove("hidden");
-  updateRestDisplay(rem,secs);
-  restInterval=setInterval(()=>{
-    rem--;
-    updateRestDisplay(rem,secs);
-    if(rem<=0){
-      clearInterval(restInterval);
-      timer.classList.add("hidden");
-      speak("Rest done. Let's go!",currentUser?.gender||onboardingGender);
+  const secs = parseInt(restStr) || 60;
+  let rem = secs;
+  
+  const overlay = document.getElementById("workout-rest-overlay");
+  const countdown = document.getElementById("ws-rest-countdown");
+  const nextExerciseText = document.getElementById("ws-rest-next-exercise");
+  const restBar = document.getElementById("ws-rest-ring-bar");
+  
+  if (overlay) overlay.classList.remove("hidden");
+  if (nextExerciseText && activeWorkoutData) {
+    const exercises = activeWorkoutData.exercises || [];
+    const nextIdx = (activeWorkoutData.current_exercise_index ?? 0) + 1;
+    const nextEx = exercises[nextIdx] || activeWorkoutData.current_exercise;
+    if (nextEx) {
+      nextExerciseText.textContent = `Next Up: ${nextEx.name}`;
     }
-  },1000);
+  }
+  
+  const dashArray = 326.72; // 2 * Math.PI * 52
+  
+  const updateWSDisplay = (r) => {
+    if (countdown) countdown.textContent = `${r}s`;
+    if (restBar) {
+      const offset = dashArray - (r / secs) * dashArray;
+      restBar.style.strokeDashoffset = offset;
+    }
+  };
+  
+  updateWSDisplay(rem);
+  
+  restInterval = setInterval(() => {
+    rem--;
+    updateWSDisplay(rem);
+    if (rem <= 0) {
+      clearInterval(restInterval);
+      if (overlay) overlay.classList.add("hidden");
+      speak("Rest done. Let's go!", currentUser?.gender || onboardingGender);
+    }
+  }, 1000);
 }
-function updateRestDisplay(r,total) {
-  document.getElementById("rt-count").textContent=r;
-  document.getElementById("rt-fill").style.width=`${(r/total)*100}%`;
+function skipRestTimer() {
+  clearInterval(restInterval);
+  const overlay = document.getElementById("workout-rest-overlay");
+  if (overlay) overlay.classList.add("hidden");
 }
-function skipTimer() { clearInterval(restInterval); document.getElementById("rest-timer").classList.add("hidden"); }
+function skipTimer() { skipRestTimer(); }
 
 // ── VOICE ─────────────────────────────────────────────────────────────
 function speak(text,gender) {
@@ -2900,62 +2969,158 @@ function showCalResult(result){
 }
 
 // ── PROGRESS ──────────────────────────────────────────────────────────
+let analyticsData = null;
+
 async function loadProgress() {
-  try{
-    const data=await apiFetch("/api/progress/");
-    document.getElementById("stat-weight-lost").textContent=data.total_weight_lost??"-";
-    document.getElementById("stat-workouts").textContent=data.total_workouts??"-";
-    document.getElementById("stat-streak").textContent=data.current_streak??"-";
-    document.getElementById("stat-badges").textContent=data.badges?.length??"-";
-    updateStreak(data.current_streak||0);
-    renderWeightChart(data.weight);
-    renderWeeklyChart(data.weekly_workouts);
-    renderMuscleChart(data.muscle_distribution);
-    renderHeatmap(data.heatmap);
-    renderBadges(data.badges);
-  }catch{}
-}
-function renderWeightChart(wd) {
-  const c=document.getElementById("weightChart"); if(!c||!wd?.labels?.length)return;
-  if(chartInst.weight)chartInst.weight.destroy();
-  chartInst.weight=new Chart(c,{type:"line",data:{labels:wd.labels,datasets:[{label:"kg",data:wd.values,borderColor:"#a78bfa",backgroundColor:"rgba(124,58,237,.12)",tension:0.4,fill:true,pointRadius:4,pointBackgroundColor:"#a78bfa",pointBorderColor:"#0d0d1a",pointBorderWidth:2}]},options:chartOpts()});
-}
-function renderWeeklyChart(wd) {
-  const c=document.getElementById("weeklyChart"); if(!c)return;
-  if(chartInst.weekly)chartInst.weekly.destroy();
-  chartInst.weekly=new Chart(c,{type:"bar",data:{labels:wd?.labels||[],datasets:[{label:"Workouts",data:wd?.values||[],backgroundColor:"rgba(16,185,129,.7)",borderColor:"#10b981",borderRadius:6}]},options:chartOpts(true)});
-}
-function renderMuscleChart(md) {
-  const c=document.getElementById("muscleChart"); if(!c||!md?.length)return;
-  if(chartInst.muscle)chartInst.muscle.destroy();
-  const COLS=["#7c3aed","#10b981","#f59e0b","#3b82f6","#ef4444","#8b5cf6"];
-  chartInst.muscle=new Chart(c,{type:"doughnut",data:{labels:md.map(m=>m.muscle),datasets:[{data:md.map(m=>m.count),backgroundColor:COLS,borderColor:"#12121e",borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"right",labels:{color:"#8b8ba8",font:{size:11},padding:10}}}}});
-}
-function renderHeatmap(hd) {
-  const grid=document.getElementById("heatmap-grid"); if(!grid)return;
-  grid.innerHTML="";
-  const today=new Date();
-  for(let i=89;i>=0;i--){
-    const d=new Date(today); d.setDate(d.getDate()-i);
-    const key=d.toISOString().split("T")[0];
-    const cnt=hd?.[key]||0;
-    const cell=document.createElement("div");
-    cell.className=`heatmap-cell${cnt>0?` active-${Math.min(cnt,3)}`:""}`;
-    cell.title=`${key}: ${cnt} workout${cnt!==1?"s":""}`;
-    grid.appendChild(cell);
+  try {
+    const data = await apiFetch("/api/progress/dashboard");
+    analyticsData = data;
+    
+    const emptyState = document.getElementById("progress-empty-state");
+    const dashboardContent = document.getElementById("progress-dashboard-content");
+    
+    if (data.total_workouts === 0) {
+      if (emptyState) emptyState.classList.remove("hidden");
+      if (dashboardContent) dashboardContent.classList.add("hidden");
+      
+      const wtVal = document.getElementById("pm-weight-val");
+      if (wtVal) wtVal.textContent = data.current_weight ? `${data.current_weight} kg` : "--";
+      return;
+    }
+    
+    if (emptyState) emptyState.classList.add("hidden");
+    if (dashboardContent) dashboardContent.classList.remove("hidden");
+    
+    // 1. Summary Cards
+    const streakVal = document.getElementById("pm-streak-val");
+    const streakBest = document.getElementById("pm-streak-best");
+    const completedVal = document.getElementById("pm-completed-val");
+    const durationVal = document.getElementById("pm-duration-val");
+    const weightVal = document.getElementById("pm-weight-val");
+    
+    if (streakVal) streakVal.textContent = data.current_streak;
+    if (streakBest) streakBest.textContent = `Best: ${data.best_streak} days`;
+    if (completedVal) completedVal.textContent = data.total_workouts;
+    if (durationVal) {
+      const hrs = Math.round(data.total_duration / 60 * 10) / 10;
+      durationVal.textContent = hrs >= 1.0 ? `${hrs}h` : `${data.total_duration}m`;
+    }
+    if (weightVal) weightVal.textContent = data.current_weight ? `${data.current_weight} kg` : "--";
+    
+    // 2. Today's Activity Card
+    const todayContainer = document.getElementById("pm-today-activity-container");
+    if (todayContainer) {
+      if (data.today) {
+        todayContainer.innerHTML = `
+          <div class="today-activity-minimal">
+            <div class="tam-header">
+              <span class="tam-check">✓ Workout completed</span>
+              <strong class="tam-name">${escapeHtml(data.today.name)}</strong>
+            </div>
+            <div class="tam-meta">
+              <span>${data.today.exercises} exercises</span>
+              <span>·</span>
+              <span>${data.today.duration} min</span>
+              <span>·</span>
+              <span>${data.today.calories} kcal estimated</span>
+            </div>
+            <div class="tam-time">
+              Started ${data.today.start_time} · Finished ${data.today.end_time}
+            </div>
+          </div>
+        `;
+      } else {
+        todayContainer.innerHTML = `
+          <div class="today-activity-empty">
+            No workout completed today.
+          </div>
+        `;
+      }
+    }
+    
+    // 3. Worked Today Muscles
+    const chipsContainer = document.getElementById("pm-worked-today-chips");
+    if (chipsContainer) {
+      if (data.today_muscles && data.today_muscles.length > 0) {
+        chipsContainer.innerHTML = data.today_muscles.map(m => `
+          <span class="worked-chip">✓ ${escapeHtml(m)}</span>
+        `).join("");
+      } else {
+        chipsContainer.innerHTML = `<span class="worked-chip-empty">No muscles worked today</span>`;
+      }
+    }
+    
+    // 4. Last 7 Days Timeline
+    const timelineContainer = document.getElementById("pm-weekly-timeline");
+    if (timelineContainer) {
+      timelineContainer.innerHTML = data.weekly_timeline.map((dayData, idx) => `
+        <div class="timeline-day-item ${dayData.completed ? 'completed' : ''}" onclick="showTimelineDetail(${idx})">
+          <span class="td-label">${dayData.day}</span>
+          <div class="td-circle">${dayData.completed ? '✓' : '—'}</div>
+        </div>
+      `).join("");
+      
+      window._weeklyTimelineData = data.weekly_timeline;
+    }
+    
+    // 5. Recent Workouts (last 5)
+    const recentContainer = document.getElementById("pm-recent-workouts");
+    if (recentContainer) {
+      if (data.recent_workouts && data.recent_workouts.length > 0) {
+        recentContainer.innerHTML = data.recent_workouts.map(w => `
+          <div class="recent-workout-item-minimal">
+            <div class="rwi-left">
+              <span class="rwi-day">${escapeHtml(w.day)}</span>
+              <strong class="rwi-name">${escapeHtml(w.name)}</strong>
+            </div>
+            <div class="rwi-right">
+              <span class="rwi-duration">${w.duration} min</span>
+              <span class="rwi-status">Completed</span>
+            </div>
+          </div>
+        `).join("");
+      } else {
+        recentContainer.innerHTML = `<p class="recent-empty">No workouts completed recently.</p>`;
+      }
+    }
+    
+    // 6. Personal Records
+    const prDuration = document.getElementById("pm-pr-duration");
+    const prStreak = document.getElementById("pm-pr-streak");
+    const prMuscle = document.getElementById("pm-pr-muscle");
+    const prExercises = document.getElementById("pm-pr-exercises");
+    
+    if (prDuration) prDuration.textContent = `${data.personal_records.best_duration} min`;
+    if (prStreak) prStreak.textContent = `${data.personal_records.longest_streak} days`;
+    if (prMuscle) prMuscle.textContent = titleCase(data.personal_records.most_active_muscle);
+    if (prExercises) prExercises.textContent = data.personal_records.total_exercises_completed;
+    
+  } catch (e) {
+    console.error("Failed to load progress dashboard:", e);
   }
 }
-function renderBadges(badges) {
-  const c=document.getElementById("badges-container"); if(!c)return;
-  if(!badges?.length){c.innerHTML=`<p class="no-badges">Complete workouts to earn badges! 🏆</p>`;return;}
-  c.innerHTML=badges.map(b=>`<div class="badge-item"><span class="badge-icon">${b.badge_icon}</span><span class="badge-name">${b.badge_name}</span></div>`).join("");
+
+function showTimelineDetail(index) {
+  const data = window._weeklyTimelineData?.[index];
+  const popup = document.getElementById("pm-timeline-detail-popup");
+  
+  if (!data || !popup) return;
+  
+  if (!data.completed) {
+    closeTimelinePopup();
+    return;
+  }
+  
+  document.getElementById("pm-tdp-name").textContent = data.name;
+  document.getElementById("pm-tdp-duration").textContent = `Duration: ${data.duration} min`;
+  document.getElementById("pm-tdp-exercises").textContent = `Exercises: ${data.exercises} completed`;
+  
+  popup.classList.remove("hidden");
 }
-function chartOpts(beginAtZero=false){
-  return{responsive:true,maintainAspectRatio:false,
-    plugins:{legend:{display:false}},
-    scales:{
-      x:{ticks:{color:"#64748b",font:{size:10},maxRotation:45},grid:{color:"rgba(255,255,255,.04)"}},
-      y:{ticks:{color:"#64748b",font:{size:10}},grid:{color:"rgba(255,255,255,.04)"},beginAtZero}}};
+
+function closeTimelinePopup() {
+  const popup = document.getElementById("pm-timeline-detail-popup");
+  if (popup) popup.classList.add("hidden");
 }
 
 // ── PROFILE ───────────────────────────────────────────────────────────
@@ -3033,6 +3198,7 @@ async function saveProfile() {
     document.getElementById("profile-goal-display").textContent=body.goal;
     updateProfileCockpit(currentUser);
     document.getElementById("profile-avatar-display").textContent=body.gender==="female"?"🏃‍♀️":"🏋️";
+    loadProgress();
   }catch{showToast("❌ Save failed.");}
 }
 
@@ -3076,3 +3242,371 @@ function launchConfetti(){
   setTimeout(()=>{o.classList.add("hidden");o.innerHTML="";},3500);
 }
 document.addEventListener("click",()=>{if(window.speechSynthesis)speechSynthesis.resume();},{once:true});
+
+// ── TWO-MODE WORKOUT STATE MANAGEMENT ─────────────────────────────────
+let activeWorkoutData = null;
+let finalSummaryReply = null;
+let workoutTime = 0;
+let workoutTimerInterval = null;
+let isWorkoutPaused = false;
+let lastExerciseName = null;
+let isDrawerOpenState = false;
+
+function transitionToWorkout(data) {
+  activeWorkoutData = data;
+  
+  const chatScreen = document.getElementById("chat-mode-shell");
+  const sessionScreen = document.getElementById("workout-session-shell");
+  const completeScreen = document.getElementById("workout-complete-screen");
+  
+  if (chatScreen) chatScreen.classList.add("hidden");
+  if (completeScreen) completeScreen.classList.add("hidden");
+  
+  const isNewSession = sessionScreen && sessionScreen.classList.contains("hidden");
+  if (isNewSession) {
+    sessionScreen.classList.remove("hidden");
+    startWorkoutTimer();
+    lastExerciseName = null; // force update
+  }
+  
+  const exercises = data.exercises || (data.current_exercise ? [data.current_exercise] : []);
+  const currentIdx = data.current_exercise_index ?? 0;
+  const currentSet = data.current_set || 1;
+  const active = data.current_exercise || exercises[currentIdx] || exercises[0] || {};
+  const total = data.total_exercises || exercises.length || 1;
+  
+  const updateUI = () => {
+    // Populate current exercise card details
+    const exerciseNameEl = document.getElementById("ws-exercise-name");
+    const exerciseSubtitleEl = document.getElementById("ws-exercise-subtitle");
+    const exerciseIconEl = document.getElementById("ws-exercise-icon");
+    const instructionsEl = document.getElementById("ws-exercise-instructions");
+    
+    if (exerciseNameEl) exerciseNameEl.textContent = active.name || "Exercise";
+    
+    const category = active.muscle || active.category || "Bodyweight";
+    if (exerciseSubtitleEl) {
+      exerciseSubtitleEl.textContent = `${category} · ${active.sets || 3} Sets · ${active.reps || 10} Reps`;
+    }
+    
+    if (exerciseIconEl) {
+      const type = exerciseMotionType(active);
+      exerciseIconEl.innerHTML = renderExerciseHologram(type, active, data.zone);
+    }
+    
+    if (instructionsEl) {
+      const defaultTips = [
+        "Maintain a slow, controlled negative phase (3 seconds).",
+        "Focus on the target muscle contraction at peak.",
+        "Keep your core braced and maintain neutral posture.",
+        "Exhale on exertion, inhale as you lower the weight."
+      ];
+      if (active.progression && Array.isArray(active.progression)) {
+        instructionsEl.innerHTML = active.progression.map(tip => `<li>${escapeHtml(tip)}</li>`).join("");
+      } else if (active.weight_guide) {
+        instructionsEl.innerHTML = `
+          <li>${escapeHtml(active.weight_guide)}</li>
+          <li>${defaultTips[1]}</li>
+          <li>${defaultTips[2]}</li>
+        `;
+      } else {
+        instructionsEl.innerHTML = defaultTips.map(tip => `<li>${tip}</li>`).join("");
+      }
+    }
+  };
+
+  if (lastExerciseName && lastExerciseName !== active.name) {
+    animateExerciseCardUpdate(updateUI);
+  } else {
+    updateUI();
+  }
+  lastExerciseName = active.name;
+
+  // Update minimal header progress
+  const headerTitleEl = document.getElementById("ws-header-title");
+  const headerProgressEl = document.getElementById("ws-header-progress");
+  const muscleTitle = data.muscle_group || data.today_muscle || "AI Workout Plan";
+  if (headerTitleEl) headerTitleEl.textContent = titleCase(muscleTitle);
+  if (headerProgressEl) headerProgressEl.textContent = `Exercise ${currentIdx + 1} of ${total}`;
+
+  // Update progress bar
+  const pct = Math.min(100, Math.round(((currentIdx + (currentSet - 1) / Math.max(active.sets || 3, 1)) / total) * 100));
+  const fillEl = document.getElementById("ws-progress-fill-minimal");
+  const progressLabelEl = document.getElementById("ws-progress-text-label");
+  if (fillEl) fillEl.style.width = `${pct}%`;
+  if (progressLabelEl) progressLabelEl.textContent = `Exercise ${currentIdx + 1} / ${total} (${pct}% Completed)`;
+
+  // Update Right Sidebar Overview
+  const overviewTitleEl = document.getElementById("ws-overview-title");
+  const overviewCountEl = document.getElementById("ws-overview-count");
+  const overviewDurationEl = document.getElementById("ws-overview-duration");
+  const overviewDifficultyEl = document.getElementById("ws-overview-difficulty");
+  const overviewReadinessEl = document.getElementById("ws-overview-readiness");
+
+  if (overviewTitleEl) overviewTitleEl.textContent = titleCase(muscleTitle);
+  if (overviewCountEl) overviewCountEl.textContent = `${total} Exercises`;
+  if (overviewDurationEl) overviewDurationEl.textContent = `~${total * 8 + 8} min`;
+  if (overviewDifficultyEl) overviewDifficultyEl.textContent = active.intensity || active.difficulty || "Guided";
+  if (overviewReadinessEl) {
+    overviewReadinessEl.textContent = (data.zone || "green").toUpperCase();
+    overviewReadinessEl.className = `badge readiness ${data.zone || "green"}`;
+  }
+
+  // Update Exercise Queue list
+  const queueContainer = document.getElementById("ws-exercise-queue");
+  if (queueContainer) {
+    queueContainer.innerHTML = exercises.map((ex, idx) => {
+      const isCurrent = idx === currentIdx;
+      const isCompleted = idx < currentIdx;
+      let statusClass = "";
+      let icon = `${idx + 1}`;
+      if (isCurrent) {
+        statusClass = "active";
+        icon = "▶";
+      } else if (isCompleted) {
+        statusClass = "complete";
+        icon = "✓";
+      }
+      return `
+        <div class="ws-queue-item ${statusClass}">
+          <div class="ws-queue-icon">${icon}</div>
+          <div class="ws-queue-details">
+            <span>${escapeHtml(ex.name)}</span>
+            <small>${ex.sets} sets x ${ex.reps} reps</small>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+  
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function animateExerciseCardUpdate(callback) {
+  const card = document.getElementById("workout-focus-card");
+  if (!card) {
+    callback();
+    return;
+  }
+  card.classList.add("slide-out-animation");
+  setTimeout(() => {
+    callback();
+    card.classList.remove("slide-out-animation");
+    card.classList.add("fade-in-animation");
+    setTimeout(() => {
+      card.classList.remove("fade-in-animation");
+    }, 250);
+  }, 250);
+}
+
+function startWorkoutTimer() {
+  clearInterval(workoutTimerInterval);
+  workoutTime = 0;
+  workoutTimerInterval = setInterval(() => {
+    workoutTime++;
+    const mins = Math.floor(workoutTime / 60);
+    const secs = workoutTime % 60;
+    const display = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+    const el = document.getElementById("ws-header-time");
+    if (el) el.textContent = display;
+  }, 1000);
+}
+
+function workoutPause() {
+  const btn = document.getElementById("ws-header-pause-btn");
+  if (isWorkoutPaused) {
+    workoutTimerInterval = setInterval(() => {
+      workoutTime++;
+      const mins = Math.floor(workoutTime / 60);
+      const secs = workoutTime % 60;
+      const display = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+      const el = document.getElementById("ws-header-time");
+      if (el) el.textContent = display;
+    }, 1000);
+    isWorkoutPaused = false;
+    if (btn) btn.textContent = "⏸ Pause";
+  } else {
+    clearInterval(workoutTimerInterval);
+    isWorkoutPaused = true;
+    if (btn) btn.textContent = "▶ Resume";
+  }
+}
+
+function workoutNext() {
+  quickSend("next");
+}
+
+function workoutPrev() {
+  quickSend("prev");
+}
+
+function workoutFinish() {
+  quickSend("finish workout");
+}
+
+function transitionToComplete(data) {
+  clearInterval(workoutTimerInterval);
+  
+  if (data.type === "workout_logged" && data.reply) {
+    finalSummaryReply = data.reply;
+  }
+  
+  const sessionScreen = document.getElementById("workout-session-shell");
+  const chatScreen = document.getElementById("chat-mode-shell");
+  const completeScreen = document.getElementById("workout-complete-screen");
+  
+  if (sessionScreen) sessionScreen.classList.add("hidden");
+  if (chatScreen) chatScreen.classList.add("hidden");
+  if (completeScreen) {
+    completeScreen.classList.remove("hidden");
+    
+    const durationMin = Math.round(workoutTime / 60) || 45;
+    const caloriesBurned = Math.round(durationMin * 8.5) || 380;
+    const volumeKg = Math.round((activeWorkoutData?.exercises?.length || 5) * 3 * 10 * 20) || 3240;
+    const completedCount = activeWorkoutData?.exercises?.length || 6;
+    
+    const durEl = document.getElementById("wc-duration");
+    const calEl = document.getElementById("wc-calories");
+    const volEl = document.getElementById("wc-volume");
+    const doneEl = document.getElementById("wc-completed");
+    const recEl = document.getElementById("wc-recovery");
+    const xpEl = document.getElementById("wc-xp");
+    
+    if (durEl) durEl.textContent = `${durationMin} min`;
+    if (calEl) calEl.textContent = `${caloriesBurned} kcal`;
+    if (volEl) volEl.textContent = `${volumeKg.toLocaleString()} kg`;
+    if (doneEl) doneEl.textContent = completedCount;
+    if (recEl) recEl.textContent = `${activeWorkoutData?.zone === "red" ? "68" : activeWorkoutData?.zone === "yellow" ? "82" : "94"}%`;
+    if (xpEl) xpEl.textContent = `+${completedCount * 100} XP`;
+  }
+  
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function returnToCoach() {
+  const completeScreen = document.getElementById("workout-complete-screen");
+  const sessionScreen = document.getElementById("workout-session-shell");
+  const chatScreen = document.getElementById("chat-mode-shell");
+  
+  if (completeScreen) completeScreen.classList.add("hidden");
+  if (sessionScreen) sessionScreen.classList.add("hidden");
+  if (chatScreen) {
+    chatScreen.classList.remove("hidden");
+    
+    if (finalSummaryReply) {
+      const chatBox = document.getElementById("chat-box");
+      if (chatBox) {
+        const msg = document.createElement("div");
+        msg.className = "message bot";
+        msg.innerHTML = cleanDisplayText(finalSummaryReply)
+          .replace(/\*\*(.*?)\*\*/g,"<strong>$1</strong>")
+          .replace(/_(.*?)_/g,"<em>$1</em>")
+          .replace(/\n/g,"<br>");
+        chatBox.appendChild(msg);
+      }
+      finalSummaryReply = null;
+    }
+  }
+  
+  scrollToBottom();
+}
+
+function toggleCoachDrawer() {
+  const drawer = document.getElementById("coach-side-drawer");
+  if (!drawer) return;
+  isDrawerOpenState = !isDrawerOpenState;
+  if (isDrawerOpenState) {
+    drawer.classList.remove("hidden");
+  } else {
+    drawer.classList.add("hidden");
+  }
+}
+
+function sendDrawerMessage() {
+  const input = document.getElementById("drawer-message-input");
+  if (!input) return;
+  const val = input.value.trim();
+  if (!val) return;
+  input.value = "";
+  
+  pushDrawerMessage(val, "user");
+  callServer(val);
+}
+
+function handleDrawerKey(e) {
+  if (e.key === "Enter") sendDrawerMessage();
+}
+
+function pushDrawerMessage(text, sender) {
+  const container = document.getElementById("drawer-messages");
+  if (!container) return;
+  
+  const msg = document.createElement("div");
+  msg.className = `drawer-msg-item ${sender}`;
+  msg.innerHTML = cleanDisplayText(text)
+    .replace(/\*\*(.*?)\*\*/g,"<strong>$1</strong>")
+    .replace(/_(.*?)_/g,"<em>$1</em>")
+    .replace(/\n/g,"<br>");
+    
+  container.appendChild(msg);
+  container.scrollTop = container.scrollHeight;
+}
+
+// Override skipTimer and startRestTimer to hook new screen Rest Overlay
+function skipRestTimer() {
+  clearInterval(restInterval);
+  const overlay = document.getElementById("workout-rest-overlay");
+  if (overlay) overlay.classList.add("hidden");
+}
+
+const originalStartRestTimer = startRestTimer;
+startRestTimer = function(restStr) {
+  clearInterval(restInterval);
+  if (!restStr) return;
+  const secs = parseInt(restStr) || 60;
+  let rem = secs;
+  
+  const overlay = document.getElementById("workout-rest-overlay");
+  const countdown = document.getElementById("ws-rest-countdown");
+  const nextExerciseText = document.getElementById("ws-rest-next-exercise");
+  const restBar = document.getElementById("ws-rest-ring-bar");
+  
+  if (overlay) overlay.classList.remove("hidden");
+  if (nextExerciseText && activeWorkoutData) {
+    const exercises = activeWorkoutData.exercises || [];
+    const nextIdx = (activeWorkoutData.current_exercise_index ?? 0) + 1;
+    const nextEx = exercises[nextIdx] || activeWorkoutData.current_exercise;
+    if (nextEx) {
+      nextExerciseText.textContent = `Next Up: ${nextEx.name}`;
+    }
+  }
+  
+  const dashArray = 326.72; // 2 * Math.PI * 52
+  
+  const updateWSDisplay = (r) => {
+    if (countdown) countdown.textContent = `${r}s`;
+    if (restBar) {
+      const offset = dashArray - (r / secs) * dashArray;
+      restBar.style.strokeDashoffset = offset;
+    }
+  };
+  
+  updateWSDisplay(rem);
+  
+  restInterval = setInterval(() => {
+    rem--;
+    updateWSDisplay(rem);
+    if (rem <= 0) {
+      clearInterval(restInterval);
+      if (overlay) overlay.classList.add("hidden");
+      speak("Rest done. Let's go!", currentUser?.gender || onboardingGender);
+    }
+  }, 1000);
+};
+
+// No-op for removed popover message hooks
+function pushPopoverMessage(text, sender = "bot") {
+  if (isDrawerOpenState) {
+    pushDrawerMessage(text, "bot");
+  }
+}

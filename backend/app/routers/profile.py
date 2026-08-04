@@ -75,6 +75,29 @@ async def update_profile(
         if all(getattr(profile, f) for f in required):
             profile.onboarding_complete = True
 
+    if "weight" in update_data and update_data["weight"]:
+        from app.models.progress import WeightLog
+        from sqlalchemy import and_
+        today_date = date.today()
+        existing_log_res = await db.execute(
+            select(WeightLog).where(
+                and_(
+                    WeightLog.user_id == current_user.id,
+                    WeightLog.date == today_date
+                )
+            )
+        )
+        existing_log = existing_log_res.scalar_one_or_none()
+        if existing_log:
+            existing_log.weight = update_data["weight"]
+        else:
+            weight_log = WeightLog(
+                user_id=current_user.id,
+                weight=update_data["weight"],
+                date=today_date
+            )
+            db.add(weight_log)
+
     await db.commit()
     await db.refresh(profile)
     return _enrich_profile(profile)

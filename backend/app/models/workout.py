@@ -21,6 +21,13 @@ class Workout(Base):
     sport: Mapped[str | None] = mapped_column(String(50))
     zone: Mapped[str | None] = mapped_column(String(10))             # green | yellow | red
     notes: Mapped[str | None] = mapped_column(Text)
+    
+    # Analytics fields
+    total_sets: Mapped[int | None] = mapped_column(Integer)          # Total sets completed
+    total_reps: Mapped[int | None] = mapped_column(Integer)          # Total reps completed
+    calories_estimate: Mapped[float | None] = mapped_column(Float)    # Estimated calories burned
+    completion_percentage: Mapped[float | None] = mapped_column(Float) # % of exercises completed
+    
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped["Auth"] = relationship("Auth", back_populates="workouts")

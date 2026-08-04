@@ -1,9 +1,8 @@
-import {
-  PoseLandmarker,
-  FilesetResolver,
-} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304/+esm";
+// Load MediaPipe from CDN (using global scope for non-module loading)
+const PoseLandmarker = window.PoseLandmarker;
+const FilesetResolver = window.FilesetResolver;
 
-export const LM = {
+const LM = {
   NOSE: 0,
   LEFT_SHOULDER: 11,
   RIGHT_SHOULDER: 12,
@@ -19,13 +18,13 @@ export const LM = {
   RIGHT_ANKLE: 28,
 };
 
-export const POSE_EDGES = [
+const POSE_EDGES = [
   [11, 12], [11, 13], [13, 15], [12, 14], [14, 16],
   [11, 23], [12, 24], [23, 24],
   [23, 25], [25, 27], [24, 26], [26, 28],
 ];
 
-export function angleDeg(a, b, c) {
+function angleDeg(a, b, c) {
   const v1x = a.x - b.x;
   const v1y = a.y - b.y;
   const v2x = c.x - b.x;
@@ -39,7 +38,7 @@ export function angleDeg(a, b, c) {
 let cached = null;
 let creating = null;
 
-export async function getPoseLandmarker() {
+async function getPoseLandmarker() {
   if (cached) return cached;
   if (creating) return creating;
 
@@ -64,3 +63,11 @@ export async function getPoseLandmarker() {
 
   return creating;
 }
+
+// Export to global scope for other scripts
+window.GhostPose = {
+  getPoseLandmarker,
+  POSE_EDGES,
+  LM,
+  angleDeg
+};

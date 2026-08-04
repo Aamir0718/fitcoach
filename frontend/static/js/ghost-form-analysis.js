@@ -1,11 +1,85 @@
-import { angleDeg, LM } from "./ghost-pose.js";
+// Import from global scope
+const { angleDeg, LM } = window.GhostPose || {};
 
-export const TARGET_REPS = 12;
+// Fallback LM if global not available
+const LM_FALLBACK = {
+  NOSE: 0,
+  LEFT_SHOULDER: 11,
+  RIGHT_SHOULDER: 12,
+  LEFT_ELBOW: 13,
+  RIGHT_ELBOW: 14,
+  LEFT_WRIST: 15,
+  RIGHT_WRIST: 16,
+  LEFT_HIP: 23,
+  RIGHT_HIP: 24,
+  LEFT_KNEE: 25,
+  RIGHT_KNEE: 26,
+  LEFT_ANKLE: 27,
+  RIGHT_ANKLE: 28,
+};
+
+const LM_ACTUAL = LM || LM_FALLBACK;
+const TARGET_REPS = 12;
+
+const KEY_JOINTS = {
+  squat: [
+    LM_ACTUAL.LEFT_HIP, LM_ACTUAL.LEFT_KNEE, LM_ACTUAL.LEFT_ANKLE,
+    LM_ACTUAL.RIGHT_HIP, LM_ACTUAL.RIGHT_KNEE, LM_ACTUAL.RIGHT_ANKLE,
+    LM_ACTUAL.LEFT_SHOULDER
+  ],
+  pushup: [
+    LM_ACTUAL.LEFT_SHOULDER, LM_ACTUAL.LEFT_ELBOW, LM_ACTUAL.LEFT_WRIST,
+    LM_ACTUAL.RIGHT_SHOULDER, LM_ACTUAL.RIGHT_ELBOW, LM_ACTUAL.RIGHT_WRIST,
+    LM_ACTUAL.LEFT_HIP, LM_ACTUAL.LEFT_ANKLE
+  ],
+  biceps: [
+    LM_ACTUAL.RIGHT_SHOULDER, LM_ACTUAL.RIGHT_ELBOW, LM_ACTUAL.RIGHT_WRIST,
+    LM_ACTUAL.RIGHT_HIP
+  ]
+};
+
+let lastSmoothedLandmarks = null;
+const ALPHA = 0.35;
+
+function smoothLandmarks(current) {
+  if (!current) return null;
+  if (!lastSmoothedLandmarks || lastSmoothedLandmarks.length !== current.length) {
+    lastSmoothedLandmarks = current.map(lm => ({ ...lm }));
+    return lastSmoothedLandmarks;
+  }
+  for (let i = 0; i < current.length; i++) {
+    lastSmoothedLandmarks[i].x = ALPHA * current[i].x + (1 - ALPHA) * lastSmoothedLandmarks[i].x;
+    lastSmoothedLandmarks[i].y = ALPHA * current[i].y + (1 - ALPHA) * lastSmoothedLandmarks[i].y;
+    lastSmoothedLandmarks[i].z = ALPHA * current[i].z + (1 - ALPHA) * lastSmoothedLandmarks[i].z;
+    if (current[i].visibility !== undefined) {
+      lastSmoothedLandmarks[i].visibility = ALPHA * current[i].visibility + (1 - ALPHA) * (lastSmoothedLandmarks[i].visibility || 0);
+    }
+  }
+  return lastSmoothedLandmarks;
+}
+
+function checkPoseReliability(landmarks, exercise) {
+  const joints = KEY_JOINTS[exercise] || [];
+  for (const j of joints) {
+    const lm = landmarks[j];
+    if (!lm) return false;
+    if (lm.visibility !== undefined && lm.visibility < 0.7) {
+      return false;
+    }
+  }
+  return true;
+}
 
 export function newRepState() {
   return {
     reps: 0,
     phase: "up",
+    stateName: "READY", // READY -> DOWN -> UP
+    pendingState: null,
+    pendingStateTime: 0,
+    lastRepTime: 0,
+    lastAngle: null,
+    angleTrend: 0,
     goodFrames: 0,
     totalFrames: 0,
     depthSamples: [],
@@ -15,19 +89,41 @@ export function newRepState() {
 
 export function analyze({ landmarks, exercise }) {
   if (!landmarks || landmarks.length < 29) return null;
-  if (exercise === "squat") return analyzeSquat(landmarks);
-  if (exercise === "pushup") return analyzePushup(landmarks);
-  return analyzeBiceps(landmarks);
+
+  // 1. Smooth landmarks using EMA to eliminate camera noise/jitter
+  const smoothed = smoothLandmarks(landmarks);
+  if (!smoothed) return null;
+
+  // 2. Validate pose confidence and visibility
+  const reliable = checkPoseReliability(smoothed, exercise);
+  if (!reliable) {
+    return {
+      primaryAngle: 0,
+      exercise,
+      phase: "up",
+      good: false,
+      cues: ["Body not fully visible - check camera alignment"],
+      errors: ["low_visibility"],
+      depthPct: 0,
+      precision: 0,
+      angles: {}
+    };
+  }
+
+  // 3. Analyze based on smoothed landmarks
+  if (exercise === "squat") return analyzeSquat(smoothed);
+  if (exercise === "pushup") return analyzePushup(smoothed);
+  return analyzeBiceps(smoothed);
 }
 
 function analyzeSquat(lm) {
-  const hip = lm[LM.LEFT_HIP];
-  const rightHip = lm[LM.RIGHT_HIP];
-  const knee = lm[LM.LEFT_KNEE];
-  const rightKnee = lm[LM.RIGHT_KNEE];
-  const ankle = lm[LM.LEFT_ANKLE];
-  const rightAnkle = lm[LM.RIGHT_ANKLE];
-  const shoulder = lm[LM.LEFT_SHOULDER];
+  const hip = lm[LM_ACTUAL.LEFT_HIP];
+  const rightHip = lm[LM_ACTUAL.RIGHT_HIP];
+  const knee = lm[LM_ACTUAL.LEFT_KNEE];
+  const rightKnee = lm[LM_ACTUAL.RIGHT_KNEE];
+  const ankle = lm[LM_ACTUAL.LEFT_ANKLE];
+  const rightAnkle = lm[LM_ACTUAL.RIGHT_ANKLE];
+  const shoulder = lm[LM_ACTUAL.LEFT_SHOULDER];
 
   const kneeAngle = angleDeg(hip, knee, ankle);
   const rightKneeAngle = angleDeg(rightHip, rightKnee, rightAnkle);
@@ -54,7 +150,7 @@ function analyzeSquat(lm) {
     good = false;
     errors.push("knee_tracking");
   }
-  if (kneeAngle > 150) {
+  if (kneeAngle > 115 && kneeAngle <= 145) {
     cues.push("Go lower");
     errors.push("shallow_squat");
   }
@@ -80,20 +176,20 @@ function analyzeSquat(lm) {
       leftKnee: kneeAngle,
       rightKnee: rightKneeAngle,
       leftHip: hipAngle,
-      leftShoulder: angleDeg(lm[LM.LEFT_ELBOW], shoulder, hip),
+      leftShoulder: angleDeg(lm[LM_ACTUAL.LEFT_ELBOW], shoulder, hip),
     },
   };
 }
 
 function analyzePushup(lm) {
-  const shoulder = lm[LM.LEFT_SHOULDER];
-  const rightShoulder = lm[LM.RIGHT_SHOULDER];
-  const elbow = lm[LM.LEFT_ELBOW];
-  const rightElbow = lm[LM.RIGHT_ELBOW];
-  const wrist = lm[LM.LEFT_WRIST];
-  const rightWrist = lm[LM.RIGHT_WRIST];
-  const hip = lm[LM.LEFT_HIP];
-  const ankle = lm[LM.LEFT_ANKLE];
+  const shoulder = lm[LM_ACTUAL.LEFT_SHOULDER];
+  const rightShoulder = lm[LM_ACTUAL.RIGHT_SHOULDER];
+  const elbow = lm[LM_ACTUAL.LEFT_ELBOW];
+  const rightElbow = lm[LM_ACTUAL.RIGHT_ELBOW];
+  const wrist = lm[LM_ACTUAL.LEFT_WRIST];
+  const rightWrist = lm[LM_ACTUAL.RIGHT_WRIST];
+  const hip = lm[LM_ACTUAL.LEFT_HIP];
+  const ankle = lm[LM_ACTUAL.LEFT_ANKLE];
 
   const elbowAngle = angleDeg(shoulder, elbow, wrist);
   const rightElbowAngle = angleDeg(rightShoulder, rightElbow, rightWrist);
@@ -113,7 +209,7 @@ function analyzePushup(lm) {
     good = false;
     errors.push("elbow_flare");
   }
-  if (elbowAngle > 160) {
+  if (elbowAngle > 105 && elbowAngle <= 145) {
     cues.push("Lower your chest");
     errors.push("shallow_rep");
   }
@@ -145,10 +241,10 @@ function analyzePushup(lm) {
 }
 
 function analyzeBiceps(lm) {
-  const shoulder = lm[LM.RIGHT_SHOULDER];
-  const elbow = lm[LM.RIGHT_ELBOW];
-  const wrist = lm[LM.RIGHT_WRIST];
-  const hip = lm[LM.RIGHT_HIP];
+  const shoulder = lm[LM_ACTUAL.RIGHT_SHOULDER];
+  const elbow = lm[LM_ACTUAL.RIGHT_ELBOW];
+  const wrist = lm[LM_ACTUAL.RIGHT_WRIST];
+  const hip = lm[LM_ACTUAL.RIGHT_HIP];
   const elbowAngle = angleDeg(shoulder, elbow, wrist);
   const shoulderAngle = angleDeg(elbow, shoulder, hip);
   const cues = [];
@@ -165,7 +261,7 @@ function analyzeBiceps(lm) {
     good = false;
     errors.push("swinging_arms");
   }
-  if (elbowAngle > 160) {
+  if (elbowAngle > 75 && elbowAngle <= 145) {
     cues.push("Curl all the way up");
     errors.push("incomplete_contraction");
   }
@@ -189,7 +285,7 @@ function analyzeBiceps(lm) {
     angles: {
       rightElbow: elbowAngle,
       rightShoulder: shoulderAngle,
-      rightHip: angleDeg(shoulder, hip, lm[LM.RIGHT_KNEE]),
+      rightHip: angleDeg(shoulder, hip, lm[LM_ACTUAL.RIGHT_KNEE]),
     },
   };
 }
@@ -203,10 +299,149 @@ export function tick(state, fb) {
     angleScores: [...state.angleScores.slice(-80), fb.precision ?? 100],
   };
 
-  if (state.phase === "down" && fb.phase === "up") {
-    next.reps = state.reps + 1;
+  // If the frame is invalid (low visibility or bad landmarks), pause transitions and return
+  if (!fb.good || (fb.errors && fb.errors.includes("low_visibility"))) {
+    next.pendingState = null;
+    next.pendingStateTime = 0;
+    return next;
   }
-  next.phase = fb.phase;
+
+  const now = Date.now();
+  const COOLDOWN = 700; // Cooldown of 700ms to prevent double counting
+  const lastRepTime = state.lastRepTime || 0;
+
+  // Ignore all detections during cooldown
+  if (now - lastRepTime < COOLDOWN) {
+    next.pendingState = null;
+    next.pendingStateTime = 0;
+    return next;
+  }
+
+  const primaryAngle = fb.primaryAngle;
+  const exercise = fb.exercise;
+  const currentStateName = state.stateName || "READY";
+
+  // Rule 5: Direction check. Track angle trend (increasing/decreasing)
+  const prevAngle = state.lastAngle;
+  let angleTrend = state.angleTrend || 0; // -1 = decreasing, 1 = increasing
+  if (prevAngle !== null) {
+    const diff = primaryAngle - prevAngle;
+    if (Math.abs(diff) > 2.0) { // Ignore small fluctuations below 2 degrees
+      angleTrend = diff > 0 ? 1 : -1;
+    }
+  }
+  next.lastAngle = primaryAngle;
+  next.angleTrend = angleTrend;
+
+  // Rule 2 & 9 & 10: State Machine target state determination based on ROM thresholds
+  let targetState = null;
+  if (exercise === "squat") {
+    if (primaryAngle > 155) {
+      targetState = "READY";
+    } else if (primaryAngle < 105 && angleTrend === -1) {
+      targetState = "DOWN";
+    } else if (primaryAngle > 145 && currentStateName === "DOWN" && angleTrend === 1) {
+      targetState = "UP";
+    }
+  } else if (exercise === "pushup") {
+    if (primaryAngle > 155) {
+      targetState = "READY";
+    } else if (primaryAngle < 95 && angleTrend === -1) {
+      targetState = "DOWN";
+    } else if (primaryAngle > 145 && currentStateName === "DOWN" && angleTrend === 1) {
+      targetState = "UP";
+    }
+  } else if (exercise === "biceps") {
+    if (primaryAngle > 155) {
+      targetState = "READY";
+    } else if (primaryAngle < 65 && angleTrend === -1) {
+      targetState = "DOWN";
+    } else if (primaryAngle > 150 && currentStateName === "DOWN" && angleTrend === 1) {
+      targetState = "UP";
+    }
+  }
+
+  // Rule 3: Stability check (300ms delay) before transitioning state
+  if (targetState && targetState !== currentStateName) {
+    if (targetState !== state.pendingState) {
+      next.pendingState = targetState;
+      next.pendingStateTime = now;
+    } else if (now - (state.pendingStateTime || 0) >= 300) {
+      // Transition confirmed!
+      if (currentStateName === "UP" && targetState === "READY") {
+        next.reps = state.reps + 1;
+        next.lastRepTime = now;
+      }
+      next.stateName = targetState;
+      next.pendingState = null;
+      next.pendingStateTime = 0;
+    }
+  } else {
+    // Reset pending state if we don't have a new target state or user returns to current state
+    next.pendingState = null;
+    next.pendingStateTime = 0;
+  }
+
+  // Update dynamic phase value for form scoring logic compatibility
+  next.phase = next.stateName === "DOWN" ? "down" : "up";
+
+  // Rule 11: Real-time context feedback cues
+  const guideCues = [];
+  const activeState = next.stateName;
+
+  if (exercise === "squat") {
+    if (activeState === "READY") {
+      if (primaryAngle < 150) {
+        guideCues.push("Squat deeper - lower further");
+      } else {
+        guideCues.push("Ready - begin squatting");
+      }
+    } else if (activeState === "DOWN") {
+      if (primaryAngle > 115) {
+        guideCues.push("Lower further");
+      } else {
+        guideCues.push("Good depth - now push up!");
+      }
+    } else if (activeState === "UP") {
+      guideCues.push("Almost done - stand all the way up");
+    }
+  } else if (exercise === "pushup") {
+    if (activeState === "READY") {
+      if (primaryAngle < 145) {
+        guideCues.push("Lower further");
+      } else {
+        guideCues.push("Ready - begin push-up");
+      }
+    } else if (activeState === "DOWN") {
+      if (primaryAngle > 105) {
+        guideCues.push("Lower chest further");
+      } else {
+        guideCues.push("Good depth - push all the way up");
+      }
+    } else if (activeState === "UP") {
+      guideCues.push("Straighten your arms completely");
+    }
+  } else if (exercise === "biceps") {
+    if (activeState === "READY") {
+      if (primaryAngle < 145) {
+        guideCues.push("Straighten your arm completely");
+      } else {
+        guideCues.push("Ready - begin curl");
+      }
+    } else if (activeState === "DOWN") {
+      if (primaryAngle > 75) {
+        guideCues.push("Curl higher - raise higher");
+      } else {
+        guideCues.push("Good squeeze - lower slowly");
+      }
+    } else if (activeState === "UP") {
+      guideCues.push("Straighten your arm completely");
+    }
+  }
+
+  // Inject the guide cue at the front of the cues array
+  fb.cues = [...guideCues, ...(fb.cues || [])];
+
   return next;
 }
 
@@ -250,3 +485,12 @@ function average(values, fallback) {
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
+
+// Export to global scope for other scripts
+window.GhostFormAnalysis = {
+  TARGET_REPS,
+  analyze,
+  tick,
+  scoreForm,
+  newRepState
+};

@@ -24,6 +24,10 @@ class Auth(Base):
     badges: Mapped[list["Badge"]] = relationship("Badge", back_populates="user", cascade="all, delete-orphan")
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
     progress_photos: Mapped[list["ProgressPhoto"]] = relationship("ProgressPhoto", back_populates="user", cascade="all, delete-orphan")
+    nutrition_logs: Mapped[list["NutritionLog"]] = relationship("NutritionLog", back_populates="user", cascade="all, delete-orphan")
+    streak: Mapped["Streak"] = relationship("Streak", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    personal_records: Mapped[list["PersonalRecord"]] = relationship("PersonalRecord", back_populates="user", cascade="all, delete-orphan")
+    activity_logs: Mapped[list["ActivityLog"]] = relationship("ActivityLog", back_populates="user", cascade="all, delete-orphan")
 
 
 class RefreshToken(Base):

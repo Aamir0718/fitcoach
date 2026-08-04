@@ -6,6 +6,7 @@ from datetime import date, timezone, datetime
 from app.database import get_db
 from app.models.auth import Auth
 from app.models.recovery import RecoveryLog
+from app.models.progress import ActivityLog
 from app.schemas.recovery import RecoveryLogRequest, RecoveryResponse
 from app.core.security import get_current_verified_user
 
@@ -54,6 +55,19 @@ async def log_recovery(
     db.add(log)
     await db.commit()
     await db.refresh(log)
+    
+    # Create activity log
+    activity = ActivityLog(
+        user_id=current_user.id,
+        activity_type="recovery",
+        title=f"Recovery Check: {zone.upper()}",
+        description=f"Score: {score}/100",
+        meta_data={"score": score, "zone": zone, "sleep_hours": body.sleep_hours},
+        date=date.today()
+    )
+    db.add(activity)
+    await db.commit()
+    
     return log
 
 

@@ -1,37 +1,115 @@
-import { getPoseLandmarker, POSE_EDGES, LM } from "./ghost-pose.js";
-import { analyze, tick, scoreForm, TARGET_REPS, newRepState } from "./ghost-form-analysis.js";
+// Load dependencies from global scope (loaded via script tags)
+const { getPoseLandmarker, POSE_EDGES, LM } = window.GhostPose || {};
+const { analyze, tick, scoreForm, TARGET_REPS, newRepState } = window.GhostFormAnalysis || {};
+
+// Fallback constants if global exports not available
+const LM_FALLBACK = {
+  NOSE: 0,
+  LEFT_SHOULDER: 11,
+  RIGHT_SHOULDER: 12,
+  LEFT_ELBOW: 13,
+  RIGHT_ELBOW: 14,
+  LEFT_WRIST: 15,
+  RIGHT_WRIST: 16,
+  LEFT_HIP: 23,
+  RIGHT_HIP: 24,
+  LEFT_KNEE: 25,
+  RIGHT_KNEE: 26,
+  LEFT_ANKLE: 27,
+  RIGHT_ANKLE: 28,
+};
+
+const POSE_EDGES_FALLBACK = [
+  [11, 12], [11, 13], [13, 15], [12, 14], [14, 16],
+  [11, 23], [12, 24], [23, 24],
+  [23, 25], [25, 27], [24, 26], [26, 28],
+];
+
+// Use actual exports or fallbacks
+const LM_ACTUAL = LM || LM_FALLBACK;
+const POSE_EDGES_ACTUAL = POSE_EDGES || POSE_EDGES_FALLBACK;
+const TARGET_REPS_ACTUAL = TARGET_REPS || 12;
+const newRepState_ACTUAL = newRepState || function() {
+  return {
+    reps: 0,
+    phase: "up",
+    stateName: "READY",
+    pendingState: null,
+    pendingStateTime: 0,
+    lastRepTime: 0,
+    lastAngle: null,
+    angleTrend: 0,
+    goodFrames: 0,
+    totalFrames: 0,
+    depthSamples: [],
+    angleScores: [],
+  };
+};
+
+// Exercise library will be loaded from API
+let EXERCISE_LIBRARY = {};
+
+// Form key mapping for pose detection - maps exercise names to form analysis keys
+// Exercises not in this list are not supported for pose detection
+const FORM_KEY_MAPPING = {
+  "Bicep Curl": "biceps",
+  "Hammer Curl": "biceps",
+  "Tricep Pushdown": "pushup",
+  "Squat": "squat",
+  "Lunges": "squat",
+  "Romanian Deadlift": "squat",
+  "Push-up": "pushup",
+  "Bench Press": "pushup",
+  "Incline Press": "pushup",
+  "Barbell Row": "biceps",
+  "Lat Pulldown": "biceps",
+  "Seated Row": "biceps",
+  "Plank": "pushup",
+  "Crunches": "pushup",
+  "Russian Twist": "biceps",
+  "Hip Thrust": "squat",
+  "Glute Bridge": "squat",
+  "Bulgarian Split Squat": "squat",
+  "Shoulder Press": "pushup",
+  "Lateral Raise": "biceps",
+  "Front Raise": "biceps",
+  "Burpees": "pushup",
+  "Mountain Climbers": "pushup",
+  "Thrusters": "squat"
+};
+
+// Check if an exercise is supported for pose detection
+function isExerciseSupported(exerciseName) {
+  return exerciseName in FORM_KEY_MAPPING;
+}
+
+// Icon mapping for exercises
+const ICON_MAPPING = {
+  "arms": "💪",
+  "legs": "🦵",
+  "chest": "🏋️",
+  "back": "🏋️",
+  "core": "🧘",
+  "glutes": "🍑",
+  "shoulders": "🏋️",
+  "full_body": "🏃"
+};
+
+const CATEGORY_META = {
+  arms: { name: "Arms", icon: "💪" },
+  legs: { name: "Legs", icon: "🦵" },
+  chest: { name: "Chest", icon: "🏋" },
+  shoulders: { name: "Shoulders", icon: "🎯" },
+  core: { name: "Core", icon: "🔥" },
+  glutes: { name: "Glutes", icon: "🍑" },
+  back: { name: "Back", icon: "🪽" },
+  full_body: { name: "Full Body", icon: "🏃" }
+};
 
 const EXERCISE_BRIEFS = {
-  squat: "Feet shoulder-width. Hips back, chest tall. Drive through the heels.",
+  squat: "Feet shoulder-width. Hips back, knees tracking, chest tall.",
   pushup: "Hands under shoulders. Lock the core. Keep elbows near 45 degrees from the torso.",
-  biceps: "Elbows pinned. Slow eccentric. Squeeze the peak without swinging.",
-};
-
-const DEMO_COPY = {
-  squat: "Match the ghost outline: hips back, knees tracking, chest tall.",
-  pushup: "Keep one clean line from shoulders to ankles and lower under control.",
   biceps: "Pin the upper arm and curl without letting the shoulder swing forward.",
-};
-
-const MUSCLE_ACTIVATION = {
-  squat: [
-    ["Quads", 92],
-    ["Glutes", 84],
-    ["Hamstrings", 62],
-    ["Core", 48],
-  ],
-  pushup: [
-    ["Chest", 88],
-    ["Triceps", 74],
-    ["Shoulders", 58],
-    ["Core", 52],
-  ],
-  biceps: [
-    ["Biceps", 94],
-    ["Forearms", 61],
-    ["Shoulders", 26],
-    ["Core", 18],
-  ],
 };
 
 const SCORE_STATES = [
@@ -41,11 +119,17 @@ const SCORE_STATES = [
 ];
 
 const state = {
+  initialized: false,
+  status: "idle", // "idle", "loading", "running"
+  selectedCategory: null,
+  selectedExercise: null,
+  selectedExercises: [], // Set dynamically to [selectedExercise] on session start
+  exercisesLoaded: false, // Track if exercises have been loaded from API
+  
+  currentExerciseIndex: 0,
+  currentSet: 1,
   exercise: "squat",
-  activeWorkout: null,
-  exerciseMeta: new Map(),
-  targetReps: TARGET_REPS,
-  status: "idle",
+  targetReps: TARGET_REPS_ACTUAL,
   reps: 0,
   acc: 100,
   displayAcc: 100,
@@ -54,13 +138,65 @@ const state = {
   rafId: null,
   timerId: null,
   lastVideoTime: -1,
-  repState: newRepState(),
+  repState: newRepState_ACTUAL(),
   previousAngles: null,
   stabilityScore: 100,
   completedPulse: false,
-  renderedExercise: null,
-  initialized: false,
 };
+
+// Fetch exercises from the backend API
+async function fetchExercisesFromAPI() {
+  try {
+    const token = localStorage.getItem('fc_token');
+    if (!token) {
+      console.error('No auth token found');
+      return;
+    }
+
+    const response = await fetch(`${window.API || ""}/api/workouts/exercises`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch exercises: ${response.status}`);
+    }
+
+    const exercises = await response.json();
+    
+    // Group exercises by category
+    EXERCISE_LIBRARY = {};
+    exercises.forEach(ex => {
+      if (!EXERCISE_LIBRARY[ex.category]) {
+        EXERCISE_LIBRARY[ex.category] = [];
+      }
+      
+      // Map API response to frontend format
+      const difficulty = ex.tags && ex.tags.length > 0 ? ex.tags[0] : 'beginner';
+      const formKey = FORM_KEY_MAPPING[ex.name] || 'pushup';
+      const icon = ICON_MAPPING[ex.category] || '💪';
+      
+      EXERCISE_LIBRARY[ex.category].push({
+        name: ex.name,
+        muscle: ex.muscle || 'General',
+        reps: parseInt(ex.reps) || 12,
+        sets: ex.sets || 3,
+        difficulty: difficulty.charAt(0).toUpperCase() + difficulty.slice(1),
+        icon: icon,
+        form_key: formKey
+      });
+    });
+
+    state.exercisesLoaded = true;
+    console.log('Exercises loaded from API:', Object.keys(EXERCISE_LIBRARY));
+    
+  } catch (error) {
+    console.error('Error fetching exercises:', error);
+    // Fallback to empty library - user will see no exercises
+    EXERCISE_LIBRARY = {};
+  }
+}
 
 const els = {};
 
@@ -68,106 +204,293 @@ function cacheEls() {
   els.video = document.getElementById("ghost-video");
   els.canvas = document.getElementById("ghost-canvas");
   els.overlay = document.getElementById("ghost-idle-overlay");
-  els.overlayTitle = document.getElementById("ghost-overlay-title");
-  els.overlayCopy = document.getElementById("ghost-overlay-copy");
-  els.startBtn = document.getElementById("ghost-start-btn");
-  els.stopBtn = document.getElementById("ghost-stop-btn");
-  els.statusPill = document.getElementById("ghost-status-pill");
+  
   els.reps = document.getElementById("ghost-reps");
+  els.targetReps = document.getElementById("ghost-target-reps");
   els.accuracy = document.getElementById("ghost-accuracy");
   els.accuracyLabel = document.getElementById("ghost-accuracy-label");
   els.timer = document.getElementById("ghost-timer");
-  els.depthFill = document.getElementById("ghost-depth-fill");
-  els.angle = document.getElementById("ghost-angle");
   els.brief = document.getElementById("ghost-brief");
   els.liveCue = document.getElementById("ghost-live-cue");
-  els.exerciseSelector = document.getElementById("ghost-exercise-selector");
-  els.accuracyCard = document.getElementById("ghost-accuracy-card");
-  els.repRing = document.getElementById("ghost-rep-ring");
-  els.targetReps = document.getElementById("ghost-target-reps");
-  els.muscleList = document.getElementById("ghost-muscle-list");
-  els.demoFigure = document.getElementById("ghost-demo-figure");
-  els.demoCopy = document.getElementById("ghost-demo-copy");
+  
+  els.selectionContainer = document.getElementById("ghost-selection-container");
+  els.categoriesGrid = document.getElementById("ghost-categories-grid");
+  els.exercisesSelection = document.getElementById("ghost-exercises-selection");
+  els.exercisesList = document.getElementById("ghost-exercises-list");
+  els.actionBar = document.getElementById("ghost-action-bar");
+  
+  els.startSessionBtn = document.getElementById("ghost-start-session-btn");
+  els.selectedCategoryTitle = document.getElementById("ghost-selected-category-title");
+  els.selectionText = document.getElementById("gab-selection-text");
+  
+  els.workoutContainer = document.getElementById("ghost-workout-container");
+  els.workoutProgress = document.getElementById("ghost-workout-progress");
+  els.workoutExerciseName = document.getElementById("ghost-workout-exercise-name");
+  els.workoutSets = document.getElementById("ghost-workout-sets");
+  
+  els.nextBtn = document.getElementById("ghost-workout-next-btn");
+  els.finishBtn = document.getElementById("ghost-workout-finish-btn");
 }
 
-function init() {
-  if (state.initialized) return;
+async function init() {
   cacheEls();
-  if (!els.video || !els.canvas) return;
+  
+  // Only check for video/canvas if starting camera session, not for initial UI rendering
+  if (state.status === "running" && (!els.video || !els.canvas)) return;
+  
+  // Always re-render categories when switching to this tab
+  if (!state.exercisesLoaded) {
+    await fetchExercisesFromAPI();
+  }
 
-  els.startBtn?.addEventListener("click", start);
-  els.stopBtn?.addEventListener("click", stop);
-  els.exerciseSelector?.addEventListener("click", (event) => {
-    const btn = event.target.closest("[data-exercise]");
-    if (!btn) return;
-    setExercise(btn.dataset.exercise, btn.dataset.exerciseName);
-  });
+  // Set up event listeners only once
+  if (!state.initialized) {
+    // Set up categories clicks
+    els.categoriesGrid?.addEventListener("click", (event) => {
+      const card = event.target.closest(".category-card");
+      if (!card) return;
+      
+      const category = card.dataset.category;
+      
+      // Toggle active selected class
+      document.querySelectorAll(".category-card").forEach(c => {
+        c.classList.toggle("selected", c === card);
+      });
+      
+      state.selectedCategory = category;
+      state.selectedExercise = null;
+      
+      els.exercisesSelection.classList.remove("hidden");
+      const meta = CATEGORY_META[category] || { name: category.charAt(0).toUpperCase() + category.slice(1) };
+      els.selectedCategoryTitle.textContent = meta.name.toUpperCase();
+      
+      renderExercisesList();
+      updateActionBarStats();
+    });
 
-  state.initialized = true;
-  loadActiveWorkout();
+    // Exercise card clicks
+    els.exercisesList?.addEventListener("click", (event) => {
+      const card = event.target.closest(".exercise-card-item");
+      if (!card) return;
+      
+      // Check if exercise is supported
+      const isSupported = card.dataset.supported === "true";
+      if (!isSupported) {
+        // Show toast but don't select
+        if (typeof window.showToast === "function") {
+          window.showToast("⚠️ This exercise is coming soon - pose detection not yet available");
+        }
+        return;
+      }
+      
+      const exName = card.dataset.name;
+      const exList = EXERCISE_LIBRARY[state.selectedCategory] || [];
+      const exItem = exList.find(item => item.name === exName);
+      if (!exItem) return;
+      
+      // Select exactly one exercise card
+      document.querySelectorAll(".exercise-card-item").forEach(c => {
+        c.classList.toggle("selected", c === card);
+      });
+      
+      state.selectedExercise = exItem;
+      updateActionBarStats();
+    });
+
+    // Begin Session Button click
+    els.startSessionBtn?.addEventListener("click", startSession);
+
+    // Next & Finish Workout Buttons
+    els.nextBtn?.addEventListener("click", nextExercise);
+    els.finishBtn?.addEventListener("click", finishWorkout);
+
+    state.initialized = true;
+  } else {
+    // If already initialized but switching back to idle, reset selection
+    if (state.status === "idle") {
+      cancelSelection();
+    }
+  }
+
+  // Render muscle groups categories grid dynamically
+  renderCategoriesGrid();
   render();
 }
 
-function setExercise(exercise, exerciseName = null) {
-  state.exercise = exercise;
-  const meta = state.exerciseMeta.get(exerciseName) || state.exerciseMeta.get(exercise) || null;
-  state.targetReps = meta?.posture_config?.rep_target || meta?.rep_target || TARGET_REPS;
-  state.repState = newRepState();
+function renderCategoriesGrid() {
+  if (!els.categoriesGrid) return;
+  els.categoriesGrid.innerHTML = Object.keys(EXERCISE_LIBRARY).map(key => {
+    const meta = CATEGORY_META[key] || { name: key.charAt(0).toUpperCase() + key.slice(1), icon: ICON_MAPPING[key] || '💪' };
+    const count = EXERCISE_LIBRARY[key].length;
+    const isSelected = state.selectedCategory === key;
+    return `
+      <div class="category-card ${isSelected ? 'selected' : ''}" data-category="${key}">
+        <span class="category-icon">${meta.icon}</span>
+        <strong class="category-name">${meta.name}</strong>
+        <span class="category-count">${count} exercises</span>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderExercisesList() {
+  if (!els.exercisesList) return;
+  const exercises = EXERCISE_LIBRARY[state.selectedCategory] || [];
+  
+  if (exercises.length === 0) {
+    els.exercisesList.innerHTML = '<p style="color: rgba(255,255,255,0.5); grid-column: 1/-1; text-align: center; padding: 20px;">No exercises found for this category.</p>';
+    return;
+  }
+  
+  els.exercisesList.innerHTML = exercises.map(ex => {
+    const isSelected = state.selectedExercise && state.selectedExercise.name === ex.name;
+    const difficulty = ex.difficulty || 'Beginner';
+    const reps = ex.reps || 12;
+    const muscle = ex.muscle || 'General';
+    const isSupported = isExerciseSupported(ex.name);
+    const disabledClass = isSupported ? '' : 'disabled';
+    const statusBadge = isSupported ? '' : '<span class="eci-coming-soon">Coming Soon</span>';
+    
+    return `
+      <div class="exercise-card-item ${isSelected ? 'selected' : ''} ${disabledClass}" data-name="${ex.name}" data-supported="${isSupported}">
+        <div class="eci-header">
+          <span class="eci-badge">${difficulty}</span>
+          <span class="eci-reps">${reps} reps</span>
+          ${statusBadge}
+        </div>
+        <strong class="eci-name">${ex.name}</strong>
+        <span class="eci-muscle">${muscle}</span>
+      </div>
+    `;
+  }).join("");
+}
+
+function updateActionBarStats() {
+  if (state.selectedCategory) {
+    els.actionBar?.classList.remove("hidden");
+  } else {
+    els.actionBar?.classList.add("hidden");
+  }
+
+  if (state.selectedExercise) {
+    if (els.selectionText) els.selectionText.textContent = `Selected: ${state.selectedExercise.name}`;
+    if (els.startSessionBtn) els.startSessionBtn.disabled = false;
+  } else {
+    if (els.selectionText) els.selectionText.textContent = "Selected: None";
+    if (els.startSessionBtn) els.startSessionBtn.disabled = true;
+  }
+}
+
+function cancelSelection() {
+  state.selectedCategory = null;
+  state.selectedExercise = null;
+  state.selectedExercises = [];
+  
+  document.querySelectorAll(".category-card").forEach(c => {
+    c.classList.remove("selected");
+  });
+  
+  els.exercisesSelection?.classList.add("hidden");
+  els.actionBar?.classList.add("hidden");
+}
+
+async function startSession() {
+  if (!state.selectedExercise) return;
+  
+  state.selectedExercises = [state.selectedExercise];
+  
+  // Build and store workout session object
+  const meta = CATEGORY_META[state.selectedCategory] || { name: state.selectedCategory };
+  const session = {
+    category: meta.name,
+    exercises: state.selectedExercises.map(ex => ({ ...ex }))
+  };
+  localStorage.setItem("fc_ghost_session", JSON.stringify(session));
+  
+  els.selectionContainer?.classList.add("hidden");
+  els.workoutContainer?.classList.remove("hidden");
+  
+  state.currentExerciseIndex = 0;
+  state.currentSet = 1;
+  state.elapsed = 0;
+  
+  loadCurrentWorkoutExercise();
+  renderWorkoutQueue();
+  await startCamera();
+}
+
+function loadCurrentWorkoutExercise() {
+  const activeEx = state.selectedExercises[state.currentExerciseIndex];
+  if (!activeEx) return;
+  
+  state.exercise = activeEx.form_key;
+  state.targetReps = activeEx.reps;
+  state.repState = newRepState_ACTUAL();
   state.reps = 0;
   state.acc = 100;
   state.displayAcc = 100;
   state.feedback = null;
   state.previousAngles = null;
   state.stabilityScore = 100;
-  document.querySelectorAll(".ghost-exercise-btn").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.exercise === exercise && (!exerciseName || btn.dataset.exerciseName === exerciseName));
-  });
-  render();
-}
-
-function formKeyForExercise(exercise) {
-  const configured = exercise?.posture_config?.form_key || exercise?.form_key;
-  if (configured) return configured;
-  const name = (exercise?.name || "").toLowerCase();
-  if (name.includes("push") || name.includes("plank") || name.includes("press")) return "pushup";
-  if (name.includes("curl") || name.includes("row") || name.includes("pull") || name.includes("rotation")) return "biceps";
-  return "squat";
-}
-
-function loadActiveWorkout(payload = null) {
-  let workout = payload;
-  if (!workout) {
-    try {
-      workout = JSON.parse(localStorage.getItem("fc_active_workout") || "null");
-    } catch {
-      workout = null;
-    }
+  
+  if (els.workoutProgress) {
+    els.workoutProgress.textContent = `Exercise ${state.currentExerciseIndex + 1} / ${state.selectedExercises.length}`;
   }
-  if (!workout?.exercises?.length || !els.exerciseSelector) return;
+  if (els.workoutExerciseName) {
+    els.workoutExerciseName.textContent = activeEx.name;
+  }
+  if (els.workoutSets) {
+    els.workoutSets.textContent = `${state.currentSet} of 3`;
+  }
+  
+  if (els.reps) els.reps.textContent = "0";
+  if (els.targetReps) els.targetReps.textContent = state.targetReps;
+  if (els.accuracy) els.accuracy.textContent = "100%";
+  if (els.accuracyLabel) els.accuracyLabel.textContent = "Textbook execution";
+  if (els.brief) els.brief.textContent = EXERCISE_BRIEWS_FALLBACK(state.exercise);
+  
+  renderWorkoutQueue();
+}
 
-  state.activeWorkout = workout;
-  state.exerciseMeta = new Map();
-  els.exerciseSelector.innerHTML = workout.exercises.map((exercise, index) => {
-    const formKey = formKeyForExercise(exercise);
-    const target = exercise?.posture_config?.rep_target || TARGET_REPS;
-    state.exerciseMeta.set(exercise.name, { ...exercise, rep_target: target });
+function renderWorkoutQueue() {
+  const queueList = document.getElementById("ghost-queue-list");
+  const progressText = document.getElementById("ghost-queue-progress-text");
+  if (!queueList || !state.selectedExercises.length) return;
+  
+  const completedCount = state.currentExerciseIndex;
+  if (progressText) {
+    progressText.textContent = `${completedCount} / ${state.selectedExercises.length} Completed`;
+  }
+  
+  queueList.innerHTML = state.selectedExercises.map((ex, idx) => {
+    let iconClass = "dot";
+    let iconText = "●";
+    let statusClass = "upcoming";
+    
+    if (idx < state.currentExerciseIndex) {
+      iconClass = "checkmark";
+      iconText = "✔";
+      statusClass = "completed";
+    } else if (idx === state.currentExerciseIndex) {
+      iconClass = "active-indicator";
+      iconText = "●";
+      statusClass = "active";
+    }
+    
     return `
-      <button class="ghost-exercise-btn ${index === 0 ? "active" : ""}" type="button" data-exercise="${formKey}" data-exercise-name="${escapeAttr(exercise.name)}">
-        <span>${index + 1}. ${exercise.name}</span><small>${exercise.sets || 3} x ${exercise.reps || target}</small>
-      </button>
+      <div class="ghost-queue-item ${statusClass}">
+        <span class="gqi-icon ${iconClass}">${iconText}</span>
+        <span class="gqi-name">${ex.name}</span>
+      </div>
     `;
   }).join("");
-
-  const first = workout.exercises[0];
-  setExercise(formKeyForExercise(first), first.name);
 }
 
-function escapeAttr(value) {
-  return String(value || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+function EXERCISE_BRIEWS_FALLBACK(formKey) {
+  return EXERCISE_BRIEFS[formKey] || "Match the reference profile posture.";
 }
 
-async function start() {
-  init();
+async function startCamera() {
   setStatus("loading");
   try {
     const landmarker = await getPoseLandmarker();
@@ -183,23 +506,14 @@ async function start() {
 
     els.canvas.width = els.video.videoWidth;
     els.canvas.height = els.video.videoHeight;
-    state.repState = newRepState();
-    state.reps = 0;
-    state.acc = 100;
-    state.displayAcc = 100;
-    state.feedback = null;
-    state.previousAngles = null;
-    state.stabilityScore = 100;
     state.lastVideoTime = -1;
+    
     setStatus("running");
     startTimer();
     loop(landmarker);
   } catch (err) {
     console.error(err);
     setStatus("error");
-    els.overlayCopy.textContent = err instanceof Error
-      ? err.message
-      : "Could not start the camera. Check browser permissions.";
   }
 }
 
@@ -216,6 +530,87 @@ function stop() {
   const ctx = els.canvas?.getContext("2d");
   ctx?.clearRect(0, 0, els.canvas.width, els.canvas.height);
   setStatus("idle");
+}
+
+function nextExercise() {
+  state.currentExerciseIndex += 1;
+  state.currentSet = 1;
+  
+  if (state.currentExerciseIndex < state.selectedExercises.length) {
+    loadCurrentWorkoutExercise();
+  } else {
+    finishWorkout();
+  }
+}
+
+async function finishWorkout() {
+  stop();
+  await saveWorkoutSession();
+  
+  state.selectedCategory = null;
+  state.selectedExercise = null;
+  state.selectedExercises = [];
+  state.currentExerciseIndex = 0;
+  state.currentSet = 1;
+  
+  els.selectionContainer?.classList.remove("hidden");
+  els.workoutContainer?.classList.add("hidden");
+  els.exercisesSelection?.classList.add("hidden");
+  els.actionBar?.classList.add("hidden");
+  
+  // Reset active categories grid highlighting
+  document.querySelectorAll(".category-card").forEach(c => {
+    c.classList.remove("selected");
+  });
+  
+  if (typeof window.showToast === "function") {
+    window.showToast("🎉 Ghost Workout logged successfully!");
+  }
+}
+
+async function saveWorkoutSession() {
+  if (!state.selectedExercises.length) return;
+  
+  const elapsedSeconds = state.elapsed;
+  const durationMinutes = Math.max(1, Math.round(elapsedSeconds / 60));
+  const exerciseNames = state.selectedExercises.map(ex => ex.name).join(", ");
+  
+  const payload = {
+    muscle_group: (state.selectedCategory || "Full Body").toUpperCase(),
+    exercises_done: exerciseNames,
+    duration: durationMinutes,
+    mode: "ghost",
+    zone: "green",
+    exercises: state.selectedExercises.map(ex => ({
+      name: ex.name,
+      sets: [
+        { reps: ex.reps, weight: 0 }
+      ]
+    }))
+  };
+
+  try {
+    if (typeof window.apiFetch === "function") {
+      await window.apiFetch("/api/workouts/log", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      if (typeof window.loadProgress === "function") {
+        window.loadProgress();
+      }
+    }  else {
+      await fetch(`${window.API || ""}/api/workouts/log`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("fc_token") || ""}`
+        },
+        body: JSON.stringify(payload)
+      });
+    }
+  } catch (err) {
+    console.error("Failed to log ghost workout:", err);
+  }
 }
 
 function loop(landmarker) {
@@ -247,7 +642,26 @@ function loop(landmarker) {
           feedback,
           stabilityScore: state.stabilityScore,
         });
-        if (state.reps > previousReps) pulseRepCompletion();
+        
+        if (state.reps > previousReps) {
+          pulseRepCompletion();
+          if (state.reps >= state.targetReps) {
+            if (state.currentSet < 3) {
+              state.currentSet += 1;
+              state.reps = 0;
+              state.repState = newRepState_ACTUAL();
+              if (els.workoutSets) els.workoutSets.textContent = `${state.currentSet} of 3`;
+              if (typeof window.showToast === "function") {
+                window.showToast(`💪 Set ${state.currentSet - 1} complete! Prepare for Set ${state.currentSet}.`);
+              }
+            } else {
+              if (typeof window.showToast === "function") {
+                window.showToast("🎉 Exercise complete!");
+              }
+              setTimeout(nextExercise, 1500);
+            }
+          }
+        }
         drawCoachingOverlay(ctx, landmarks, els.canvas.width, els.canvas.height, feedback);
       }
     } else {
@@ -307,7 +721,7 @@ function drawEdges(ctx, landmarks, width, height, offsetX, offsetY, animated = f
     ctx.setLineDash([16, 6]);
     ctx.lineDashOffset = dashOffset;
   }
-  for (const [a, b] of POSE_EDGES) {
+  for (const [a, b] of POSE_EDGES_ACTUAL) {
     const start = landmarks[a];
     const end = landmarks[b];
     if (!start || !end) continue;
@@ -378,22 +792,22 @@ function drawAngleLabels(ctx, landmarks, angles, width, height, scoreState) {
 
 function angleLabelAnchors(landmarks, angles) {
   return [
-    { name: "ELBOW", value: angles.leftElbow, point: landmarks[LM.LEFT_ELBOW], dx: -38, dy: -22 },
-    { name: "ELBOW", value: angles.rightElbow, point: landmarks[LM.RIGHT_ELBOW], dx: 38, dy: -22 },
-    { name: "KNEE", value: angles.leftKnee, point: landmarks[LM.LEFT_KNEE], dx: -34, dy: 24 },
-    { name: "KNEE", value: angles.rightKnee, point: landmarks[LM.RIGHT_KNEE], dx: 34, dy: 24 },
-    { name: "HIP", value: angles.leftHip, point: landmarks[LM.LEFT_HIP], dx: -34, dy: -24 },
-    { name: "HIP", value: angles.rightHip, point: landmarks[LM.RIGHT_HIP], dx: 34, dy: -24 },
-    { name: "SHLD", value: angles.leftShoulder, point: landmarks[LM.LEFT_SHOULDER], dx: -38, dy: -24 },
-    { name: "SHLD", value: angles.rightShoulder, point: landmarks[LM.RIGHT_SHOULDER], dx: 38, dy: -24 },
+    { name: "ELBOW", value: angles.leftElbow, point: landmarks[LM_ACTUAL.LEFT_ELBOW], dx: -38, dy: -22 },
+    { name: "ELBOW", value: angles.rightElbow, point: landmarks[LM_ACTUAL.RIGHT_ELBOW], dx: 38, dy: -22 },
+    { name: "KNEE", value: angles.leftKnee, point: landmarks[LM_ACTUAL.LEFT_KNEE], dx: -34, dy: 24 },
+    { name: "KNEE", value: angles.rightKnee, point: landmarks[LM_ACTUAL.RIGHT_KNEE], dx: 34, dy: 24 },
+    { name: "HIP", value: angles.leftHip, point: landmarks[LM_ACTUAL.LEFT_HIP], dx: -34, dy: -24 },
+    { name: "HIP", value: angles.rightHip, point: landmarks[LM_ACTUAL.RIGHT_HIP], dx: 34, dy: -24 },
+    { name: "SHLD", value: angles.leftShoulder, point: landmarks[LM_ACTUAL.LEFT_SHOULDER], dx: -38, dy: -24 },
+    { name: "SHLD", value: angles.rightShoulder, point: landmarks[LM_ACTUAL.RIGHT_SHOULDER], dx: 38, dy: -24 },
   ].filter((label) => Number.isFinite(label.value));
 }
 
 function getIdealGhost(landmarks, width, height, exercise) {
-  const leftShoulder = landmarks[LM.LEFT_SHOULDER];
-  const rightShoulder = landmarks[LM.RIGHT_SHOULDER];
-  const leftHip = landmarks[LM.LEFT_HIP];
-  const rightHip = landmarks[LM.RIGHT_HIP];
+  const leftShoulder = landmarks[LM_ACTUAL.LEFT_SHOULDER];
+  const rightShoulder = landmarks[LM_ACTUAL.RIGHT_SHOULDER];
+  const leftHip = landmarks[LM_ACTUAL.LEFT_HIP];
+  const rightHip = landmarks[LM_ACTUAL.RIGHT_HIP];
   if (!leftShoulder || !rightShoulder || !leftHip || !rightHip) return [];
 
   const centerX = ((leftHip.x + rightHip.x) / 2) * width;
@@ -429,7 +843,7 @@ function getIdealGhost(landmarks, width, height, exercise) {
     p.le = { x: p.ls.x - spread * .2, y: y + body * .38 };
     p.re = { x: p.rs.x + spread * .2, y: y + body * .38 };
     p.lw = { x: p.le.x - spread * .08, y: y + body * .74 };
-    p.rw = { x: p.re.x + spread * .08, y: y + body * .74 };
+    p.rw = { x: p.re.x - spread * .08, y: y + body * .74 };
   } else {
     p.rs = { x: centerX + spread * .45, y: shoulderY };
     p.rh = { x: centerX + spread * .35, y: hipY };
@@ -485,44 +899,37 @@ function render() {
   const error = state.status === "error";
 
   els.overlay?.classList.toggle("hidden", running);
-  els.stopBtn?.classList.toggle("hidden", !running);
-  els.liveCue?.classList.toggle("hidden", !running);
-  els.startBtn.disabled = loading;
 
-  els.overlayTitle.textContent = loading ? "Loading the model..." : error ? "Camera unavailable" : "Step into frame";
-  if (!error) {
-    els.overlayCopy.textContent = "Choose an exercise, stand far enough for full-body visibility, then allow camera access.";
+  if (els.overlay) {
+    const h3 = els.overlay.querySelector("h3");
+    const p = els.overlay.querySelector("p");
+    if (loading) {
+      if (h3) h3.textContent = "Loading the model...";
+      if (p) p.textContent = "Please wait while we initialize pose estimation.";
+    } else if (error) {
+      if (h3) h3.textContent = "Camera blocked";
+      if (p) p.textContent = "Please check your browser permissions.";
+    } else {
+      if (h3) h3.textContent = "Starting Camera...";
+      if (p) p.textContent = "Ensure your full body is visible in the frame.";
+    }
   }
-  els.startBtn.textContent = loading ? "Preparing..." : "Begin Session";
-  els.statusPill.innerHTML = `<span></span> ${running ? "Live tracking" : loading ? "Preparing camera" : error ? "Camera blocked" : "Camera idle"}`;
-  els.statusPill.classList.toggle("running", running);
-  els.statusPill.classList.toggle("error", error);
 
   state.displayAcc += (state.acc - state.displayAcc) * 0.22;
   const displayAcc = Math.round(state.displayAcc);
   const scoreState = getScoreState(displayAcc);
 
-  els.reps.textContent = String(state.reps);
-  els.targetReps.textContent = state.targetReps;
-  els.repRing.style.setProperty("--rep-progress", Math.min(state.reps / state.targetReps, 1));
-  els.repRing.classList.toggle("complete", state.reps >= state.targetReps);
-  els.accuracy.textContent = `${displayAcc}%`;
-  els.accuracyLabel.textContent = accuracyLabel(displayAcc);
-  els.accuracyCard.dataset.state = scoreState.key;
-  els.depthFill.style.width = `${state.feedback?.depthPct ?? 0}%`;
-  els.angle.textContent = state.feedback ? `${Math.round(state.feedback.primaryAngle)}°` : "--°";
-  els.brief.textContent = EXERCISE_BRIEFS[state.exercise];
-  if (state.renderedExercise !== state.exercise) {
-    renderMuscleActivation();
-    renderDemoGuide();
-    state.renderedExercise = state.exercise;
-  }
+  if (els.reps) els.reps.textContent = String(state.reps);
+  if (els.targetReps) els.targetReps.textContent = state.targetReps;
+  if (els.accuracy) els.accuracy.textContent = `${displayAcc}%`;
+  if (els.accuracyLabel) els.accuracyLabel.textContent = accuracyLabel(displayAcc);
 
-  const cue = state.feedback?.cues?.[0] || "Good posture";
-  els.liveCue.textContent = cue;
-  els.liveCue.classList.toggle("good", Boolean(state.feedback && !state.feedback.cues.length));
-  els.liveCue.dataset.state = scoreState.key;
-  renderTimer();
+  if (els.liveCue) {
+    const cue = state.feedback?.cues?.[0] || "Good posture";
+    els.liveCue.textContent = cue;
+    els.liveCue.classList.toggle("good", Boolean(state.feedback && !state.feedback.cues.length));
+    els.liveCue.classList.toggle("hidden", !running);
+  }
 }
 
 function renderTimer() {
@@ -556,65 +963,9 @@ function getScoreState(value) {
 }
 
 function pulseRepCompletion() {
-  els.repRing?.classList.add("pulse");
-  window.setTimeout(() => els.repRing?.classList.remove("pulse"), 520);
+  // Option pulse effects
 }
 
-function renderMuscleActivation() {
-  if (!els.muscleList) return;
-  const rows = MUSCLE_ACTIVATION[state.exercise] || [];
-  els.muscleList.innerHTML = rows.map(([name, value]) => `
-    <div class="ghost-muscle-row">
-      <span>${name}</span>
-      <div class="ghost-muscle-track"><div style="--activation:${value}%"></div></div>
-      <small>${value}%</small>
-    </div>
-  `).join("");
-}
+window.fitCoachGhostTrainer = { init, start: startSession, stop };
 
-function renderDemoGuide() {
-  if (!els.demoFigure) return;
-  els.demoFigure.dataset.exercise = state.exercise;
-  els.demoCopy.textContent = DEMO_COPY[state.exercise];
-  els.demoFigure.innerHTML = demoSvg(state.exercise);
-}
-
-function demoSvg(exercise) {
-  const paths = {
-    squat: `
-      <polyline points="58,20 50,48 34,72 26,104" />
-      <polyline points="62,20 76,48 92,72 100,104" />
-      <line x1="58" y1="20" x2="62" y2="20" />
-      <line x1="50" y1="48" x2="76" y2="48" />
-      <line x1="58" y1="20" x2="38" y2="58" />
-      <line x1="62" y1="20" x2="84" y2="58" />
-    `,
-    pushup: `
-      <polyline points="18,62 44,58 74,62 108,66" />
-      <line x1="36" y1="58" x2="28" y2="92" />
-      <line x1="50" y1="58" x2="56" y2="92" />
-      <line x1="74" y1="62" x2="84" y2="82" />
-      <line x1="108" y1="66" x2="116" y2="82" />
-    `,
-    biceps: `
-      <line x1="60" y1="20" x2="58" y2="52" />
-      <line x1="58" y1="52" x2="58" y2="104" />
-      <line x1="60" y1="24" x2="88" y2="58" />
-      <line x1="88" y1="58" x2="74" y2="34" />
-      <line x1="60" y1="24" x2="34" y2="58" />
-      <line x1="34" y1="58" x2="34" y2="92" />
-    `,
-  };
-  return `<svg viewBox="0 0 128 118" role="img" aria-label="${exercise} form guide">
-    <g>${paths[exercise]}</g>
-  </svg>`;
-}
-
-window.fitCoachGhostTrainer = { init, start, stop };
-
-document.addEventListener("DOMContentLoaded", init);
-window.addEventListener("fitcoach:workout-loaded", (event) => loadActiveWorkout(event.detail));
-window.addEventListener("storage", (event) => {
-  if (event.key === "fc_active_workout") loadActiveWorkout();
-});
 window.addEventListener("beforeunload", stop);

@@ -8,6 +8,7 @@ from app.database import get_db
 from app.models.auth import Auth
 from app.models.workout import Workout, PlannedWorkout, WeeklyPlan, AIMemory, Exercise, SetLog, FCMToken
 from app.models.profile import Profile
+from app.models.progress import ActivityLog, Streak, PersonalRecord
 from app.schemas.workout import (
     WorkoutLogRequest, WorkoutResponse, SwapRequest, WorkoutFinishRequest,
     SetLogRequest, SetLogResponse, ProgressiveOverloadResponse,
@@ -19,6 +20,79 @@ from app.routers.progress import check_and_award_badges
 router = APIRouter(prefix="/api/workouts", tags=["workouts"])
 
 
+async def update_streak(user_id: int, workout_date: date, db: AsyncSession):
+    """Update user streak when a workout is completed."""
+    streak_result = await db.execute(select(Streak).where(Streak.user_id == user_id))
+    streak = streak_result.scalar_one_or_none()
+    
+    if not streak:
+        streak = Streak(user_id=user_id, current_streak=1, longest_streak=1, last_workout_date=workout_date)
+        db.add(streak)
+    else:
+        # Check if workout is consecutive day
+        if streak.last_workout_date:
+            days_diff = (workout_date - streak.last_workout_date).days
+            if days_diff == 1:
+                streak.current_streak += 1
+                if streak.current_streak > streak.longest_streak:
+                    streak.longest_streak = streak.current_streak
+            elif days_diff > 1:
+                streak.current_streak = 1
+        else:
+            streak.current_streak = 1
+        streak.last_workout_date = workout_date
+    
+    await db.commit()
+
+
+async def check_personal_records(user_id: int, exercise_name: str, weight_kg: float, reps: int, workout_date: date, db: AsyncSession):
+    """Check and update personal records for an exercise."""
+    pr_result = await db.execute(
+        select(PersonalRecord).where(
+            PersonalRecord.user_id == user_id,
+            PersonalRecord.exercise_name == exercise_name
+        )
+    )
+    pr = pr_result.scalar_one_or_none()
+    
+    if not pr:
+        pr = PersonalRecord(
+            user_id=user_id,
+            exercise_name=exercise_name,
+            best_weight_kg=weight_kg,
+            best_reps=reps,
+            best_weight_date=workout_date,
+            best_reps_date=workout_date
+        )
+        db.add(pr)
+    else:
+        updated = False
+        if weight_kg and (not pr.best_weight_kg or weight_kg > pr.best_weight_kg):
+            pr.best_weight_kg = weight_kg
+            pr.best_weight_date = workout_date
+            updated = True
+        if reps and (not pr.best_reps or reps > pr.best_reps):
+            pr.best_reps = reps
+            pr.best_reps_date = workout_date
+            updated = True
+        if updated:
+            await db.commit()
+
+
+async def create_activity_log(user_id: int, activity_type: str, title: str, description: str, meta_data: dict, db: AsyncSession):
+    """Create an activity log entry for the timeline."""
+    activity = ActivityLog(
+        user_id=user_id,
+        activity_type=activity_type,
+        title=title,
+        description=description,
+        meta_data=meta_data,
+        date=date.today()
+    )
+    db.add(activity)
+    await db.commit()
+
+
 # ── Workout logging ────────────────────────────────────────────────────────────
 
 @router.post("/log", response_model=WorkoutResponse, status_code=201)
@@ -28,10 +102,29 @@ async def log_workout(
     db: AsyncSession = Depends(get_db),
 ):
     log_date = body.date or date.today()
+    
+    # Calculate analytics data
+    total_sets = 0
+    total_reps = 0
+    calories_estimate = None
+    
+    if body.exercises:
+        for exercise in body.exercises:
+            if exercise.get("sets"):
+                total_sets += len(exercise["sets"])
+                for set_data in exercise["sets"]:
+                    if set_data.get("reps"):
+                        total_reps += set_data["reps"]
+    
+    # Estimate calories: ~5-8 calories per minute based on intensity
+    if body.duration:
+        calories_estimate = round(body.duration * 6.5)
+    
     workout = Workout(
         user_id=current_user.id,
         date=log_date,
         muscle_group=body.muscle_group,
+        exercises=body.exercises if body.exercises else None,
         exercises_done=body.exercises_done,
         duration=body.duration,
         completed=True,
@@ -39,10 +132,45 @@ async def log_workout(
         sport=body.sport,
         zone=body.zone,
         notes=body.notes,
+        total_sets=total_sets if total_sets > 0 else None,
+        total_reps=total_reps if total_reps > 0 else None,
+        calories_estimate=calories_estimate,
+        completion_percentage=100.0,
     )
     db.add(workout)
     await db.commit()
     await db.refresh(workout)
+
+    # Update streak
+    await update_streak(current_user.id, log_date, db)
+    
+    # Check personal records for exercises with weight/reps
+    if body.exercises:
+        for exercise in body.exercises:
+            exercise_name = exercise.get("name")
+            if exercise.get("sets"):
+                for set_data in exercise["sets"]:
+                    weight = set_data.get("weight_kg")
+                    reps = set_data.get("reps")
+                    if weight or reps:
+                        await check_personal_records(
+                            current_user.id, 
+                            exercise_name, 
+                            weight or 0, 
+                            reps or 0, 
+                            log_date, 
+                            db
+                        )
+    
+    # Create activity log
+    await create_activity_log(
+        current_user.id,
+        "workout",
+        f"Completed {body.muscle_group or 'Workout'}",
+        f"Duration: {body.duration} min",
+        {"duration": body.duration, "muscle_group": body.muscle_group},
+        db
+    )
 
     total_result = await db.execute(
         select(sqlfunc.count()).where(Workout.user_id == current_user.id, Workout.completed == True)
@@ -58,19 +186,39 @@ async def finish_workout(
     db: AsyncSession = Depends(get_db),
 ):
     """Log a completed Ghost Trainer session from the mobile app."""
+    workout_date = date.today()
+    
+    # Estimate calories
+    calories_estimate = round(body.duration_minutes * 6.5) if body.duration_minutes else None
+    
     workout = Workout(
         user_id=current_user.id,
-        date=date.today(),
+        date=workout_date,
         muscle_group=body.muscle_group or "Mixed",
         exercises_done=", ".join(body.exercises_done) if body.exercises_done else None,
         duration=body.duration_minutes,
         completed=True,
         zone=body.zone or "green",
         notes=body.notes,
+        calories_estimate=calories_estimate,
+        completion_percentage=100.0,
     )
     db.add(workout)
     await db.commit()
     await db.refresh(workout)
+
+    # Update streak
+    await update_streak(current_user.id, workout_date, db)
+    
+    # Create activity log
+    await create_activity_log(
+        current_user.id,
+        "workout",
+        f"Completed {body.muscle_group or 'Workout'}",
+        f"Duration: {body.duration_minutes} min",
+        {"duration": body.duration_minutes, "muscle_group": body.muscle_group},
+        db
+    )
 
     total_result = await db.execute(
         select(sqlfunc.count()).where(Workout.user_id == current_user.id, Workout.completed == True)
