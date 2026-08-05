@@ -144,12 +144,54 @@ const state = {
   completedPulse: false,
 };
 
+// Fallback exercise dataset for when API fails
+const FALLBACK_EXERCISE_LIBRARY = {
+  chest: [
+    { name: "Bench Press", muscle: "Pectoralis Major", reps: 12, sets: 3, difficulty: "Intermediate", icon: "🏋️", form_key: "pushup" },
+    { name: "Incline Press", muscle: "Upper Chest", reps: 10, sets: 3, difficulty: "Intermediate", icon: "🏋️", form_key: "pushup" },
+    { name: "Push-up", muscle: "Pectoralis Major", reps: 15, sets: 3, difficulty: "Beginner", icon: "💪", form_key: "pushup" },
+    { name: "Chest Fly", muscle: "Pectoralis Major", reps: 12, sets: 3, difficulty: "Beginner", icon: "🏋️", form_key: "pushup" }
+  ],
+  back: [
+    { name: "Barbell Row", muscle: "Latissimus Dorsi", reps: 12, sets: 3, difficulty: "Intermediate", icon: "🏋️", form_key: "biceps" },
+    { name: "Lat Pulldown", muscle: "Latissimus Dorsi", reps: 12, sets: 3, difficulty: "Beginner", icon: "🏋️", form_key: "biceps" },
+    { name: "Seated Row", muscle: "Rhomboids", reps: 12, sets: 3, difficulty: "Beginner", icon: "🏋️", form_key: "biceps" },
+    { name: "Deadlift", muscle: "Erector Spinae", reps: 8, sets: 3, difficulty: "Advanced", icon: "🏋️", form_key: "squat" }
+  ],
+  shoulders: [
+    { name: "Shoulder Press", muscle: "Deltoids", reps: 12, sets: 3, difficulty: "Intermediate", icon: "🎯", form_key: "pushup" },
+    { name: "Lateral Raise", muscle: "Lateral Deltoid", reps: 15, sets: 3, difficulty: "Beginner", icon: "🎯", form_key: "biceps" },
+    { name: "Front Raise", muscle: "Anterior Deltoid", reps: 12, sets: 3, difficulty: "Beginner", icon: "🎯", form_key: "biceps" },
+    { name: "Reverse Fly", muscle: "Posterior Deltoid", reps: 15, sets: 3, difficulty: "Beginner", icon: "🎯", form_key: "biceps" }
+  ],
+  arms: [
+    { name: "Bicep Curl", muscle: "Biceps Brachii", reps: 12, sets: 3, difficulty: "Beginner", icon: "💪", form_key: "biceps" },
+    { name: "Hammer Curl", muscle: "Brachialis", reps: 12, sets: 3, difficulty: "Beginner", icon: "💪", form_key: "biceps" },
+    { name: "Tricep Pushdown", muscle: "Triceps Brachii", reps: 15, sets: 3, difficulty: "Beginner", icon: "💪", form_key: "pushup" },
+    { name: "Skull Crushers", muscle: "Triceps Brachii", reps: 12, sets: 3, difficulty: "Intermediate", icon: "💪", form_key: "pushup" }
+  ],
+  legs: [
+    { name: "Squat", muscle: "Quadriceps", reps: 12, sets: 3, difficulty: "Intermediate", icon: "🦵", form_key: "squat" },
+    { name: "Lunges", muscle: "Quadriceps", reps: 10, sets: 3, difficulty: "Intermediate", icon: "🦵", form_key: "squat" },
+    { name: "Romanian Deadlift", muscle: "Hamstrings", reps: 12, sets: 3, difficulty: "Intermediate", icon: "🦵", form_key: "squat" },
+    { name: "Leg Press", muscle: "Quadriceps", reps: 12, sets: 3, difficulty: "Beginner", icon: "🦵", form_key: "squat" }
+  ],
+  core: [
+    { name: "Plank", muscle: "Rectus Abdominis", reps: 60, sets: 3, difficulty: "Beginner", icon: "🔥", form_key: "pushup" },
+    { name: "Crunches", muscle: "Rectus Abdominis", reps: 20, sets: 3, difficulty: "Beginner", icon: "🔥", form_key: "pushup" },
+    { name: "Russian Twist", muscle: "Obliques", reps: 20, sets: 3, difficulty: "Intermediate", icon: "🔥", form_key: "biceps" },
+    { name: "Leg Raises", muscle: "Lower Abs", reps: 15, sets: 3, difficulty: "Intermediate", icon: "🔥", form_key: "pushup" }
+  ]
+};
+
 // Fetch exercises from the backend API
 async function fetchExercisesFromAPI() {
   try {
     const token = localStorage.getItem('fc_token');
     if (!token) {
-      console.error('No auth token found');
+      console.warn('No auth token found, using fallback exercises');
+      EXERCISE_LIBRARY = { ...FALLBACK_EXERCISE_LIBRARY };
+      state.exercisesLoaded = true;
       return;
     }
 
@@ -192,9 +234,11 @@ async function fetchExercisesFromAPI() {
     console.log('Exercises loaded from API:', Object.keys(EXERCISE_LIBRARY));
     
   } catch (error) {
-    console.error('Error fetching exercises:', error);
-    // Fallback to empty library - user will see no exercises
-    EXERCISE_LIBRARY = {};
+    console.error('Error fetching exercises, using fallback:', error);
+    // Fallback to local dataset instead of empty library
+    EXERCISE_LIBRARY = { ...FALLBACK_EXERCISE_LIBRARY };
+    state.exercisesLoaded = true;
+    console.log('Using fallback exercise library:', Object.keys(EXERCISE_LIBRARY));
   }
 }
 
@@ -235,10 +279,15 @@ function cacheEls() {
 async function init() {
   cacheEls();
   
+  // Show loading state
+  if (els.categoriesGrid) {
+    els.categoriesGrid.innerHTML = '<div class="loading-state">Loading exercises...</div>';
+  }
+  
   // Only check for video/canvas if starting camera session, not for initial UI rendering
   if (state.status === "running" && (!els.video || !els.canvas)) return;
   
-  // Always re-render categories when switching to this tab
+  // Always load exercises when switching to this tab
   if (!state.exercisesLoaded) {
     await fetchExercisesFromAPI();
   }
@@ -319,7 +368,15 @@ async function init() {
 
 function renderCategoriesGrid() {
   if (!els.categoriesGrid) return;
-  els.categoriesGrid.innerHTML = Object.keys(EXERCISE_LIBRARY).map(key => {
+  
+  // Check if we have categories to render
+  const categories = Object.keys(EXERCISE_LIBRARY);
+  if (categories.length === 0) {
+    els.categoriesGrid.innerHTML = '<div class="loading-state">No muscle groups available. Please try refreshing the page.</div>';
+    return;
+  }
+  
+  els.categoriesGrid.innerHTML = categories.map(key => {
     const meta = CATEGORY_META[key] || { name: key.charAt(0).toUpperCase() + key.slice(1), icon: ICON_MAPPING[key] || '💪' };
     const count = EXERCISE_LIBRARY[key].length;
     const isSelected = state.selectedCategory === key;
@@ -348,18 +405,22 @@ function renderExercisesList() {
     const reps = ex.reps || 12;
     const muscle = ex.muscle || 'General';
     const isSupported = isExerciseSupported(ex.name);
-    const disabledClass = isSupported ? '' : 'disabled';
-    const statusBadge = isSupported ? '' : '<span class="eci-coming-soon">Coming Soon</span>';
+    const sets = ex.sets || 3;
     
     return `
-      <div class="exercise-card-item ${isSelected ? 'selected' : ''} ${disabledClass}" data-name="${ex.name}" data-supported="${isSupported}">
+      <div class="exercise-card-item ${isSelected ? 'selected' : ''} ${!isSupported ? 'disabled' : ''}" 
+           data-name="${ex.name}" 
+           data-supported="${isSupported}">
         <div class="eci-header">
-          <span class="eci-badge">${difficulty}</span>
-          <span class="eci-reps">${reps} reps</span>
-          ${statusBadge}
+          <span class="eci-icon">${ex.icon || '💪'}</span>
+          <span class="eci-difficulty">${difficulty}</span>
         </div>
         <strong class="eci-name">${ex.name}</strong>
-        <span class="eci-muscle">${muscle}</span>
+        <div class="eci-details">
+          <span class="eci-muscle">${muscle}</span>
+          <span class="eci-sets">${sets} sets × ${reps} reps</span>
+        </div>
+        ${!isSupported ? '<div class="eci-coming-soon">Coming Soon</div>' : ''}
       </div>
     `;
   }).join("");
@@ -967,5 +1028,20 @@ function pulseRepCompletion() {
 }
 
 window.fitCoachGhostTrainer = { init, start: startSession, stop };
+
+// Auto-initialize when DOM is ready if on trainer tab
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    const trainerTab = document.getElementById('tab-trainer');
+    if (trainerTab && trainerTab.classList.contains('active')) {
+      window.fitCoachGhostTrainer.init();
+    }
+  });
+} else {
+  const trainerTab = document.getElementById('tab-trainer');
+  if (trainerTab && trainerTab.classList.contains('active')) {
+    window.fitCoachGhostTrainer.init();
+  }
+}
 
 window.addEventListener("beforeunload", stop);

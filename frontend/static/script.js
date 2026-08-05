@@ -26,7 +26,7 @@ let sportObSport        = null;
 let recoveryInputs      = {};
 let foodPhotoBase64 = null;
 let homeCountRaf = {};
-
+// ── ATHLETE THEMES ───────────────────────────────────────────────────────
 const ATHLETE_THEMES = {
   galaxy: { label: "Galaxy Purple" },
   carbon: { label: "Carbon Black" },
@@ -173,68 +173,27 @@ function animateTextNumber(id, value, suffix = "") {
   homeCountRaf[id] = requestAnimationFrame(tick);
 }
 
-async function loadHome() {
-  try {
-    // 1. Greeting
-    document.getElementById("home-greeting").textContent = timeGreeting();
+// ── MOTIVATIONAL QUOTES (kept for potential use) ─────────────────────────
+const MOTIVATIONAL_QUOTES = [
+  { text: "The body achieves what the mind believes.", author: "Unknown" },
+  { text: "Discipline is choosing between what you want now and what you want most.", author: "Unknown" },
+  { text: "Your strongest self is built one workout at a time.", author: "Unknown" },
+  { text: "The only bad workout is the one you didn't do.", author: "Unknown" },
+  { text: "Success starts with self-discipline.", author: "Unknown" },
+  { text: "Train hard, recover smarter.", author: "Unknown" },
+  { text: "Your body can stand almost anything. It's your mind you have to convince.", author: "Unknown" },
+  { text: "The pain you feel today will be the strength you feel tomorrow.", author: "Unknown" },
+  { text: "Don't wish for it, work for it.", author: "Unknown" },
+  { text: "Every rep counts when you're consistent.", author: "Unknown" }
+];
 
-    // 2. Random quote (changes daily)
-    const dayIndex = new Date().getDate() % HOME_QUOTES.length;
-    const q = HOME_QUOTES[dayIndex];
-    document.getElementById("home-quote-text").textContent = q.text;
-    document.getElementById("home-quote-author").textContent = "— " + q.author;
+const PORTRAIT_IMAGES = [
+  'portrait_01.jpg',
+  'portrait_02.jpg',
+  'portrait_03.jpg'
+];
 
-    // 3. Load progress stats
-    try {
-      const data = await apiFetch("/api/progress/");
-      const workouts = data.total_workouts || 0;
-      const streak   = data.current_streak || 0;
-      const badges   = data.badges?.length || 0;
-
-      // Update metrics
-      animateTextNumber("metric-calories", workouts * 280);
-      setTxt("metric-time", workouts * 45 + "m");
-      setTxt("metric-steps", workouts * 5000);
-      setTxt("metric-active", workouts * 30 + "m");
-
-      // Update streak
-      animateTextNumber("home-streak-count", streak);
-      animateTextNumber("streak-number", streak);
-      setTxt("streak-message", streak > 0 ? `Keep it going! ${streak} days strong` : "Start your streak today!");
-
-      // Update weekly summary
-      setTxt("week-workouts", workouts);
-      setTxt("week-calories", workouts * 280);
-      setTxt("week-minutes", workouts * 45);
-
-      // Weekly heatmap
-      renderHomeWeek(data.heatmap);
-    } catch(e) {}
-
-    // 4. Recovery banner
-    try {
-      const rec = await apiFetch("/api/recovery/latest", { ignore401: true }).catch(()=>null);
-      const bar  = document.getElementById("home-recovery-bar");
-      const dot  = document.getElementById("home-recovery-dot");
-      const txt  = document.getElementById("home-recovery-text");
-
-      if (rec && rec.zone) {
-        bar.style.display = "flex";
-        dot.className     = "hrb-dot " + rec.zone;
-        const zoneLabel   = { green:"Full intensity 🟢", yellow:"Moderate day 🟡", red:"Rest day 🔴" };
-        txt.textContent   = "Recovery: " + (zoneLabel[rec.zone] || rec.zone) + " (score " + rec.score + ")";
-      } else {
-        bar.style.display = "flex";
-        document.getElementById("home-recovery-dot").className = "hrb-dot yellow";
-        document.getElementById("home-recovery-text").textContent = "Log your recovery to get personalised intensity";
-      }
-    } catch(e) {}
-
-  } catch(e) {
-    console.log("Home load error:", e);
-  }
-}
- 
+// ── RENDER HOME WEEK HEATMAP ─────────────────────────────────────────────── 
 function renderHomeWeek(heatmap) {
   const container = document.getElementById("home-week-row");
   if (!container) return;
@@ -297,7 +256,8 @@ const SPORT_QUESTIONS = {
 window.onload = async () => {
   initThemeEngine();
   if (authToken) {
-    await continueAfterAuth(window.FC_INITIAL_TAB || "home");
+    // Silent token validation - don't show errors on initial page load
+    await continueAfterAuth(window.FC_INITIAL_TAB || "home", { silent: true });
   } else {
     showAuth();
   }
@@ -359,7 +319,8 @@ function _storeTokens(d) {
   localStorage.setItem("fc_token", authToken);
   if (d.refresh_token) localStorage.setItem("fc_refresh", d.refresh_token);
 }
-async function continueAfterAuth(preferredTab = "home") {
+async function continueAfterAuth(preferredTab = "home", options = {}) {
+  const { silent = false } = options;
   let profile;
   try {
     profile = await apiFetch("/api/profile/me");
@@ -372,7 +333,10 @@ async function continueAfterAuth(preferredTab = "home") {
     localStorage.removeItem("fc_token");
     localStorage.removeItem("fc_refresh");
     showAuth();
-    showAuthError(err.message || "Session verification failed. Please sign in again.");
+    // Only show error if not in silent mode (i.e., not on initial page load)
+    if (!silent) {
+      showAuthError(err.message || "Session verification failed. Please sign in again.");
+    }
     return;
   }
 
@@ -382,6 +346,7 @@ async function continueAfterAuth(preferredTab = "home") {
   try {
     if (profile?.onboarding_complete) {
       switchTab(preferredTab || "home");
+      // loadRecoveryBanner() is now safe to call even if elements don't exist
       loadRecoveryBanner();
     } else {
       switchTab("chat");
@@ -583,6 +548,22 @@ function showAuthError(msg) {
   el.textContent = msg; el.classList.remove("hidden");
 }
 
+// ── PASSWORD VISIBILITY TOGGLE ─────────────────────────────────────────
+function togglePasswordVisibility(inputId, button) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  
+  const isPassword = input.type === 'password';
+  input.type = isPassword ? 'text' : 'password';
+  
+  // Update button visual state
+  button.classList.toggle('visible', !isPassword);
+  button.querySelector('.eye-icon').textContent = isPassword ? '🙈' : '👁️';
+  
+  // Update accessibility
+  button.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+}
+
 // ── API ───────────────────────────────────────────────────────────────
 async function apiFetch(url, options={}) {
   let res;
@@ -676,7 +657,6 @@ function switchTab(tab) {
   if (tab==="progress") loadProgress();
   if (tab==="profile")  loadProfile();
   if (tab==="recovery") loadRecoveryLatest();
-  if (tab==="home") loadHome();
   if (tab==="chat") {
     const chatBox = document.getElementById("chat-box");
     if (chatBox && chatBox.children.length === 0) loadChat();
@@ -1843,13 +1823,16 @@ async function loadRecoveryBanner() {
     const data = await apiFetch("/api/recovery/latest", { ignore401: true });
     if (!data.zone) return;
     const banner = document.getElementById("recovery-banner");
+    if (!banner) return; // Gracefully handle missing banner element
     banner.classList.remove("hidden","yellow","red");
     if (data.zone==="yellow") banner.classList.add("yellow");
     if (data.zone==="red")    banner.classList.add("red");
     const icons = {green:"🟢",yellow:"🟡",red:"🔴"};
     const msgs  = {green:"Full recovery — go hard today!",yellow:"Moderate recovery — pace yourself",red:"Low recovery — mobility session today"};
-    document.getElementById("recovery-banner-icon").textContent = icons[data.zone];
-    document.getElementById("recovery-banner-text").textContent = `Recovery: ${data.score}/100 — ${msgs[data.zone]}`;
+    const iconEl = document.getElementById("recovery-banner-icon");
+    const textEl = document.getElementById("recovery-banner-text");
+    if (iconEl) iconEl.textContent = icons[data.zone];
+    if (textEl) textEl.textContent = `Recovery: ${data.score}/100 — ${msgs[data.zone]}`;
   } catch {}
 }
 
@@ -3610,3 +3593,5 @@ function pushPopoverMessage(text, sender = "bot") {
     pushDrawerMessage(text, "bot");
   }
 }
+
+

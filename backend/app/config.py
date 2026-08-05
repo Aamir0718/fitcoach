@@ -54,8 +54,11 @@ class Settings(BaseSettings):
     "http://127.0.0.1:3000",
     "http://localhost:5000",
     "http://127.0.0.1:5000",
+    "http://localhost:5500",  # VS Code Live Server
+    "http://127.0.0.1:5500",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
+    "*"  # Allow all origins for development (can be restricted in production)
     ]
     SENTRY_DSN: str = ""
 

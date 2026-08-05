@@ -1,0 +1,55 @@
+{
+  "slides": [
+    {
+      "gradient": "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
+      "headline": "Train Smarter.",
+      "description": "Your personal AI fitness coach knows exactly what you need.",
+      "cta": "Start Workout",
+      "action": "switchTab('chat')",
+      "ctaSecondary": "Open Ghost Trainer",
+      "actionSecondary": "switchTab('trainer')"
+    },
+    {
+      "gradient": "linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)",
+      "headline": "Every Rep Counts.",
+      "description": "Precision form analysis helps you maximize every movement.",
+      "cta": "Open Ghost Trainer",
+      "action": "switchTab('trainer')",
+      "ctaSecondary": "Talk to AI Coach",
+      "actionSecondary": "switchTab('chat')"
+    },
+    {
+      "gradient": "linear-gradient(135deg, #141e30 0%, #243b55 100%)",
+      "headline": "Discipline Beats Motivation.",
+      "description": "Build consistency with intelligent workout planning.",
+      "cta": "Talk to AI Coach", 
+      "action": "switchTab('chat')",
+      "ctaSecondary": "View Progress",
+      "actionSecondary": "switchTab('progress')"
+    },
+    {
+      "gradient": "linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)",
+      "headline": "Built One Workout At A Time.",
+      "description": "Track your progress and celebrate every milestone.",
+      "cta": "View Progress",
+      "action": "switchTab('progress')",
+      "ctaSecondary": "Log Recovery",
+      "actionSecondary": "switchTab('recovery')"
+    },
+    {
+      "gradient": "linear-gradient(135deg, #2c3e50 0%, #4ca1af 100%)",
+      "headline": "Your Strongest Self Starts Today.",
+      "description": "Recovery insights help you train smarter, not harder.",
+      "cta": "Log Recovery",
+      "action": "switchTab('recovery')",
+      "ctaSecondary": "Start Workout",
+      "actionSecondary": "switchTab('chat')"
+    }
+  ],
+  "settings": {
+    "autoPlay": true,
+    "interval": 5000,
+    "transition": "fade",
+    "duration": 1000
+  }
+}

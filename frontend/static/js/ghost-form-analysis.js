@@ -70,7 +70,7 @@ function checkPoseReliability(landmarks, exercise) {
   return true;
 }
 
-export function newRepState() {
+function newRepState() {
   return {
     reps: 0,
     phase: "up",
@@ -87,7 +87,7 @@ export function newRepState() {
   };
 }
 
-export function analyze({ landmarks, exercise }) {
+function analyze({ landmarks, exercise }) {
   if (!landmarks || landmarks.length < 29) return null;
 
   // 1. Smooth landmarks using EMA to eliminate camera noise/jitter
@@ -115,6 +115,255 @@ export function analyze({ landmarks, exercise }) {
   if (exercise === "pushup") return analyzePushup(smoothed);
   return analyzeBiceps(smoothed);
 }
+
+function analyzeSquat(lm) {
+  const hip = lm[LM_ACTUAL.LEFT_HIP];
+  const rightHip = lm[LM_ACTUAL.RIGHT_HIP];
+  const knee = lm[LM_ACTUAL.LEFT_KNEE];
+  const rightKnee = lm[LM_ACTUAL.RIGHT_KNEE];
+  const ankle = lm[LM_ACTUAL.LEFT_ANKLE];
+  const rightAnkle = lm[LM_ACTUAL.RIGHT_ANKLE];
+  const shoulder = lm[LM_ACTUAL.LEFT_SHOULDER];
+
+  const kneeAngle = angleDeg(hip, knee, ankle);
+  const rightKneeAngle = angleDeg(rightHip, rightKnee, rightAnkle);
+  const hipAngle = angleDeg(shoulder, hip, knee);
+  const torsoLean = angleDeg(shoulder, hip, knee);
+  const cues = [];
+  let good = true;
+  const errors = [];
+
+  if (torsoLean < 130) {
+    cues.push("Straighten your back");
+    good = false;
+    errors.push("leaning_torso");
+  }
+  const kneeWidth = Math.abs(knee.x - rightKnee.x);
+  const ankleWidth = Math.abs(ankle.x - rightAnkle.x);
+  if (kneeWidth < ankleWidth * 0.68) {
+    cues.push("Push knees out");
+    good = false;
+    errors.push("knee_collapse");
+  }
+  if (Math.abs(knee.x - ankle.x) > 0.08) {
+    cues.push("Keep knees over toes");
+    good = false;
+    errors.push("knee_tracking");
+  }
+  if (kneeAngle > 115 && kneeAngle <= 145) {
+    cues.push("Go lower");
+    errors.push("shallow_squat");
+  }
+
+  const depthPct = clamp(((170 - kneeAngle) / 90) * 100, 0, 100);
+  const phase = kneeAngle < 110 ? "down" : "up";
+  const precision = scoreTargets([
+    targetScore(kneeAngle, 90, 85),
+    targetScore(rightKneeAngle, 90, 85),
+    targetScore(hipAngle, 95, 80),
+  ]);
+
+  return {
+    primaryAngle: kneeAngle,
+    exercise: "squat",
+    phase,
+    good,
+    cues,
+    errors,
+    depthPct,
+    precision,
+    angles: {
+      leftKnee: kneeAngle,
+      rightKnee: rightKneeAngle,
+      leftHip: hipAngle,
+      leftShoulder: angleDeg(lm[LM_ACTUAL.LEFT_ELBOW], shoulder, hip),
+    },
+  };
+}
+
+function analyzePushup(lm) {
+  const shoulder = lm[LM_ACTUAL.LEFT_SHOULDER];
+  const rightShoulder = lm[LM_ACTUAL.RIGHT_SHOULDER];
+  const elbow = lm[LM_ACTUAL.LEFT_ELBOW];
+  const rightElbow = lm[LM_ACTUAL.RIGHT_ELBOW];
+  const wrist = lm[LM_ACTUAL.LEFT_WRIST];
+  const rightWrist = lm[LM_ACTUAL.RIGHT_WRIST];
+  const hip = lm[LM_ACTUAL.LEFT_HIP];
+  const ankle = lm[LM_ACTUAL.LEFT_ANKLE];
+
+  const elbowAngle = angleDeg(shoulder, elbow, wrist);
+  const rightElbowAngle = angleDeg(rightShoulder, rightElbow, rightWrist);
+  const bodyLine = angleDeg(shoulder, hip, ankle);
+  const shoulderAngle = angleDeg(elbow, shoulder, hip);
+  const cues = [];
+  let good = true;
+  const errors = [];
+
+  if (bodyLine < 160) {
+    cues.push("Hips sagging - engage your core");
+    good = false;
+    errors.push("hips_sagging");
+  }
+  if (Math.abs(elbow.x - shoulder.x) > 0.16) {
+    cues.push("Keep elbows tucked");
+    good = false;
+    errors.push("elbow_flare");
+  }
+  if (elbowAngle > 105 && elbowAngle <= 145) {
+    cues.push("Lower your chest");
+    errors.push("shallow_rep");
+  }
+
+  const depthPct = clamp(((170 - elbowAngle) / 90) * 100, 0, 100);
+  const phase = elbowAngle < 100 ? "down" : "up";
+  const precision = scoreTargets([
+    targetScore(elbowAngle, 90, 85),
+    targetScore(rightElbowAngle, 90, 85),
+    targetScore(bodyLine, 175, 30),
+  ]);
+
+  return {
+    primaryAngle: elbowAngle,
+    exercise: "pushup",
+    phase,
+    good,
+    cues,
+    errors,
+    depthPct,
+    precision,
+    angles: {
+      leftElbow: elbowAngle,
+      rightElbow: rightElbowAngle,
+      leftShoulder: shoulderAngle,
+      leftHip: bodyLine,
+    },
+  };
+}
+
+function analyzeBiceps(lm) {
+  const shoulder = lm[LM_ACTUAL.RIGHT_SHOULDER];
+  const elbow = lm[LM_ACTUAL.RIGHT_ELBOW];
+  const wrist = lm[LM_ACTUAL.RIGHT_WRIST];
+  const hip = lm[LM_ACTUAL.RIGHT_HIP];
+  const elbowAngle = angleDeg(shoulder, elbow, wrist);
+  const shoulderAngle = angleDeg(elbow, shoulder, hip);
+  const cues = [];
+  let good = true;
+  const errors = [];
+
+  if (elbow.x < shoulder.x - 0.06) {
+    cues.push("Keep elbow tucked in");
+    good = false;
+    errors.push("swinging_arms");
+  }
+  if (shoulderAngle < 18 || shoulderAngle > 52) {
+    cues.push("Stop swinging");
+    good = false;
+    errors.push("swinging_arms");
+  }
+  if (elbowAngle > 75 && elbowAngle <= 145) {
+    cues.push("Curl all the way up");
+    errors.push("incomplete_contraction");
+  }
+  if (elbowAngle < 50) cues.push("Squeeze at the top");
+
+  const depthPct = clamp(((170 - elbowAngle) / 130) * 100, 0, 100);
+  const phase = elbowAngle < 70 ? "down" : "up";
+  const precision = scoreTargets([
+    targetScore(elbowAngle, 55, 115),
+    targetScore(shoulderAngle, 35, 35),
+  ]);
+  return {
+    primaryAngle: elbowAngle,
+    exercise: "biceps",
+    phase,
+    good,
+    cues,
+    errors,
+    depthPct,
+    precision,
+    angles: {
+      rightElbow: elbowAngle,
+      rightShoulder: shoulderAngle,
+    },
+  };
+}
+
+function clamp(val, min, max) {
+  return Math.max(min, Math.min(max, val));
+}
+
+function targetScore(val, target, range) {
+  const diff = Math.abs(val - target);
+  const pct = Math.max(0, 1 - diff / range);
+  return pct;
+}
+
+function scoreTargets(scores) {
+  if (!scores.length) return 0;
+  const sum = scores.reduce((a, b) => a + b, 0);
+  return sum / scores.length;
+}
+
+function tick(state, analysis) {
+  if (!analysis) return state;
+  
+  const phase = analysis.phase;
+  const primaryAngle = analysis.primaryAngle;
+  const good = analysis.good;
+  
+  state.lastAngle = primaryAngle;
+  state.totalFrames++;
+  if (good) state.goodFrames++;
+  
+  // Phase detection with hysteresis
+  const phaseChanged = state.phase !== phase;
+  if (phaseChanged) {
+    if (phase === "down" && state.phase === "up") {
+      // Going down
+      state.phase = "down";
+      state.pendingState = "up";
+      state.pendingStateTime = Date.now();
+    } else if (phase === "up" && state.phase === "down") {
+      // Coming up
+      const now = Date.now();
+      if (state.pendingState === "up" && (now - state.pendingStateTime) > 200) {
+        // Valid rep completed
+        state.reps++;
+        state.lastRepTime = now;
+        state.stateName = "UP";
+      }
+      state.phase = "up";
+      state.pendingState = null;
+    }
+  }
+  
+  // Angle tracking for form scoring
+  if (primaryAngle !== null) {
+    state.angleScores.push(analysis.precision || 0);
+    if (state.angleScores.length > 30) state.angleScores.shift();
+  }
+  
+  return state;
+}
+
+function scoreForm(state) {
+  if (state.totalFrames === 0) return 0;
+  const precision = state.angleScores.length > 0 
+    ? state.angleScores.reduce((a, b) => a + b, 0) / state.angleScores.length 
+    : 0;
+  const visibility = state.goodFrames / state.totalFrames;
+  return (precision * 0.7 + visibility * 0.3) * 100;
+}
+
+// Export to global scope for other scripts
+window.GhostFormAnalysis = {
+  analyze,
+  tick,
+  scoreForm,
+  TARGET_REPS,
+  newRepState
+};
 
 function analyzeSquat(lm) {
   const hip = lm[LM_ACTUAL.LEFT_HIP];
