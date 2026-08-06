@@ -1,3 +1,4 @@
+(function () {
 // Import from global scope
 const { angleDeg, LM } = window.GhostPose || {};
 
@@ -539,7 +540,7 @@ function analyzeBiceps(lm) {
   };
 }
 
-export function tick(state, fb) {
+function tick(state, fb) {
   const next = {
     ...state,
     totalFrames: state.totalFrames + 1,
@@ -694,12 +695,12 @@ export function tick(state, fb) {
   return next;
 }
 
-export function accuracy(state) {
+function accuracy(state) {
   if (!state.totalFrames) return 100;
   return Math.round((state.goodFrames / state.totalFrames) * 100);
 }
 
-export function scoreForm({ state, feedback, stabilityScore }) {
+function scoreForm({ state, feedback, stabilityScore }) {
   if (!feedback || !state.totalFrames) return 100;
   const posture = (state.goodFrames / state.totalFrames) * 100;
   const precision = average(state.angleScores, feedback.precision ?? 100);
@@ -743,3 +744,4 @@ window.GhostFormAnalysis = {
   scoreForm,
   newRepState
 };
+})();

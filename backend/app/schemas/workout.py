@@ -27,6 +27,7 @@ class ChatResponse(BaseModel):
 
 class WorkoutLogRequest(BaseModel):
     muscle_group: str
+    exercises: Optional[List[dict]] = None
     exercises_done: Optional[str] = None
     duration: int
     mode: str

@@ -1,3 +1,4 @@
+(function () {
 // Load dependencies from global scope (loaded via script tags)
 const { getPoseLandmarker, POSE_EDGES, LM } = window.GhostPose || {};
 const { analyze, tick, scoreForm, TARGET_REPS, newRepState } = window.GhostFormAnalysis || {};
@@ -1045,3 +1046,4 @@ if (document.readyState === 'loading') {
 }
 
 window.addEventListener("beforeunload", stop);
+})();

@@ -313,27 +313,111 @@ async function loadHomeWorkout() {
   }
 }
 
-function animateTextNumber(id, value, suffix = "") {
-  const el = document.getElementById(id);
-  if (!el) return;
-  const number = Number(value);
-  if (!Number.isFinite(number)) {
-    el.textContent = value || "—";
-    return;
+// ── HOME DASHBOARD ───────────────────────────────────────────────────────
+function loadHomeDashboard() {
+  // Load recovery data
+  loadHomeRecovery();
+  
+  // Load calories data
+  loadHomeCalories();
+  
+  // Load progress data
+  loadHomeProgress();
+  
+  // Load workout info
+  loadHomeWorkout();
+}
+
+async function loadHomeRecovery() {
+  try {
+    const response = await fetch(`${API}/recovery/latest`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      const heroRecovery = document.getElementById('hero-recovery');
+      
+      if (heroRecovery && data.recovery_score !== undefined) {
+        heroRecovery.textContent = Math.round(data.recovery_score);
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load recovery data:', error);
+    setTxt('hero-recovery', '--');
   }
-  cancelAnimationFrame(homeCountRaf[id]);
-  const start = performance.now();
-  const duration = 720;
-  const from = Number(el.dataset.value || 0);
-  const ease = (t) => 1 - Math.pow(1 - t, 3);
-  const tick = (now) => {
-    const t = Math.min(1, (now - start) / duration);
-    const current = Math.round(from + (number - from) * ease(t));
-    el.textContent = current + suffix;
-    if (t < 1) homeCountRaf[id] = requestAnimationFrame(tick);
-    else el.dataset.value = number;
-  };
-  homeCountRaf[id] = requestAnimationFrame(tick);
+}
+
+async function loadHomeCalories() {
+  try {
+    const response = await fetch(`${API}/nutrition/today`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      const heroCalories = document.getElementById('hero-calories');
+      
+      if (heroCalories && data.total_calories !== undefined) {
+        heroCalories.textContent = Math.round(data.total_calories);
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load calories data:', error);
+    setTxt('hero-calories', '--');
+  }
+}
+
+async function loadHomeProgress() {
+  try {
+    const response = await fetch(`${API}/progress/summary`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      const heroStreak = document.getElementById('hero-streak');
+      
+      if (heroStreak && data.current_streak !== undefined) {
+        heroStreak.textContent = data.current_streak;
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load progress data:', error);
+    setTxt('hero-streak', '0');
+  }
+}
+
+async function loadHomeWorkout() {
+  try {
+    const response = await fetch(`${API}/workouts/today`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      const workoutType = document.getElementById('home-workout-type');
+      const workoutDuration = document.getElementById('home-workout-duration');
+      const workoutExercises = document.getElementById('home-workout-exercises');
+      
+      if (workoutType && data.name) {
+        workoutType.textContent = data.name;
+      }
+      
+      if (workoutDuration && data.estimated_duration) {
+        workoutDuration.textContent = `${data.estimated_duration} min`;
+      }
+      
+      if (workoutExercises && data.exercises) {
+        workoutExercises.textContent = `${data.exercises.length} exercises`;
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load workout data:', error);
+    setTxt('home-workout-type', 'No workout planned');
+    setTxt('home-workout-duration', '-- min');
+    setTxt('home-workout-exercises', '-- exercises');
+  }
 }
 
 // ── MOTIVATIONAL QUOTES (kept for potential use) ─────────────────────────
@@ -825,7 +909,10 @@ function switchTab(tab) {
     const chatBox = document.getElementById("chat-box");
     if (chatBox && chatBox.children.length === 0) loadChat();
   }
-  if (tab==="trainer") window.fitCoachGhostTrainer?.init();
+  if (tab==="trainer") {
+    console.log('Switching to trainer tab, calling init...');
+    window.fitCoachGhostTrainer?.init();
+  }
   if (tab!=="trainer") window.fitCoachGhostTrainer?.stop();
 }
 
