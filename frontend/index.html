@@ -7,6 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes"/>
   <title>FitCoach AI</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <script>
     (function () {
@@ -18,7 +19,6 @@
     })();
   </script>
   <link rel="stylesheet" href="/static/style.css"/>
-  <link rel="stylesheet" href="/static/home-premium.css"/>
   <script>
     window.FC_INITIAL_TAB = "{{ initial_tab|default('home') }}";
   </script>
@@ -226,252 +226,165 @@
 
   <!-- ===== HOME TAB ===== -->
   <div id="tab-home" class="tab-content active">
-    <div class="premium-home">
-
-      <!-- ANIMATED BACKGROUND -->
-      <div class="home-bg" aria-hidden="true">
-        <div class="bg-grid"></div>
-        <div class="bg-noise"></div>
-        <div class="bg-lights">
-          <div class="light light-1"></div>
-          <div class="light light-2"></div>
-          <div class="light light-3"></div>
-          <div class="light light-4"></div>
+    <div class="home-dashboard">
+      
+      <!-- Welcome Header -->
+      <div class="home-welcome">
+        <div class="welcome-content">
+          <h1 class="welcome-title" id="home-welcome-title">Welcome back</h1>
+          <p class="welcome-subtitle" id="home-welcome-subtitle">Ready to train today?</p>
         </div>
-        <div class="bg-particles" id="home-particles"></div>
+        <div class="welcome-actions">
+          <button class="btn-primary btn-start-workout" onclick="switchTab('chat')">
+            <span>Start Workout</span>
+          </button>
+        </div>
       </div>
 
-      <!-- FLOATING GLASS NAVIGATION -->
-      <nav class="home-nav" id="home-nav">
-        <div class="nav-group">
-          <button class="nav-item">Home</button>
-          <button class="nav-item">AI Coach</button>
-          <button class="nav-item">Recovery</button>
-          <button class="nav-item">Nutrition</button>
-          <button class="nav-item">Community</button>
-          <button class="nav-item">Instagram</button>
-          <button class="nav-item">Help Center</button>
-          <button class="nav-item">Contact</button>
+      <!-- Stats Grid -->
+      <div class="home-stats-grid">
+        <!-- Recovery -->
+        <div class="home-stat-card home-recovery-card" onclick="switchTab('recovery')">
+          <div class="stat-header">
+            <span class="stat-label">Recovery</span>
+            <i data-lucide="heart-pulse" class="stat-icon"></i>
+          </div>
+          <div class="stat-value">
+            <span id="home-recovery-display">--</span>
+            <span class="stat-unit">%</span>
+          </div>
+          <div class="stat-status" id="home-recovery-status">Loading...</div>
         </div>
-        <button class="nav-start">Start Session</button>
-      </nav>
 
-      <!-- PREMIUM HERO -->
-      <section class="hero-premium" id="hero-premium">
-        <div class="hero-container">
-          <div class="hero-left">
-            <span class="hero-label">AI Fitness Operating System</span>
-            <h1 class="hero-title">
-              <span class="hero-line">TRAIN SMARTER.</span>
-              <span class="hero-line">RECOVER BETTER.</span>
-              <span class="hero-line">LIVE STRONGER.</span>
-            </h1>
-            <p class="hero-text">An AI-powered fitness operating system that adapts to your body, your goals, and your life. Precision training, real-time form analysis, and intelligent recovery — all in one place.</p>
-            <div class="hero-buttons">
-              <button class="btn-hero btn-hero-primary" data-action="session">
-                <i data-lucide="play" class="btn-icon"></i>
-                <span>Start Today's Session</span>
-              </button>
-              <button class="btn-hero btn-hero-secondary" data-action="coach">
-                <i data-lucide="message-circle" class="btn-icon"></i>
-                <span>Meet Your AI Coach</span>
-              </button>
-            </div>
-            <div class="hero-stats">
-              <div class="stat-chip"><span class="stat-num">7</span><span class="stat-label">Modules</span></div>
-              <div class="divider"></div>
-              <div class="stat-chip"><span class="stat-num">24/7</span><span class="stat-label">AI</span></div>
-              <div class="divider"></div>
-              <div class="stat-chip"><span class="stat-num">100%</span><span class="stat-label">Personalized</span></div>
-            </div>
+        <!-- Calories -->
+        <div class="home-stat-card home-calories-card" onclick="switchTab('calories')">
+          <div class="stat-header">
+            <span class="stat-label">Calories</span>
+            <i data-lucide="flame" class="stat-icon"></i>
           </div>
-          <div class="hero-right">
-            <div class="phone-scene" id="phone-scene">
-              <div class="live-athlete" id="live-athlete">
-                <span class="athlete-live-pill"><span class="live-dot"></span><span class="athlete-live-label">Running</span></span>
-                <img src="/assets/images/home/runner.webp" class="athlete-img active" alt="Runner" data-athlete="runner">
-                <img src="/assets/images/home/jump_rope.webp" class="athlete-img" alt="Jump Rope" data-athlete="jumprope">
-                <img src="/assets/images/home/deadlift.webp" class="athlete-img" alt="Deadlift" data-athlete="deadlift">
-                <img src="/assets/images/home/boxing.webp" class="athlete-img" alt="Boxing" data-athlete="boxing">
-                <img src="/assets/images/home/hero_athlete.webp" class="athlete-img" alt="Walking" data-athlete="walking">
-              </div>
-              <div class="phone-mockup" id="phone-mockup">
-                <img src="/assets/images/home/phone_mockup.webp" alt="iPhone" class="phone-img">
-                <div class="phone-screen">
-                  <div class="phone-content">
-                    <div class="phone-display-header">
-                      <span class="pd-title">Today's Workout</span>
-                      <span class="pd-time" id="phone-time">10:42 AM</span>
-                    </div>
-                    <div class="phone-metrics-grid">
-                      <div class="phone-metric">
-                        <span class="pm-label">Recovery</span>
-                        <span class="pm-value" id="phone-recovery">92<span>%</span></span>
-                      </div>
-                      <div class="phone-metric">
-                        <span class="pm-label">Calories</span>
-                        <span class="pm-value" id="phone-calories">1,847<span> kcal</span></span>
-                      </div>
-                      <div class="phone-metric">
-                        <span class="pm-label">Heart Rate</span>
-                        <span class="pm-value" id="phone-heart"><span id="hr-bpm" class="hr-pulse">72</span> <small>bpm</small></span>
-                      </div>
-                      <div class="phone-metric">
-                        <span class="pm-label">Readiness</span>
-                        <span class="pm-value">Optimal</span>
-                      </div>
-                    </div>
-                    <div class="phone-graphs">
-                      <div class="mini-graph" id="graph-recovery">
-                        <canvas width="60" height="40"></canvas>
-                      </div>
-                      <div class="mini-graph" id="graph-calories">
-                        <canvas width="60" height="40"></canvas>
-                      </div>
-                    </div>
-                    <div class="phone-notifications">
-                      <div class="phone-notification"><i data-lucide="check-circle-2"></i><span><strong>Workout completed</strong> &mdash; 42 min</span></div>
-                      <div class="phone-notification"><i data-lucide="moon-star"></i><span><strong>Recovery optimal</strong> &mdash; great sleep ahead</span></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+          <div class="stat-value">
+            <span id="home-calories-display">--</span>
+            <span class="stat-unit">kcal</span>
           </div>
+          <div class="stat-status" id="home-calories-status">Loading...</div>
         </div>
-      </section>
 
-      <!-- FEATURES -->
-      <section class="features-premium" data-animate-section>
-        <div class="features-container">
-          <div class="features-header section-header-anim" data-animate>
-            <span class="features-kicker">Core Modules</span>
-            <h2 class="features-title">Everything You Need</h2>
-            <p class="features-sub">A complete AI fitness operating system — train, recover, and optimize.</p>
+        <!-- Streak -->
+        <div class="home-stat-card home-streak-card" onclick="switchTab('progress')">
+          <div class="stat-header">
+            <span class="stat-label">Streak</span>
+            <i data-lucide="trending-up" class="stat-icon"></i>
           </div>
-          <div class="features-grid">
-            <div class="feature-card" data-animate="item">
-              <div class="feature-icon"><i data-lucide="brain" class="lucide-feature"></i></div>
-              <h3>AI Coach</h3>
-              <p>Adaptive workout plans that evolve with your progress and learn your patterns.</p>
-            </div>
-            <div class="feature-card" data-animate="item">
-              <div class="feature-icon"><i data-lucide="eye" class="lucide-feature"></i></div>
-              <h3>Ghost Trainer</h3>
-              <p>Real-time posture analysis and form correction powered by computer vision.</p>
-            </div>
-            <div class="feature-card" data-animate="item">
-              <div class="feature-icon"><i data-lucide="moon" class="lucide-feature"></i></div>
-              <h3>Recovery Intelligence</h3>
-              <p>Advanced recovery scoring that analyzes your readiness and optimizes intensity.</p>
-            </div>
-            <div class="feature-card" data-animate="item">
-              <div class="feature-icon"><i data-lucide="apple" class="lucide-feature"></i></div>
-              <h3>Nutrition AI</h3>
-              <p>Smart meal guidance and macro tracking tailored to your training goals.</p>
-            </div>
-            <div class="feature-card" data-animate="item">
-              <div class="feature-icon"><i data-lucide="dumbbell" class="lucide-feature"></i></div>
-              <h3>Workout Generator</h3>
-              <p>Generates personalized workout plans based on your equipment and goals.</p>
-            </div>
-            <div class="feature-card" data-animate="item">
-              <div class="feature-icon"><i data-lucide="trending-up" class="lucide-feature"></i></div>
-              <h3>Progress Intelligence</h3>
-              <p>Tracks your progress with detailed analytics and actionable insights.</p>
-            </div>
+          <div class="stat-value">
+            <span id="home-streak-display">--</span>
+            <span class="stat-unit">days</span>
           </div>
+          <div class="stat-status">Keep it up!</div>
         </div>
-      </section>
 
-      <!-- PERSONAL TRAINER -->
-      <section class="trainer-premium" data-animate-section>
-        <div class="trainer-container">
-          <div class="trainer-content" data-animate="item">
-            <span class="trainer-label">Elite AI Performance Coach</span>
-            <h2 class="trainer-title">Meet Your AI Trainer</h2>
-            <h3 class="trainer-name">Atlas</h3>
-            <p class="trainer-desc">Your 24/7 AI performance coach &mdash; adaptive intelligence, body analysis, workout planning, and recovery guidance, always in sync.</p>
-            <div class="trainer-tags">
-              <span class="trainer-tag"><i data-lucide="clock"></i>Available 24/7</span>
-              <span class="trainer-tag"><i data-lucide="brain"></i>Adaptive Intelligence</span>
-              <span class="trainer-tag"><i data-lucide="scan"></i>Body Analysis</span>
-              <span class="trainer-tag"><i data-lucide="calendar-check"></i>Workout Planning</span>
-              <span class="trainer-tag"><i data-lucide="heart-pulse"></i>Recovery Guidance</span>
+        <!-- Workouts -->
+        <div class="home-stat-card home-workouts-card" onclick="switchTab('progress')">
+          <div class="stat-header">
+            <span class="stat-label">This Week</span>
+            <i data-lucide="dumbbell" class="stat-icon"></i>
+          </div>
+          <div class="stat-value">
+            <span id="home-workouts-display">--</span>
+            <span class="stat-unit">workouts</span>
+          </div>
+          <div class="stat-status">On track</div>
+        </div>
+      </div>
+
+      <!-- Today's Workout -->
+      <div class="home-section">
+        <div class="section-header">
+          <h2 class="section-title">Today's Workout</h2>
+          <button class="btn-text" onclick="switchTab('chat')">View Details</button>
+        </div>
+        <div class="home-workout-card" onclick="switchTab('chat')">
+          <div class="workout-info">
+            <div class="workout-type" id="home-workout-type">Loading...</div>
+            <div class="workout-meta">
+              <span id="home-workout-duration">-- min</span>
+              <span id="home-workout-exercises">-- exercises</span>
             </div>
-            <button class="btn-trainer">
-              <i data-lucide="user" class="btn-icon-trainer"></i>
-              <span>Meet Atlas</span>
-            </button>
           </div>
-          <div class="trainer-image" data-animate="item">
-            <img src="/assets/images/home/gym_portrait.webp" alt="Atlas — AI Trainer">
-            <div class="trainer-glow"></div>
+          <div class="workout-action">
+            <i data-lucide="play-circle" class="play-icon"></i>
           </div>
         </div>
-      </section>
+      </div>
 
-      <!-- SOCIAL -->
-      <section class="social-premium" data-animate-section>
-        <div class="social-container">
-          <div class="section-header-anim" data-animate>
-            <span class="social-kicker">Connect</span>
-            <h2 class="social-title">Join the Community</h2>
-          </div>
-          <div class="social-grid">
-            <a href="#" class="social-card" data-animate="item">
-              <i data-lucide="instagram" class="social-icon"></i>
-              <span>Instagram</span>
-            </a>
-            <a href="#" class="social-card" data-animate="item">
-              <i data-lucide="users" class="social-icon"></i>
-              <span>Community</span>
-            </a>
-            <a href="#" class="social-card" data-animate="item">
-              <i data-lucide="life-ring" class="social-icon"></i>
-              <span>Support</span>
-            </a>
-            <a href="#" class="social-card" data-animate="item">
-              <i data-lucide="help-circle" class="social-icon"></i>
-              <span>Help Center</span>
-            </a>
-            <a href="#" class="social-card" data-animate="item">
-              <i data-lucide="mail" class="social-icon"></i>
-              <span>Contact</span>
-            </a>
-          </div>
+      <!-- Quick Actions -->
+      <div class="home-section">
+        <div class="section-header">
+          <h2 class="section-title">Quick Actions</h2>
         </div>
-      </section>
+        <div class="home-quick-actions">
+          <button class="quick-action-btn" onclick="switchTab('chat')">
+            <i data-lucide="message-circle"></i>
+            <span>AI Coach</span>
+          </button>
+          <button class="quick-action-btn" onclick="switchTab('trainer')">
+            <i data-lucide="eye"></i>
+            <span>Ghost Trainer</span>
+          </button>
+          <button class="quick-action-btn" onclick="switchTab('recovery')">
+            <i data-lucide="moon"></i>
+            <span>Recovery</span>
+          </button>
+          <button class="quick-action-btn" onclick="switchTab('calories')">
+            <i data-lucide="apple"></i>
+            <span>Nutrition</span>
+          </button>
+          <button class="quick-action-btn" onclick="switchTab('progress')">
+            <i data-lucide="bar-chart-2"></i>
+            <span>Progress</span>
+          </button>
+          <button class="quick-action-btn" onclick="switchTab('profile')">
+            <i data-lucide="user"></i>
+            <span>Profile</span>
+          </button>
+        </div>
+      </div>
 
-      <!-- QUOTE SECTION -->
-      <section class="quote-section" data-animate-section>
-        <div class="quote-container">
-          <h2 class="quote-text" data-animate>
-            <span class="quote-line">YOUR BODY</span>
-            <span class="quote-line">IS THE ONLY</span>
-            <span class="quote-line">PLACE YOU HAVE</span>
-            <span class="quote-line">TO LIVE.</span>
-          </h2>
-          <div class="quote-faded" aria-hidden="true">
-            YOUR BODY IS THE ONLY PLACE YOU HAVE TO LIVE.
-          </div>
-          <p class="quote-author" data-animate>— FITCOACH AI</p>
+      <!-- Recent Activity -->
+      <div class="home-section">
+        <div class="section-header">
+          <h2 class="section-title">Recent Activity</h2>
+          <button class="btn-text" onclick="switchTab('progress')">View All</button>
         </div>
-      </section>
-
-      <!-- FOOTER -->
-      <footer class="home-footer" data-animate>
-        <div class="footer-content">
-          <div class="footer-brand">FitCoach AI</div>
-          <div class="footer-links">
-            <a href="#">Instagram</a>
-            <a href="#">Privacy</a>
-            <a href="#">Terms</a>
-            <a href="#">Support</a>
+        <div class="home-activity-list" id="home-activity-list">
+          <div class="activity-item">
+            <div class="activity-icon activity-workout">
+              <i data-lucide="dumbbell"></i>
+            </div>
+            <div class="activity-details">
+              <div class="activity-title">Upper Body Strength</div>
+              <div class="activity-meta">Yesterday • 45 min</div>
+            </div>
           </div>
-          <div class="footer-version">v1.0.0</div>
+          <div class="activity-item">
+            <div class="activity-icon activity-recovery">
+              <i data-lucide="heart-pulse"></i>
+            </div>
+            <div class="activity-details">
+              <div class="activity-title">Recovery Score Updated</div>
+              <div class="activity-meta">Yesterday • 92%</div>
+            </div>
+          </div>
+          <div class="activity-item">
+            <div class="activity-icon activity-nutrition">
+              <i data-lucide="flame"></i>
+            </div>
+            <div class="activity-details">
+              <div class="activity-title">Calories Logged</div>
+              <div class="activity-meta">2 days ago • 2,100 kcal</div>
+            </div>
+          </div>
         </div>
-      </footer>
+      </div>
 
     </div>
   </div><!-- end tab-home -->
@@ -1683,6 +1596,5 @@
   })();
 </script>
 <script src="https://unpkg.com/lucide@latest/dist/lucide.min.js"></script>
-<script src="/static/home-premium.js"></script>
 </body>
 </html>

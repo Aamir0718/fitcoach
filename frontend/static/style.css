@@ -29,6 +29,379 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--text);min-hei
 h1,h2,h3,.auth-logo h1,.tab-title,.coach-name,.demo-name,.stat-value,.ob-question,.coach-hero-copy h3,.exercise-topline h4,.status-card strong,.macro-card strong{font-family:var(--font-display)}
 button,input,textarea,select{font-family:var(--font-body)}
 
+/* ===================== HOME DASHBOARD ===================== */
+.home-dashboard {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.home-welcome {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 0;
+}
+
+.welcome-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.welcome-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+.welcome-subtitle {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.welcome-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.btn-start-workout {
+  background: linear-gradient(135deg, var(--purple), var(--purple-deep));
+  color: #fff;
+  border: 1px solid rgba(var(--rgb-primary-light), 0.35);
+  border-radius: var(--radius-sm);
+  padding: 12px 24px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btn-start-workout:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(var(--rgb-primary), 0.34);
+}
+
+/* Stats Grid */
+.home-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.home-stat-card {
+  background: var(--theme-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(20px);
+}
+
+.home-stat-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--theme-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.stat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.stat-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.stat-icon {
+  width: 32px;
+  height: 32px;
+  color: var(--purpleLt);
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.stat-unit {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.stat-status {
+  font-size: 13px;
+  color: var(--theme-accent);
+  font-weight: 600;
+}
+
+/* Card-specific colors */
+.home-recovery-card .stat-icon { color: var(--theme-accent); }
+.home-calories-card .stat-icon { color: var(--orange); }
+.home-streak-card .stat-icon { color: var(--purpleLt); }
+.home-workouts-card .stat-icon { color: var(--blue); }
+
+/* Home Sections */
+.home-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+.btn-text {
+  background: transparent;
+  border: none;
+  color: var(--purpleLt);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.btn-text:hover {
+  color: var(--text);
+}
+
+/* Workout Card */
+.home-workout-card {
+  background: var(--theme-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(20px);
+}
+
+.home-workout-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--theme-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.workout-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.workout-type {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.workout-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.workout-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(var(--rgb-primary), 0.15);
+  transition: all 0.3s ease;
+}
+
+.home-workout-card:hover .workout-action {
+  background: rgba(var(--rgb-primary), 0.25);
+}
+
+.play-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--purpleLt);
+}
+
+/* Quick Actions */
+.home-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.quick-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 16px;
+  background: var(--theme-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(20px);
+}
+
+.quick-action-btn:hover {
+  transform: translateY(-4px);
+  border-color: var(--theme-border);
+  background: rgba(var(--rgb-primary), 0.1);
+}
+
+.quick-action-btn i {
+  width: 24px;
+  height: 24px;
+  color: var(--purpleLt);
+}
+
+.quick-action-btn span {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Activity List */
+.home-activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: var(--theme-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: all 0.3s ease;
+}
+
+.activity-item:hover {
+  border-color: var(--theme-border);
+}
+
+.activity-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.activity-workout {
+  background: rgba(var(--rgb-primary), 0.15);
+}
+
+.activity-workout i {
+  color: var(--purpleLt);
+}
+
+.activity-recovery {
+  background: rgba(16, 185, 129, 0.15);
+}
+
+.activity-recovery i {
+  color: var(--green);
+}
+
+.activity-nutrition {
+  background: rgba(245, 158, 11, 0.15);
+}
+
+.activity-nutrition i {
+  color: var(--orange);
+}
+
+.activity-icon i {
+  width: 20px;
+  height: 20px;
+}
+
+.activity-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.activity-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.activity-meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .home-dashboard {
+    padding: 16px;
+    gap: 24px;
+  }
+
+  .home-welcome {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .welcome-title {
+    font-size: 24px;
+  }
+
+  .home-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .home-quick-actions {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+
 /* SCREENS */
 .screen{display:none;width:100%;min-height:100vh}
 .screen.active{display:flex}

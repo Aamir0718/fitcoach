@@ -106,7 +106,7 @@ function initThemeEngine() {
   });
 }
 
-// ── HOME SCREEN ───────────────────────────────────────────────────────
+// ── HOME SCREEN ─────────────────────────────────────────────────────--
  
 const HOME_QUOTES = [
   { text: "The body achieves what the mind believes.", author: "FitCoach AI" },
@@ -148,6 +148,169 @@ function getTodayCTAMessage(profile, recoveryZone) {
 function setTxt(id, val) {
   const el = document.getElementById(id);
   if (el) el.textContent = val;
+}
+
+// ── HOME DASHBOARD ───────────────────────────────────────────────────────
+function loadHomeDashboard() {
+  // Set welcome message
+  const greeting = timeGreeting();
+  const welcomeTitle = document.getElementById('home-welcome-title');
+  const welcomeSubtitle = document.getElementById('home-welcome-subtitle');
+  
+  if (welcomeTitle) {
+    welcomeTitle.textContent = `${greeting}, ${currentUser?.name?.split(' ')[0] || 'Athlete'}`;
+  }
+  if (welcomeSubtitle) {
+    const hour = new Date().getHours();
+    let subtitle = "Ready to train today?";
+    if (hour < 12) subtitle = "Start your day strong";
+    else if (hour < 17) subtitle = "Keep the momentum going";
+    else subtitle = "Evening training session";
+    welcomeSubtitle.textContent = subtitle;
+  }
+
+  // Load recovery data
+  loadHomeRecovery();
+  
+  // Load calories data
+  loadHomeCalories();
+  
+  // Load progress data
+  loadHomeProgress();
+  
+  // Load workout info
+  loadHomeWorkout();
+}
+
+async function loadHomeRecovery() {
+  try {
+    const response = await fetch(`${API}/recovery/latest`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      const recoveryDisplay = document.getElementById('home-recovery-display');
+      const recoveryStatus = document.getElementById('home-recovery-status');
+      
+      if (recoveryDisplay && data.recovery_score !== undefined) {
+        recoveryDisplay.textContent = Math.round(data.recovery_score);
+        
+        if (recoveryStatus) {
+          if (data.recovery_score >= 80) {
+            recoveryStatus.textContent = 'Optimal';
+            recoveryStatus.style.color = 'var(--green)';
+          } else if (data.recovery_score >= 60) {
+            recoveryStatus.textContent = 'Good';
+            recoveryStatus.style.color = 'var(--orange)';
+          } else {
+            recoveryStatus.textContent = 'Needs Rest';
+            recoveryStatus.style.color = 'var(--red)';
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load recovery data:', error);
+    setTxt('home-recovery-display', '--');
+    setTxt('home-recovery-status', 'No data');
+  }
+}
+
+async function loadHomeCalories() {
+  try {
+    const response = await fetch(`${API}/nutrition/today`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      const caloriesDisplay = document.getElementById('home-calories-display');
+      const caloriesStatus = document.getElementById('home-calories-status');
+      
+      if (caloriesDisplay && data.total_calories !== undefined) {
+        caloriesDisplay.textContent = Math.round(data.total_calories);
+        
+        if (caloriesStatus) {
+          const goal = data.daily_goal || 2000;
+          const percentage = (data.total_calories / goal) * 100;
+          
+          if (percentage >= 90 && percentage <= 110) {
+            caloriesStatus.textContent = 'On Track';
+            caloriesStatus.style.color = 'var(--green)';
+          } else if (percentage < 90) {
+            caloriesStatus.textContent = 'Below Goal';
+            caloriesStatus.style.color = 'var(--orange)';
+          } else {
+            caloriesStatus.textContent = 'Above Goal';
+            caloriesStatus.style.color = 'var(--red)';
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load calories data:', error);
+    setTxt('home-calories-display', '--');
+    setTxt('home-calories-status', 'No data');
+  }
+}
+
+async function loadHomeProgress() {
+  try {
+    const response = await fetch(`${API}/progress/summary`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      const streakDisplay = document.getElementById('home-streak-display');
+      const workoutsDisplay = document.getElementById('home-workouts-display');
+      
+      if (streakDisplay && data.current_streak !== undefined) {
+        streakDisplay.textContent = data.current_streak;
+      }
+      
+      if (workoutsDisplay && data.weekly_workouts !== undefined) {
+        workoutsDisplay.textContent = data.weekly_workouts;
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load progress data:', error);
+    setTxt('home-streak-display', '0');
+    setTxt('home-workouts-display', '0');
+  }
+}
+
+async function loadHomeWorkout() {
+  try {
+    const response = await fetch(`${API}/workouts/today`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      const workoutType = document.getElementById('home-workout-type');
+      const workoutDuration = document.getElementById('home-workout-duration');
+      const workoutExercises = document.getElementById('home-workout-exercises');
+      
+      if (workoutType && data.name) {
+        workoutType.textContent = data.name;
+      }
+      
+      if (workoutDuration && data.estimated_duration) {
+        workoutDuration.textContent = `${data.estimated_duration} min`;
+      }
+      
+      if (workoutExercises && data.exercises) {
+        workoutExercises.textContent = `${data.exercises.length} exercises`;
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load workout data:', error);
+    setTxt('home-workout-type', 'No workout planned');
+    setTxt('home-workout-duration', '-- min');
+    setTxt('home-workout-exercises', '-- exercises');
+  }
 }
 
 function animateTextNumber(id, value, suffix = "") {
@@ -654,6 +817,7 @@ function switchTab(tab) {
   if (localStorage.getItem("fc_theme_auto") === "1") {
     applyAthleteTheme(AUTO_THEME_BY_TAB[tab] || "galaxy", { previewOnly: true });
   }
+  if (tab==="home") loadHomeDashboard();
   if (tab==="progress") loadProgress();
   if (tab==="profile")  loadProfile();
   if (tab==="recovery") loadRecoveryLatest();
@@ -3593,5 +3757,21 @@ function pushPopoverMessage(text, sender = "bot") {
     pushDrawerMessage(text, "bot");
   }
 }
+
+// Initialize Lucide icons for home dashboard
+function initHomeIcons() {
+  if (window.lucide) {
+    lucide.createIcons();
+  }
+}
+
+// Initialize home dashboard on load
+document.addEventListener('DOMContentLoaded', () => {
+  initHomeIcons();
+  // Load home data if home tab is active
+  if (document.getElementById('tab-home').classList.contains('active')) {
+    loadHomeDashboard();
+  }
+});
 
 
