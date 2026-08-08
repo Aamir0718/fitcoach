@@ -230,149 +230,88 @@
 
   <!-- ===== HOME TAB ===== -->
   <div id="tab-home" class="tab-content active">
-    <div class="premium-home">
-      
-      <!-- Background Grid -->
-      <div class="background-grid"></div>
-      
-      <!-- Particle Container -->
-      <div class="particle-container"></div>
-      
-      <!-- Hero Section -->
-      <section class="hero-section">
-        <div class="hero-background">
-          <!-- Slides will be dynamically generated -->
+    <div class="home-shell">
+
+      <!-- Hero band: full-bleed photo + scrim, today's session front and center -->
+      <section class="home-hero">
+        <div class="home-hero-media" style="background-image:url('/static/images/home/deadlift.webp')"></div>
+        <div class="home-hero-scrim"></div>
+        <div class="home-hero-topstrip">
+          <span id="home-welcome-subtitle">Ready to train today?</span>
+          <span id="home-welcome-title">FitCoach</span>
         </div>
-        
-        <div class="hero-overlay"></div>
-        
-        <div class="hero-gradient-blobs">
-          <div class="gradient-blob gradient-blob-1"></div>
-          <div class="gradient-blob gradient-blob-2"></div>
-          <div class="gradient-blob gradient-blob-3"></div>
-          <div class="gradient-blob gradient-blob-4"></div>
-        </div>
-        
-        <div class="hero-content">
-          <div class="hero-left">
-            <div class="hero-badge">
-              <span class="badge-dot"></span>
-              <span>AI-Powered Fitness</span>
-            </div>
-            <h1 class="hero-title">
-              <span class="title-line">Train Smarter.</span>
-              <span class="title-line">Recover Better.</span>
-              <span class="title-line">Live Stronger.</span>
-            </h1>
-            <p class="hero-subtitle">
-              Your personal AI fitness coach — adaptive workouts, real-time form analysis, recovery scoring, and nutrition intelligence.
-            </p>
-            <div class="hero-actions">
-              <button class="hero-btn hero-btn-primary" onclick="switchTab('planner')">
-                <span>Start Training</span>
-                <i data-lucide="arrow-right" class="btn-icon"></i>
-              </button>
-              <button class="hero-btn hero-btn-secondary" onclick="switchTab('chat')">
-                <span>Meet AI Coach</span>
-                <i data-lucide="message-circle" class="btn-icon"></i>
-              </button>
-            </div>
+        <div class="home-hero-content">
+          <span class="eyebrow home-hero-eyebrow">Today's training</span>
+          <h1 class="home-hero-title" id="home-workout-type">Loading…</h1>
+          <div class="home-hero-stats">
+            <div class="home-hero-stat"><strong id="hero-recovery">--</strong><span>Recovery</span></div>
+            <div class="home-hero-stat"><strong id="hero-calories">--</strong><span>Calories</span></div>
+            <div class="home-hero-stat"><strong id="hero-streak">--</strong><span>Day streak</span></div>
           </div>
-          
-          <div class="hero-right">
-            <div class="hero-stats">
-              <div class="hero-stat glass-card">
-                <span class="stat-number" id="hero-recovery">--</span>
-                <span class="stat-label">Recovery</span>
-              </div>
-              <div class="hero-stat glass-card">
-                <span class="stat-number" id="hero-calories">--</span>
-                <span class="stat-label">Calories</span>
-              </div>
-              <div class="hero-stat glass-card">
-                <span class="stat-number" id="hero-streak">--</span>
-                <span class="stat-label">Day Streak</span>
-              </div>
-            </div>
+          <div class="home-hero-actions">
+            <button class="home-hero-btn-primary" onclick="startWorkout()">Start Workout</button>
+            <button class="home-hero-btn-outline" onclick="switchTab('planner')">View Plan</button>
           </div>
         </div>
       </section>
 
-      <!-- Quick Actions Grid -->
-      <section class="quick-section">
-        <div class="section-header">
-          <h2 class="section-title">Quick Actions</h2>
+      <!-- Stat row: week consistency, today's session length, this week's count -->
+      <section class="home-stat-row">
+        <div class="home-stat-col">
+          <span class="mono-label">Week consistency</span>
+          <div class="week-row" id="home-week-row">
+            <div class="week-day"><div class="week-bar empty" style="height:16px"></div><div class="week-label">Mon</div></div>
+            <div class="week-day"><div class="week-bar empty" style="height:16px"></div><div class="week-label">Tue</div></div>
+            <div class="week-day"><div class="week-bar empty" style="height:16px"></div><div class="week-label">Wed</div></div>
+            <div class="week-day"><div class="week-bar empty" style="height:16px"></div><div class="week-label">Thu</div></div>
+            <div class="week-day"><div class="week-bar empty" style="height:16px"></div><div class="week-label">Fri</div></div>
+            <div class="week-day"><div class="week-bar empty" style="height:16px"></div><div class="week-label">Sat</div></div>
+            <div class="week-day"><div class="week-bar today" style="height:32px"></div><div class="week-label">Sun</div></div>
+          </div>
         </div>
-        <div class="quick-grid">
-          <div class="quick-card glass-card" onclick="switchTab('chat')">
-            <div class="quick-icon quick-ai">
-              <i data-lucide="brain"></i>
-            </div>
-            <h3>AI Coach</h3>
-            <p>Get personalized workout guidance</p>
-          </div>
-          
-          <div class="quick-card glass-card" onclick="switchTab('planner')">
-            <div class="quick-icon quick-vision">
-              <i data-lucide="eye"></i>
-            </div>
-            <h3>Start Training</h3>
-            <p>Pick today's session — live camera form analysis</p>
-          </div>
-          
-          <div class="quick-card glass-card" onclick="switchTab('recovery')">
-            <div class="quick-icon quick-recovery">
-              <i data-lucide="heart-pulse"></i>
-            </div>
-            <h3>Recovery</h3>
-            <p>Track your recovery score</p>
-          </div>
-          
-          <div class="quick-card glass-card" onclick="switchTab('calories')">
-            <div class="quick-icon quick-nutrition">
-              <i data-lucide="apple"></i>
-            </div>
-            <h3>Nutrition</h3>
-            <p>Log your meals and macros</p>
-          </div>
-          
-          <div class="quick-card glass-card" onclick="switchTab('progress')">
-            <div class="quick-icon quick-progress">
-              <i data-lucide="trending-up"></i>
-            </div>
-            <h3>Progress</h3>
-            <p>View your fitness journey</p>
-          </div>
-          
-          <div class="quick-card glass-card" onclick="switchTab('profile')">
-            <div class="quick-icon quick-profile">
-              <i data-lucide="user"></i>
-            </div>
-            <h3>Profile</h3>
-            <p>Manage your settings</p>
-          </div>
+        <div class="home-stat-col">
+          <span class="mono-label">Workout today</span>
+          <div class="big-number home-stat-value" id="home-workout-duration">-- min</div>
+          <span class="home-stat-sub" id="home-workout-exercises">-- exercises</span>
+        </div>
+        <div class="home-stat-col">
+          <span class="mono-label">This week</span>
+          <div class="big-number home-stat-value" id="home-streak-display">0</div>
+          <span class="home-stat-sub"><span id="home-workouts-display">0</span> workouts logged</span>
         </div>
       </section>
 
-      <!-- Today's Workout -->
-      <section class="quick-section">
-        <div class="section-header">
-          <h2 class="section-title">Today's Workout</h2>
-          <button class="btn-text" onclick="switchTab('planner')">View Details</button>
-        </div>
-        <div class="workout-card glass-card" onclick="switchTab('planner')">
-          <div class="workout-info">
-            <div class="workout-type" id="home-workout-type">Loading...</div>
-            <div class="workout-meta">
-              <span id="home-workout-duration">-- min</span>
-              <span id="home-workout-exercises">-- exercises</span>
-            </div>
-          </div>
-          <div class="workout-action">
-            <i data-lucide="play-circle" class="play-icon"></i>
+      <!-- Two-column body: quick actions left, coach + recovery + nutrition right -->
+      <div class="home-body-grid">
+        <div class="home-body-left">
+          <h2 class="section-heading">Quick actions</h2>
+          <div class="home-action-rows">
+            <button class="home-action-row" onclick="switchTab('chat')"><span>AI Coach</span><small>Get personalized workout guidance</small></button>
+            <button class="home-action-row" onclick="switchTab('planner')"><span>Planner</span><small>Pick today's session — live camera form analysis</small></button>
+            <button class="home-action-row" onclick="switchTab('recovery')"><span>Recovery</span><small>Track your recovery score</small></button>
+            <button class="home-action-row" onclick="switchTab('calories')"><span>Nutrition</span><small>Log your meals and macros</small></button>
+            <button class="home-action-row" onclick="switchTab('progress')"><span>Progress</span><small>View your fitness journey</small></button>
+            <button class="home-action-row" onclick="switchTab('profile')"><span>Profile</span><small>Manage your settings</small></button>
           </div>
         </div>
-      </section>
+
+        <aside class="home-body-right">
+          <div class="home-coach-note">
+            <span class="mono-label">Coach's note</span>
+            <p>Consistency compounds — show up for today's session and let the plan do the rest.</p>
+            <button class="btn-outline" onclick="switchTab('chat')">Ask the coach</button>
+          </div>
+          <div class="home-mini-card">
+            <span class="mono-label">Recovery</span>
+            <div class="home-mini-row"><strong id="home-recovery-display">--</strong><span id="home-recovery-status">No data</span></div>
+          </div>
+          <div class="home-mini-card">
+            <span class="mono-label">Nutrition today</span>
+            <div class="home-mini-row"><span>Calories</span><strong id="home-calories-display">--</strong></div>
+            <span id="home-calories-status" class="home-stat-sub">No data</span>
+          </div>
+        </aside>
+      </div>
 
     </div>
   </div><!-- end tab-home -->
