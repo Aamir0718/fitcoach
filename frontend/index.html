@@ -8,7 +8,8 @@
   <title>FitCoach AI</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <script>
     (function () {
       var savedTheme = localStorage.getItem("fc_athlete_theme") || "galaxy";
@@ -175,27 +176,23 @@
 
   <!-- SIDEBAR (desktop) -->
   <nav class="sidebar">
-    <div class="sidebar-logo"><i class="brand-core">FC</i><span>FitCoach</span></div>
-    <div class="sidebar-pulse-card">
-      <div class="pulse-orb"></div>
-      <div><strong>Your Coach</strong><span>ready to train</span></div>
-    </div>
+    <div class="sidebar-logo"><span class="logo-mark">FC</span><span class="logo-word">FitCoach</span></div>
     <div class="nav-links">
       <button class="nav-btn active" onclick="switchTab('home')" data-tab="home">
-        <span class="nav-icon">🏠</span><span>Home</span>
+        <span class="nav-dot"></span><span>Home</span>
       </button>
-      <button class="nav-btn" onclick="switchTab('chat')" data-tab="chat"><span class="nav-icon">💬</span><span>Coach</span></button>
-      <button class="nav-btn" onclick="switchTab('planner')" data-tab="planner"><span class="nav-icon">📅</span><span>Planner</span></button>
-      <button class="nav-btn" onclick="switchTab('recovery')" data-tab="recovery"><span class="nav-icon">🛌</span><span>Recovery</span></button>
-      <button class="nav-btn" onclick="switchTab('progress')" data-tab="progress"><span class="nav-icon">📊</span><span>Progress</span></button>
-      <button class="nav-btn" onclick="switchTab('calories')" data-tab="calories"><span class="nav-icon">🥗</span><span>Calories</span></button>
-      <button class="nav-btn" onclick="switchTab('visualos')" data-tab="visualos"><span class="nav-icon">✨</span><span>Themes</span></button>
-      <button class="nav-btn" onclick="switchTab('profile')" data-tab="profile"><span class="nav-icon">👤</span><span>Profile</span></button>
+      <button class="nav-btn" onclick="switchTab('chat')" data-tab="chat"><span class="nav-dot"></span><span>Coach</span></button>
+      <button class="nav-btn" onclick="switchTab('planner')" data-tab="planner"><span class="nav-dot"></span><span>Planner</span></button>
+      <button class="nav-btn" onclick="switchTab('recovery')" data-tab="recovery"><span class="nav-dot"></span><span>Recovery</span></button>
+      <button class="nav-btn" onclick="switchTab('progress')" data-tab="progress"><span class="nav-dot"></span><span>Progress</span></button>
+      <button class="nav-btn" onclick="switchTab('calories')" data-tab="calories"><span class="nav-dot"></span><span>Calories</span></button>
+      <button class="nav-btn" onclick="switchTab('visualos')" data-tab="visualos"><span class="nav-dot"></span><span>Themes</span></button>
+      <button class="nav-btn" onclick="switchTab('profile')" data-tab="profile"><span class="nav-dot"></span><span>Profile</span></button>
     </div>
     <!-- Mode toggle in sidebar -->
     <div class="sidebar-mode-toggle" id="sidebar-mode-toggle">
-      <button class="mode-btn active" id="mode-gym-btn" onclick="setWorkoutMode('gym')">🏋️ Gym</button>
-      <button class="mode-btn" id="mode-sport-btn" onclick="setWorkoutMode('sport')">🏆 Sport</button>
+      <button class="mode-btn active" id="mode-gym-btn" onclick="setWorkoutMode('gym')">Gym</button>
+      <button class="mode-btn" id="mode-sport-btn" onclick="setWorkoutMode('sport')">Sport</button>
     </div>
     <div class="sidebar-mini-metrics">
       <div><span>Mode</span><strong id="sidebar-mode-readout">Gym</strong></div>
@@ -205,14 +202,14 @@
 
   <!-- MOBILE BOTTOM NAV -->
   <nav class="bottom-nav">
-    <button class="bnav-btn active" onclick="switchTab('home')" data-tab="home"><span>🏠</span><small>Home</small></button>
-    <button class="bnav-btn" onclick="switchTab('chat')" data-tab="chat"><span>💬</span><small>Coach</small></button>
-    <button class="bnav-btn" onclick="switchTab('planner')" data-tab="planner"><span>📅</span><small>Plan</small></button>
-    <button class="bnav-btn" onclick="switchTab('recovery')" data-tab="recovery"><span>🛌</span><small>Recovery</small></button>
-    <button class="bnav-btn" onclick="switchTab('progress')" data-tab="progress"><span>📊</span><small>Progress</small></button>
-    <button class="bnav-btn" onclick="switchTab('calories')" data-tab="calories"><span>🥗</span><small>Calories</small></button>
-    <button class="bnav-btn" onclick="switchTab('visualos')" data-tab="visualos"><span>✨</span><small>Themes</small></button>
-    <button class="bnav-btn" onclick="switchTab('profile')" data-tab="profile"><span>👤</span><small>Profile</small></button>
+    <button class="bnav-btn active" onclick="switchTab('home')" data-tab="home"><span class="bnav-bar"></span><small>Home</small></button>
+    <button class="bnav-btn" onclick="switchTab('chat')" data-tab="chat"><span class="bnav-bar"></span><small>Coach</small></button>
+    <button class="bnav-btn" onclick="switchTab('planner')" data-tab="planner"><span class="bnav-bar"></span><small>Plan</small></button>
+    <button class="bnav-btn" onclick="switchTab('recovery')" data-tab="recovery"><span class="bnav-bar"></span><small>Recovery</small></button>
+    <button class="bnav-btn" onclick="switchTab('progress')" data-tab="progress"><span class="bnav-bar"></span><small>Progress</small></button>
+    <button class="bnav-btn" onclick="switchTab('calories')" data-tab="calories"><span class="bnav-bar"></span><small>Calories</small></button>
+    <button class="bnav-btn" onclick="switchTab('visualos')" data-tab="visualos"><span class="bnav-bar"></span><small>Themes</small></button>
+    <button class="bnav-btn" onclick="switchTab('profile')" data-tab="profile"><span class="bnav-bar"></span><small>Profile</small></button>
   </nav>
 
   <!-- GLOBAL VOICE WAKE-WORD — say "Hey FitCoach" from any tab and it responds
