@@ -1,6 +1,10 @@
-// Load MediaPipe from CDN (using global scope for non-module loading)
-const PoseLandmarker = window.PoseLandmarker;
-const FilesetResolver = window.FilesetResolver;
+// Load MediaPipe from CDN (using global scope for non-module loading).
+// The vision_bundle.js UMD build attaches everything under a `Vision`
+// namespace global (window.Vision.PoseLandmarker etc.), not flat window.*
+// globals — this was the actual cause of "camera failed to start" (the old
+// code read window.PoseLandmarker directly, which never existed).
+const PoseLandmarker = window.Vision?.PoseLandmarker;
+const FilesetResolver = window.Vision?.FilesetResolver;
 
 const LM = {
   NOSE: 0,
@@ -44,7 +48,7 @@ async function getPoseLandmarker() {
 
   creating = (async () => {
     const vision = await FilesetResolver.forVisionTasks(
-      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304/wasm",
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm",
     );
     cached = await PoseLandmarker.createFromOptions(vision, {
       baseOptions: {

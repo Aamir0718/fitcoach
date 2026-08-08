@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="/static/style.css"/>
   <link rel="stylesheet" href="/static/home-premium-v2.css"/>
   <script>
-    window.FC_INITIAL_TAB = "{{ initial_tab|default('home') }}";
+    window.FC_INITIAL_TAB = "home";
   </script>
 </head>
 <body>
@@ -186,7 +186,7 @@
         <span class="nav-icon">🏠</span><span>Home</span>
       </button>
       <button class="nav-btn" onclick="switchTab('chat')" data-tab="chat"><span class="nav-icon">💬</span><span>Coach</span></button>
-      <button class="nav-btn" onclick="switchTab('trainer')" data-tab="trainer"><span class="nav-icon">◎</span><span>Ghost Trainer</span></button>
+      <button class="nav-btn" onclick="switchTab('planner')" data-tab="planner"><span class="nav-icon">📅</span><span>Planner</span></button>
       <button class="nav-btn" onclick="switchTab('recovery')" data-tab="recovery"><span class="nav-icon">🛌</span><span>Recovery</span></button>
       <button class="nav-btn" onclick="switchTab('progress')" data-tab="progress"><span class="nav-icon">📊</span><span>Progress</span></button>
       <button class="nav-btn" onclick="switchTab('calories')" data-tab="calories"><span class="nav-icon">🥗</span><span>Calories</span></button>
@@ -208,13 +208,20 @@
   <nav class="bottom-nav">
     <button class="bnav-btn active" onclick="switchTab('home')" data-tab="home"><span>🏠</span><small>Home</small></button>
     <button class="bnav-btn" onclick="switchTab('chat')" data-tab="chat"><span>💬</span><small>Coach</small></button>
-    <button class="bnav-btn" onclick="switchTab('trainer')" data-tab="trainer"><span>◎</span><small>Trainer</small></button>
+    <button class="bnav-btn" onclick="switchTab('planner')" data-tab="planner"><span>📅</span><small>Plan</small></button>
     <button class="bnav-btn" onclick="switchTab('recovery')" data-tab="recovery"><span>🛌</span><small>Recovery</small></button>
     <button class="bnav-btn" onclick="switchTab('progress')" data-tab="progress"><span>📊</span><small>Progress</small></button>
     <button class="bnav-btn" onclick="switchTab('calories')" data-tab="calories"><span>🥗</span><small>Calories</small></button>
     <button class="bnav-btn" onclick="switchTab('visualos')" data-tab="visualos"><span>✨</span><small>Themes</small></button>
     <button class="bnav-btn" onclick="switchTab('profile')" data-tab="profile"><span>👤</span><small>Profile</small></button>
   </nav>
+
+  <!-- GLOBAL VOICE WAKE-WORD — say "Hey FitCoach" from any tab and it responds
+       like Siri: a spoken greeting, then it listens for and routes your command. -->
+  <button id="wake-word-fab" class="wake-word-fab" onclick="toggleWakeWord()" title="Say &quot;Hey FitCoach&quot; to talk hands-free">
+    <span class="wwf-icon">🎙️</span>
+    <span class="wwf-status" id="wake-word-status">Hey FitCoach</span>
+  </button>
 
   <!-- ===== CHAT TAB ===== -->
   <!-- ============================================================
@@ -265,7 +272,7 @@
               Your personal AI fitness coach — adaptive workouts, real-time form analysis, recovery scoring, and nutrition intelligence.
             </p>
             <div class="hero-actions">
-              <button class="hero-btn hero-btn-primary" onclick="switchTab('chat')">
+              <button class="hero-btn hero-btn-primary" onclick="switchTab('planner')">
                 <span>Start Training</span>
                 <i data-lucide="arrow-right" class="btn-icon"></i>
               </button>
@@ -309,12 +316,12 @@
             <p>Get personalized workout guidance</p>
           </div>
           
-          <div class="quick-card glass-card" onclick="switchTab('trainer')">
+          <div class="quick-card glass-card" onclick="switchTab('planner')">
             <div class="quick-icon quick-vision">
               <i data-lucide="eye"></i>
             </div>
-            <h3>Ghost Trainer</h3>
-            <p>Real-time form analysis</p>
+            <h3>Start Training</h3>
+            <p>Pick today's session — live camera form analysis</p>
           </div>
           
           <div class="quick-card glass-card" onclick="switchTab('recovery')">
@@ -355,9 +362,9 @@
       <section class="quick-section">
         <div class="section-header">
           <h2 class="section-title">Today's Workout</h2>
-          <button class="btn-text" onclick="switchTab('chat')">View Details</button>
+          <button class="btn-text" onclick="switchTab('planner')">View Details</button>
         </div>
-        <div class="workout-card glass-card" onclick="switchTab('chat')">
+        <div class="workout-card glass-card" onclick="switchTab('planner')">
           <div class="workout-info">
             <div class="workout-type" id="home-workout-type">Loading...</div>
             <div class="workout-meta">
@@ -540,6 +547,119 @@
         <button id="voice-btn" class="voice-btn" onclick="toggleVoice()">🎤</button>
         <input type="text" id="message" placeholder="Ask your coach…" onkeydown="handleKey(event)"/>
         <button class="send-btn" onclick="sendMessage()">➤</button>
+      </div>
+    </div>
+
+    <!-- LIVE TRAINING SESSION — camera + exercise + queue + AI Coach chat, all
+         in this same Coach tab. Shown in place of chat-mode-shell whenever a
+         session is active (started from Planner or by saying "start" in chat);
+         hidden and chat-mode-shell restored when the session ends. -->
+    <div id="ghost-workout-container" class="ghost-workout-container hidden">
+      <div class="ghost-workout-layout">
+
+        <!-- Column 1: Camera (Left) -->
+        <div class="ghost-column-left">
+          <div class="ghost-stage">
+            <video id="ghost-video" class="ghost-video" playsinline muted></video>
+            <canvas id="ghost-canvas" class="ghost-canvas"></canvas>
+
+            <div class="ghost-scan-grid"></div>
+
+            <div class="ghost-idle-overlay" id="ghost-idle-overlay">
+              <div class="ghost-orbit">◎</div>
+              <h3>Starting Camera...</h3>
+              <p>Ensure your full body is visible in the frame.</p>
+            </div>
+
+            <!-- Floating posture cue -->
+            <div class="ghost-live-cue hidden" id="ghost-live-cue">Good posture</div>
+          </div>
+        </div>
+
+        <!-- Column 2: Current Exercise Controls (Center) -->
+        <div class="ghost-column-center">
+          <div class="gwh-progress" id="ghost-workout-progress">Exercise 1 / 3</div>
+          <h2 class="gwh-title" id="ghost-workout-exercise-name">Bicep Curl</h2>
+
+          <div class="ghost-center-stats">
+            <div class="ghost-center-stat-box">
+              <span class="gsm-label">Sets Completed</span>
+              <strong id="ghost-workout-sets">1 of 3</strong>
+            </div>
+            <div class="ghost-center-stat-box">
+              <span class="gsm-label">Reps Target</span>
+              <div class="gsm-rep-box">
+                <strong id="ghost-reps">0</strong>
+                <small>/ <span id="ghost-target-reps">12</span></small>
+              </div>
+            </div>
+            <div class="ghost-center-stat-box">
+              <span class="gsm-label">Form Accuracy</span>
+              <strong id="ghost-accuracy">100%</strong>
+              <small id="ghost-accuracy-label">Textbook execution</small>
+            </div>
+          </div>
+
+          <div class="ghost-instructions-box">
+            <span class="gsm-label">Coaching Guide & Cues</span>
+            <p id="ghost-brief">Feet shoulder-width. Hips back, chest tall.</p>
+          </div>
+
+          <div class="ghost-workout-actions">
+            <button id="ghost-workout-next-btn" class="ghost-next-btn">Next Exercise</button>
+            <button id="ghost-workout-finish-btn" class="ghost-finish-btn">Finish Workout</button>
+          </div>
+        </div>
+
+        <!-- Column 3: Workout Queue & Timer (Right) -->
+        <div class="ghost-column-right">
+          <div class="ghost-side-panel ghost-queue-panel">
+            <div class="ghost-sidebar-header">
+              <span class="gsm-label">Workout Queue</span>
+              <div class="ghost-queue-progress" id="ghost-queue-progress-text">1 / 3 Completed</div>
+            </div>
+            <div class="ghost-queue-progress-track">
+              <div class="ghost-queue-progress-fill" id="ghost-queue-progress-fill"></div>
+            </div>
+            <div class="ghost-queue-list" id="ghost-queue-list">
+              <!-- Dynamically populated with ✔ and ● icons, grouped by Warm-up / Workout / Cool-down -->
+            </div>
+
+            <div class="ghost-workout-timer-card">
+              <span class="gsm-label">Workout Timer</span>
+              <strong id="ghost-timer">00:00</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Column 4: Docked AI Coach chat — live session, camera + chat side by side -->
+        <div class="ghost-column-chat">
+          <div class="ghost-side-panel ghost-chat-panel">
+            <div class="ghost-sidebar-header">
+              <span class="gsm-label">AI Coach</span>
+              <span class="ghost-live-dot"><i></i>Live</span>
+            </div>
+            <div class="ghost-chat-livebar" id="ghost-chat-livebar">
+              <span class="gclb-exercise" id="ghost-chat-livebar-exercise">—</span>
+              <span class="gclb-sep">·</span>
+              <span class="gclb-stat" id="ghost-chat-livebar-reps">0/0 reps</span>
+              <span class="gclb-sep">·</span>
+              <span class="gclb-stat" id="ghost-chat-livebar-acc">—</span>
+            </div>
+            <div class="ghost-chat-box" id="ghost-chat-box"></div>
+            <div class="ghost-chat-suggestions" id="ghost-chat-suggestions">
+              <button type="button" class="ghost-chip" data-msg="Swap this exercise for something else">🔄 Swap exercise</button>
+              <button type="button" class="ghost-chip" data-msg="I want to do legs instead">🦵 Do legs instead</button>
+              <button type="button" class="ghost-chip" data-intent="check-form">📐 Check my form</button>
+              <button type="button" class="ghost-chip" data-msg="I'm feeling tired, can we shorten the workout?">⏱️ Shorten workout</button>
+            </div>
+            <div class="ghost-chat-input-row">
+              <input type="text" id="ghost-chat-input" placeholder="Ask your coach, or say 'do legs instead'…" onkeydown="if(event.key==='Enter') window.fitCoachGhostTrainer?.sendChat()"/>
+              <button class="ghost-chat-send-btn" onclick="window.fitCoachGhostTrainer?.sendChat()">➤</button>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -730,120 +850,24 @@
     </div>
   </div>
 
-  <!-- ===== GHOST TRAINER TAB ===== -->
-  <div id="tab-trainer" class="tab-content">
-    <div class="ghost-shell-minimal">
-      
-      <!-- Category & Exercise Selector Screen -->
-      <div id="ghost-selection-container" class="ghost-selection-container">
-        <div class="ghost-selection-header">
-          <div class="ghost-kicker">Ghost Trainer</div>
-          <h2 class="ghost-title">Choose Muscle Group</h2>
-          <p class="ghost-subtitle">Select a target muscle group, select an exercise, then start your live form coaching session.</p>
+  <!-- ===== WEEKLY PLANNER TAB ===== -->
+  <div id="tab-planner" class="tab-content">
+    <div class="planner-shell">
+      <div class="planner-header">
+        <div class="ghost-kicker">Weekly Planner</div>
+        <h2 class="ghost-title">Your Training Pool</h2>
+        <p class="ghost-subtitle" id="planner-progress-text">Loading your plan…</p>
+        <div class="planner-progress-track">
+          <div class="planner-progress-fill" id="planner-progress-fill" style="width:0%"></div>
         </div>
-
-        <!-- Step 1: Categories Grid -->
-        <div id="ghost-categories-grid" class="ghost-categories-grid">
-          <!-- Dynamically populated category cards -->
-        </div>
-
-        <!-- Step 2: Exercises Selection List (initially hidden) -->
-        <div id="ghost-exercises-selection" class="ghost-exercises-selection hidden">
-          <div class="ges-header">
-            <h3 id="ghost-selected-category-title">ARMS</h3>
-          </div>
-          <div id="ghost-exercises-list" class="ghost-exercises-list">
-            <!-- Dynamically populated exercise cards -->
-          </div>
-        </div>
-
-        <!-- Step 3: Bottom Action Bar -->
-        <div id="ghost-action-bar" class="ghost-action-bar hidden">
-          <div class="gab-single-content">
-            <span class="gab-single-selection" id="gab-selection-text">Selected: None</span>
-            <button id="ghost-start-session-btn" class="ghost-primary-btn" disabled>Begin Live Session</button>
-          </div>
-        </div>
+        <button class="planner-refresh-btn" onclick="refreshPlanner()">↻ Regenerate Plan</button>
       </div>
-
-      <!-- Step 4: Workout Camera Session UI (initially hidden) -->
-      <div id="ghost-workout-container" class="ghost-workout-container hidden">
-        <div class="ghost-workout-layout">
-          
-          <!-- Column 1: Camera (Left) -->
-          <div class="ghost-column-left">
-            <div class="ghost-stage">
-              <video id="ghost-video" class="ghost-video" playsinline muted></video>
-              <canvas id="ghost-canvas" class="ghost-canvas"></canvas>
-              
-              <div class="ghost-scan-grid"></div>
-              
-              <div class="ghost-idle-overlay" id="ghost-idle-overlay">
-                <div class="ghost-orbit">◎</div>
-                <h3>Starting Camera...</h3>
-                <p>Ensure your full body is visible in the frame.</p>
-              </div>
-
-              <!-- Floating posture cue -->
-              <div class="ghost-live-cue hidden" id="ghost-live-cue">Good posture</div>
-            </div>
-          </div>
-
-          <!-- Column 2: Current Exercise Controls (Center) -->
-          <div class="ghost-column-center">
-            <div class="gwh-progress" id="ghost-workout-progress">Exercise 1 / 3</div>
-            <h2 class="gwh-title" id="ghost-workout-exercise-name">Bicep Curl</h2>
-            
-            <div class="ghost-center-stats">
-              <div class="ghost-center-stat-box">
-                <span class="gsm-label">Sets Completed</span>
-                <strong id="ghost-workout-sets">1 of 3</strong>
-              </div>
-              <div class="ghost-center-stat-box">
-                <span class="gsm-label">Reps Target</span>
-                <div class="gsm-rep-box">
-                  <strong id="ghost-reps">0</strong>
-                  <small>/ <span id="ghost-target-reps">12</span></small>
-                </div>
-              </div>
-              <div class="ghost-center-stat-box">
-                <span class="gsm-label">Form Accuracy</span>
-                <strong id="ghost-accuracy">100%</strong>
-                <small id="ghost-accuracy-label">Textbook execution</small>
-              </div>
-            </div>
-
-            <div class="ghost-instructions-box">
-              <span class="gsm-label">Coaching Guide & Cues</span>
-              <p id="ghost-brief">Feet shoulder-width. Hips back, chest tall.</p>
-            </div>
-
-            <div class="ghost-workout-actions">
-              <button id="ghost-workout-next-btn" class="ghost-next-btn">Next Exercise</button>
-              <button id="ghost-workout-finish-btn" class="ghost-finish-btn">Finish Workout</button>
-            </div>
-          </div>
-
-          <!-- Column 3: Workout Queue & Timer (Right) -->
-          <div class="ghost-column-right">
-            <div class="ghost-sidebar-header">
-              <span class="gsm-label">Workout Queue</span>
-              <div class="ghost-queue-progress" id="ghost-queue-progress-text">1 / 3 Completed</div>
-            </div>
-            <div class="ghost-queue-list" id="ghost-queue-list">
-              <!-- Dynamically populated with ✔ and ● icons -->
-            </div>
-            
-            <div class="ghost-workout-timer-card">
-              <span class="gsm-label">Workout Timer</span>
-              <strong id="ghost-timer">00:00</strong>
-            </div>
-          </div>
-
+      <div class="planner-pool-grid" id="planner-pool-grid">
+        <div class="loading-state">Loading your plan…</div>
       </div>
+      <p class="planner-hint">Tap any session to start it — done sessions can be redone any time. Ask your coach mid-session to swap to something else and I'll update this automatically.</p>
     </div>
   </div>
-</div>
 
   <!-- ===== RECOVERY TAB ===== -->
   <div id="tab-recovery" class="tab-content">
@@ -1418,7 +1442,7 @@
 <div id="confetti-overlay" class="confetti-overlay hidden"></div>
 <div id="toast" class="toast hidden"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304/tasks_vision.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.js" crossorigin="anonymous"></script>
 <script src="/static/script.js"></script>
 <script src="/static/js/ghost-pose.js"></script>
 <script src="/static/js/ghost-form-analysis.js"></script>

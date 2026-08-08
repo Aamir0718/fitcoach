@@ -10,7 +10,7 @@ from app.models.workout import Workout, PlannedWorkout, WeeklyPlan, AIMemory, Ex
 from app.models.profile import Profile
 from app.models.progress import ActivityLog, Streak, PersonalRecord
 from app.schemas.workout import (
-    WorkoutLogRequest, WorkoutResponse, SwapRequest, WorkoutFinishRequest,
+    WorkoutLogRequest, WorkoutResponse, SlotSelectRequest, WorkoutFinishRequest,
     SetLogRequest, SetLogResponse, ProgressiveOverloadResponse,
     FCMTokenRequest, ExerciseSwapRequest,
 )
@@ -90,6 +90,19 @@ async def create_activity_log(user_id: int, activity_type: str, title: str, desc
         date=date.today()
     )
     db.add(activity)
+    await db.commit()
+
+
+async def _mark_pool_slot_done(user_id: int, slot_key: str | None, db: AsyncSession):
+    """If slot_key is given, flip the matching weekly-plan pool item to done."""
+    if not slot_key:
+        return
+    from app.services.plan_service import mark_slot_done
+    result = await db.execute(select(WeeklyPlan).where(WeeklyPlan.user_id == user_id))
+    plan_row = result.scalar_one_or_none()
+    if not plan_row:
+        return
+    plan_row.plan = mark_slot_done(plan_row.plan, slot_key)
     await db.commit()
 
 
@@ -176,6 +189,7 @@ async def log_workout(
         select(sqlfunc.count()).where(Workout.user_id == current_user.id, Workout.completed == True)
     )
     await check_and_award_badges(current_user.id, total_result.scalar() or 0, db)
+    await _mark_pool_slot_done(current_user.id, body.slot_key, db)
     return workout
 
 
@@ -231,6 +245,8 @@ async def finish_workout(
     if profile:
         profile.xp = (profile.xp or 0) + 100
         await db.commit()
+
+    await _mark_pool_slot_done(current_user.id, body.slot_key, db)
 
     return {"id": workout.id, "message": "Workout logged successfully", "xp_gained": 100}
 
@@ -487,21 +503,43 @@ async def get_weekly_plan(
     current_user: Auth = Depends(get_current_verified_user),
     db: AsyncSession = Depends(get_db),
 ):
+    from app.services.plan_service import generate_weekly_plan, maybe_reset_week
+
     result = await db.execute(select(WeeklyPlan).where(WeeklyPlan.user_id == current_user.id))
     plan = result.scalar_one_or_none()
 
+    profile_result = await db.execute(select(Profile).where(Profile.user_id == current_user.id))
+    profile = profile_result.scalar_one_or_none()
+
+    # Self-heal: same as the Coach entrypoint — don't wall an existing user
+    # with real profile data back into onboarding just because this flag was
+    # never flipped.
+    if profile and not profile.onboarding_complete:
+        from app.services.plan_service import profile_has_usable_data
+        if profile_has_usable_data(profile):
+            profile.onboarding_complete = True
+            await db.commit()
+
     if not plan:
-        profile_result = await db.execute(select(Profile).where(Profile.user_id == current_user.id))
-        profile = profile_result.scalar_one_or_none()
-        if not profile or not profile.onboarding_complete:
+        if not profile:
             raise HTTPException(status_code=400, detail="Complete onboarding first")
 
-        from app.services.plan_service import generate_weekly_plan
+        # Don't gate plan generation on the onboarding_complete flag — an
+        # existing user may have a usable profile (goal, days_per_week, etc.)
+        # without that specific flag being set. generate_weekly_plan() already
+        # defaults any missing fields sensibly (general_fitness / 4 days / gym),
+        # so just build a best-effort plan as if this were day one.
         plan_data = generate_weekly_plan(profile)
         plan = WeeklyPlan(user_id=current_user.id, plan=plan_data, mode=profile.active_mode)
         db.add(plan)
         await db.commit()
         await db.refresh(plan)
+    elif profile:
+        # Roll into a fresh pool if we've crossed into a new week
+        reset_plan = maybe_reset_week(plan.plan, profile)
+        if reset_plan is not plan.plan:
+            plan.plan = reset_plan
+            await db.commit()
 
     return {"plan": plan.plan, "mode": plan.mode, "updated_at": plan.updated_at}
 
@@ -511,47 +549,63 @@ async def refresh_weekly_plan(
     current_user: Auth = Depends(get_current_verified_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Force-regenerate the weekly plan (e.g. after profile changes)."""
+    """Force-regenerate the weekly plan pool (e.g. after profile changes),
+    preserving 'done' status for any slot type that still exists in the new pool."""
     profile_result = await db.execute(select(Profile).where(Profile.user_id == current_user.id))
     profile = profile_result.scalar_one_or_none()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
-    from app.services.plan_service import generate_weekly_plan
-    plan_data = generate_weekly_plan(profile)
+    from app.services.plan_service import build_weekly_pool, generate_weekly_plan
 
     result = await db.execute(select(WeeklyPlan).where(WeeklyPlan.user_id == current_user.id))
     plan = result.scalar_one_or_none()
+
+    new_pool = build_weekly_pool(profile)
     if plan:
-        plan.plan = plan_data
+        done_keys = {item["key"] for item in plan.plan.get("pool", []) if item.get("done")}
+        for item in new_pool:
+            if item["key"] in done_keys:
+                item["done"] = True
+        plan.plan = {**plan.plan, "pool": new_pool, "mode": profile.active_mode}
         plan.mode = profile.active_mode
     else:
+        plan_data = generate_weekly_plan(profile)
         plan = WeeklyPlan(user_id=current_user.id, plan=plan_data, mode=profile.active_mode)
         db.add(plan)
 
     await db.commit()
-    return {"plan": plan_data, "mode": profile.active_mode}
+    return {"plan": plan.plan, "mode": profile.active_mode}
 
 
-@router.post("/weekly-plan/swap")
-async def swap_workout_days(
-    body: SwapRequest,
+@router.post("/weekly-plan/select")
+async def select_weekly_plan_slot(
+    body: SlotSelectRequest,
+    zone: str = "green",
     current_user: Auth = Depends(get_current_verified_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Pick a session type to train right now — swaps it into the pool (in place of
+    the first still-undone slot) if it isn't already part of this week's split,
+    and returns its exercises. Does not mark anything done — that happens on finish."""
+    from app.services.plan_service import select_pool_slot, get_slot, build_full_session
+
     result = await db.execute(select(WeeklyPlan).where(WeeklyPlan.user_id == current_user.id))
     plan = result.scalar_one_or_none()
     if not plan:
-        raise HTTPException(status_code=404, detail="No weekly plan found")
+        raise HTTPException(status_code=404, detail="No weekly plan found — open the Planner tab first")
 
-    days = plan.plan.get("days", [])
-    if not (0 <= body.from_day < len(days) and 0 <= body.to_day < len(days)):
-        raise HTTPException(status_code=400, detail="Invalid day index")
+    profile_result = await db.execute(select(Profile).where(Profile.user_id == current_user.id))
+    profile = profile_result.scalar_one_or_none()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
 
-    days[body.from_day], days[body.to_day] = days[body.to_day], days[body.from_day]
-    plan.plan = {**plan.plan, "days": days}
+    plan.plan = select_pool_slot(plan.plan, body.slot_key)
     await db.commit()
-    return {"plan": plan.plan}
+
+    slot = get_slot(plan.plan, body.slot_key)
+    exercises = build_full_session(slot, profile, zone)
+    return {"plan": plan.plan, "slot": slot, "exercises": exercises}
 
 
 # ── Today's exercises ─────────────────────────────────────────────────────────
@@ -571,6 +625,45 @@ async def get_todays_exercises(
     from app.services.plan_service import get_exercises_for_slot
     exercises = get_exercises_for_slot(slot_key, profile, zone)
     return {"exercises": exercises, "zone": zone, "slot_key": slot_key}
+
+
+@router.get("/exercise-library")
+async def get_exercise_library(
+    current_user: Auth = Depends(get_current_verified_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """All exercises available to this user's profile, grouped by session category —
+    powers the Ghost Trainer's free-practice browser. Reuses the same rich catalog
+    (with movement_pattern tags, for pose analysis) as the AI weekly planner,
+    rather than the separate (unseeded) `exercises` SQL table used by GET /exercises."""
+    profile_result = await db.execute(select(Profile).where(Profile.user_id == current_user.id))
+    profile = profile_result.scalar_one_or_none()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    from app.services.plan_service import get_exercises_for_slot, SESSION_LABELS, _SESSION_MAPS, _MALE_HOME_MAP, _SPORT
+
+    gender = (profile.gender or "male").lower()
+    if gender not in ("male", "female"):
+        gender = "male"
+    mode = profile.active_mode
+
+    if mode == "sport" and profile.sport:
+        keys = list(_SPORT.get((profile.sport or "").lower(), {}).keys())
+    else:
+        sess_map = _SESSION_MAPS.get((gender, mode), _MALE_HOME_MAP)
+        keys = sorted(set(sess_map.values()))
+
+    library: dict[str, list] = {}
+    for key in keys:
+        exercises = get_exercises_for_slot(key, profile, "green")
+        if exercises:
+            library[key] = exercises
+
+    return {
+        "library": library,
+        "labels": {k: SESSION_LABELS.get(k, k.replace("_", " ").title()) for k in library},
+    }
 
 
 # ── Exercise library ──────────────────────────────────────────────────────────

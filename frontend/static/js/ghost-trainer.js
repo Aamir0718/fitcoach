@@ -47,71 +47,27 @@ const newRepState_ACTUAL = newRepState || function() {
   };
 };
 
-// Exercise library will be loaded from API
-let EXERCISE_LIBRARY = {};
-
-// Form key mapping for pose detection - maps exercise names to form analysis keys
-// Exercises not in this list are not supported for pose detection
-const FORM_KEY_MAPPING = {
-  "Bicep Curl": "biceps",
-  "Hammer Curl": "biceps",
-  "Tricep Pushdown": "pushup",
-  "Squat": "squat",
-  "Lunges": "squat",
-  "Romanian Deadlift": "squat",
-  "Push-up": "pushup",
-  "Bench Press": "pushup",
-  "Incline Press": "pushup",
-  "Barbell Row": "biceps",
-  "Lat Pulldown": "biceps",
-  "Seated Row": "biceps",
-  "Plank": "pushup",
-  "Crunches": "pushup",
-  "Russian Twist": "biceps",
-  "Hip Thrust": "squat",
-  "Glute Bridge": "squat",
-  "Bulgarian Split Squat": "squat",
-  "Shoulder Press": "pushup",
-  "Lateral Raise": "biceps",
-  "Front Raise": "biceps",
-  "Burpees": "pushup",
-  "Mountain Climbers": "pushup",
-  "Thrusters": "squat"
-};
-
-// Check if an exercise is supported for pose detection
-function isExerciseSupported(exerciseName) {
-  return exerciseName in FORM_KEY_MAPPING;
-}
-
-// Icon mapping for exercises
-const ICON_MAPPING = {
-  "arms": "💪",
-  "legs": "🦵",
-  "chest": "🏋️",
-  "back": "🏋️",
-  "core": "🧘",
-  "glutes": "🍑",
-  "shoulders": "🏋️",
-  "full_body": "🏃"
-};
-
-const CATEGORY_META = {
-  arms: { name: "Arms", icon: "💪" },
-  legs: { name: "Legs", icon: "🦵" },
-  chest: { name: "Chest", icon: "🏋" },
-  shoulders: { name: "Shoulders", icon: "🎯" },
-  core: { name: "Core", icon: "🔥" },
-  glutes: { name: "Glutes", icon: "🍑" },
-  back: { name: "Back", icon: "🪽" },
-  full_body: { name: "Full Body", icon: "🏃" }
-};
-
 const EXERCISE_BRIEFS = {
   squat: "Feet shoulder-width. Hips back, knees tracking, chest tall.",
-  pushup: "Hands under shoulders. Lock the core. Keep elbows near 45 degrees from the torso.",
-  biceps: "Pin the upper arm and curl without letting the shoulder swing forward.",
+  lunge: "Step through, torso upright, drop the back knee straight down.",
+  hip_hinge: "Soft knees, push hips back, keep your spine neutral — hinge, don't squat.",
+  horizontal_push: "Hands under shoulders, elbows near 45°. Lock the core, press with control.",
+  vertical_push: "Press straight overhead — don't let the bar drift forward. Brace your core.",
+  horizontal_pull: "Pull with your elbow, not your hand. No momentum, no torso swing.",
+  vertical_pull: "Pull straight down/up in a vertical line — chin toward the bar.",
+  elbow_flexion: "Pin the upper arm and curl without letting the shoulder swing forward.",
+  elbow_extension: "Keep your upper arm still — only the forearm moves. Full extension every rep.",
+  lateral_raise: "Lead with the elbows, raise to shoulder height, control the negative.",
+  calf_raise: "Full range — rise onto your toes, then lower all the way down.",
+  core_isometric: "One straight line from shoulders to ankles. Breathe, don't sag.",
+  core_flex: "Curl your ribs toward your hips — don't just pull with your neck.",
+  core_rotation: "Rotate from the torso, not the arms. Controlled, not flung.",
+  cardio_generic: "Keep a steady pace and controlled movement — quality over speed.",
+  full_body_generic: "Match the reference posture and keep your movement controlled.",
 };
+function briefFor(pattern) {
+  return EXERCISE_BRIEFS[pattern] || EXERCISE_BRIEFS.full_body_generic;
+}
 
 const SCORE_STATES = [
   { min: 82, key: "good", color: "rgb(16, 185, 129)", glow: "rgba(16, 185, 129, .42)" },
@@ -120,136 +76,52 @@ const SCORE_STATES = [
 ];
 
 const state = {
-  initialized: false,
-  status: "idle", // "idle", "loading", "running"
-  selectedCategory: null,
-  selectedExercise: null,
-  selectedExercises: [], // Set dynamically to [selectedExercise] on session start
-  exercisesLoaded: false, // Track if exercises have been loaded from API
-  
+  status: "idle", // "idle", "loading", "running", "error"
+  selectedExercises: [],
+  activeSlotKey: null, // Set when launched from the Planner tab — marks the weekly-plan pool slot done on finish
+  sessionLabel: "Workout",
+
   currentExerciseIndex: 0,
   currentSet: 1,
-  exercise: "squat",
+  exercise: "full_body_generic",
   targetReps: TARGET_REPS_ACTUAL,
   reps: 0,
   acc: 100,
   displayAcc: 100,
+  accHistory: [], // rolling recent-accuracy samples — what "Check my form" reports from, so the number it quotes isn't just whatever the last single frame happened to be
   elapsed: 0,
   feedback: null,
+  personDetected: false, // no one framed yet until the first landmark hit lands
   rafId: null,
   timerId: null,
   lastVideoTime: -1,
   repState: newRepState_ACTUAL(),
   previousAngles: null,
+  deltaEma: null,
   stabilityScore: 100,
-  completedPulse: false,
+  lastError: null,
 };
 
-// Fallback exercise dataset for when API fails
-const FALLBACK_EXERCISE_LIBRARY = {
-  chest: [
-    { name: "Bench Press", muscle: "Pectoralis Major", reps: 12, sets: 3, difficulty: "Intermediate", icon: "🏋️", form_key: "pushup" },
-    { name: "Incline Press", muscle: "Upper Chest", reps: 10, sets: 3, difficulty: "Intermediate", icon: "🏋️", form_key: "pushup" },
-    { name: "Push-up", muscle: "Pectoralis Major", reps: 15, sets: 3, difficulty: "Beginner", icon: "💪", form_key: "pushup" },
-    { name: "Chest Fly", muscle: "Pectoralis Major", reps: 12, sets: 3, difficulty: "Beginner", icon: "🏋️", form_key: "pushup" }
-  ],
-  back: [
-    { name: "Barbell Row", muscle: "Latissimus Dorsi", reps: 12, sets: 3, difficulty: "Intermediate", icon: "🏋️", form_key: "biceps" },
-    { name: "Lat Pulldown", muscle: "Latissimus Dorsi", reps: 12, sets: 3, difficulty: "Beginner", icon: "🏋️", form_key: "biceps" },
-    { name: "Seated Row", muscle: "Rhomboids", reps: 12, sets: 3, difficulty: "Beginner", icon: "🏋️", form_key: "biceps" },
-    { name: "Deadlift", muscle: "Erector Spinae", reps: 8, sets: 3, difficulty: "Advanced", icon: "🏋️", form_key: "squat" }
-  ],
-  shoulders: [
-    { name: "Shoulder Press", muscle: "Deltoids", reps: 12, sets: 3, difficulty: "Intermediate", icon: "🎯", form_key: "pushup" },
-    { name: "Lateral Raise", muscle: "Lateral Deltoid", reps: 15, sets: 3, difficulty: "Beginner", icon: "🎯", form_key: "biceps" },
-    { name: "Front Raise", muscle: "Anterior Deltoid", reps: 12, sets: 3, difficulty: "Beginner", icon: "🎯", form_key: "biceps" },
-    { name: "Reverse Fly", muscle: "Posterior Deltoid", reps: 15, sets: 3, difficulty: "Beginner", icon: "🎯", form_key: "biceps" }
-  ],
-  arms: [
-    { name: "Bicep Curl", muscle: "Biceps Brachii", reps: 12, sets: 3, difficulty: "Beginner", icon: "💪", form_key: "biceps" },
-    { name: "Hammer Curl", muscle: "Brachialis", reps: 12, sets: 3, difficulty: "Beginner", icon: "💪", form_key: "biceps" },
-    { name: "Tricep Pushdown", muscle: "Triceps Brachii", reps: 15, sets: 3, difficulty: "Beginner", icon: "💪", form_key: "pushup" },
-    { name: "Skull Crushers", muscle: "Triceps Brachii", reps: 12, sets: 3, difficulty: "Intermediate", icon: "💪", form_key: "pushup" }
-  ],
-  legs: [
-    { name: "Squat", muscle: "Quadriceps", reps: 12, sets: 3, difficulty: "Intermediate", icon: "🦵", form_key: "squat" },
-    { name: "Lunges", muscle: "Quadriceps", reps: 10, sets: 3, difficulty: "Intermediate", icon: "🦵", form_key: "squat" },
-    { name: "Romanian Deadlift", muscle: "Hamstrings", reps: 12, sets: 3, difficulty: "Intermediate", icon: "🦵", form_key: "squat" },
-    { name: "Leg Press", muscle: "Quadriceps", reps: 12, sets: 3, difficulty: "Beginner", icon: "🦵", form_key: "squat" }
-  ],
-  core: [
-    { name: "Plank", muscle: "Rectus Abdominis", reps: 60, sets: 3, difficulty: "Beginner", icon: "🔥", form_key: "pushup" },
-    { name: "Crunches", muscle: "Rectus Abdominis", reps: 20, sets: 3, difficulty: "Beginner", icon: "🔥", form_key: "pushup" },
-    { name: "Russian Twist", muscle: "Obliques", reps: 20, sets: 3, difficulty: "Intermediate", icon: "🔥", form_key: "biceps" },
-    { name: "Leg Raises", muscle: "Lower Abs", reps: 15, sets: 3, difficulty: "Intermediate", icon: "🔥", form_key: "pushup" }
-  ]
-};
-
-// Fetch exercises from the backend API
-async function fetchExercisesFromAPI() {
-  try {
-    const token = localStorage.getItem('fc_token');
-    if (!token) {
-      console.warn('No auth token found, using fallback exercises');
-      EXERCISE_LIBRARY = { ...FALLBACK_EXERCISE_LIBRARY };
-      state.exercisesLoaded = true;
-      return;
-    }
-
-    const response = await fetch(`${window.API || ""}/api/workouts/exercises`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch exercises: ${response.status}`);
-    }
-
-    const exercises = await response.json();
-    
-    // Group exercises by category
-    EXERCISE_LIBRARY = {};
-    exercises.forEach(ex => {
-      if (!EXERCISE_LIBRARY[ex.category]) {
-        EXERCISE_LIBRARY[ex.category] = [];
-      }
-      
-      // Map API response to frontend format
-      const difficulty = ex.tags && ex.tags.length > 0 ? ex.tags[0] : 'beginner';
-      const formKey = FORM_KEY_MAPPING[ex.name] || 'pushup';
-      const icon = ICON_MAPPING[ex.category] || '💪';
-      
-      EXERCISE_LIBRARY[ex.category].push({
-        name: ex.name,
-        muscle: ex.muscle || 'General',
-        reps: parseInt(ex.reps) || 12,
-        sets: ex.sets || 3,
-        difficulty: difficulty.charAt(0).toUpperCase() + difficulty.slice(1),
-        icon: icon,
-        form_key: formKey
-      });
-    });
-
-    state.exercisesLoaded = true;
-    console.log('Exercises loaded from API:', Object.keys(EXERCISE_LIBRARY));
-    
-  } catch (error) {
-    console.error('Error fetching exercises, using fallback:', error);
-    // Fallback to local dataset instead of empty library
-    EXERCISE_LIBRARY = { ...FALLBACK_EXERCISE_LIBRARY };
-    state.exercisesLoaded = true;
-    console.log('Using fallback exercise library:', Object.keys(EXERCISE_LIBRARY));
-  }
+// Parse a numeric rep target out of strings like "10-12", "45s", "2 min", "12" —
+// falls back to TARGET_REPS_ACTUAL when nothing numeric is found.
+function parseRepsTarget(reps) {
+  if (typeof reps === "number") return reps;
+  const match = String(reps || "").match(/\d+/);
+  return match ? parseInt(match[0], 10) : TARGET_REPS_ACTUAL;
 }
 
 const els = {};
+let elsCached = false;
 
 function cacheEls() {
+  if (elsCached) return;
+  els.chatModeShell = document.getElementById("chat-mode-shell");
+  els.workoutContainer = document.getElementById("ghost-workout-container");
+
   els.video = document.getElementById("ghost-video");
   els.canvas = document.getElementById("ghost-canvas");
   els.overlay = document.getElementById("ghost-idle-overlay");
-  
+
   els.reps = document.getElementById("ghost-reps");
   els.targetReps = document.getElementById("ghost-target-reps");
   els.accuracy = document.getElementById("ghost-accuracy");
@@ -257,225 +129,51 @@ function cacheEls() {
   els.timer = document.getElementById("ghost-timer");
   els.brief = document.getElementById("ghost-brief");
   els.liveCue = document.getElementById("ghost-live-cue");
-  
-  els.selectionContainer = document.getElementById("ghost-selection-container");
-  els.categoriesGrid = document.getElementById("ghost-categories-grid");
-  els.exercisesSelection = document.getElementById("ghost-exercises-selection");
-  els.exercisesList = document.getElementById("ghost-exercises-list");
-  els.actionBar = document.getElementById("ghost-action-bar");
-  
-  els.startSessionBtn = document.getElementById("ghost-start-session-btn");
-  els.selectedCategoryTitle = document.getElementById("ghost-selected-category-title");
-  els.selectionText = document.getElementById("gab-selection-text");
-  
-  els.workoutContainer = document.getElementById("ghost-workout-container");
+
   els.workoutProgress = document.getElementById("ghost-workout-progress");
   els.workoutExerciseName = document.getElementById("ghost-workout-exercise-name");
   els.workoutSets = document.getElementById("ghost-workout-sets");
-  
+
   els.nextBtn = document.getElementById("ghost-workout-next-btn");
   els.finishBtn = document.getElementById("ghost-workout-finish-btn");
-}
 
-async function init() {
-  cacheEls();
-  
-  // Show loading state
-  if (els.categoriesGrid) {
-    els.categoriesGrid.innerHTML = '<div class="loading-state">Loading exercises...</div>';
-  }
-  
-  // Only check for video/canvas if starting camera session, not for initial UI rendering
-  if (state.status === "running" && (!els.video || !els.canvas)) return;
-  
-  // Always load exercises when switching to this tab
-  if (!state.exercisesLoaded) {
-    await fetchExercisesFromAPI();
-  }
+  els.nextBtn?.addEventListener("click", nextExercise);
+  els.finishBtn?.addEventListener("click", finishWorkout);
 
-  // Set up event listeners only once
-  if (!state.initialized) {
-    // Set up categories clicks
-    els.categoriesGrid?.addEventListener("click", (event) => {
-      const card = event.target.closest(".category-card");
-      if (!card) return;
-      
-      const category = card.dataset.category;
-      
-      // Toggle active selected class
-      document.querySelectorAll(".category-card").forEach(c => {
-        c.classList.toggle("selected", c === card);
-      });
-      
-      state.selectedCategory = category;
-      state.selectedExercise = null;
-      
-      els.exercisesSelection.classList.remove("hidden");
-      const meta = CATEGORY_META[category] || { name: category.charAt(0).toUpperCase() + category.slice(1) };
-      els.selectedCategoryTitle.textContent = meta.name.toUpperCase();
-      
-      renderExercisesList();
-      updateActionBarStats();
-    });
+  els.chatLivebarExercise = document.getElementById("ghost-chat-livebar-exercise");
+  els.chatLivebarReps = document.getElementById("ghost-chat-livebar-reps");
+  els.chatLivebarAcc = document.getElementById("ghost-chat-livebar-acc");
 
-    // Exercise card clicks
-    els.exercisesList?.addEventListener("click", (event) => {
-      const card = event.target.closest(".exercise-card-item");
-      if (!card) return;
-      
-      // Check if exercise is supported
-      const isSupported = card.dataset.supported === "true";
-      if (!isSupported) {
-        // Show toast but don't select
-        if (typeof window.showToast === "function") {
-          window.showToast("⚠️ This exercise is coming soon - pose detection not yet available");
-        }
-        return;
-      }
-      
-      const exName = card.dataset.name;
-      const exList = EXERCISE_LIBRARY[state.selectedCategory] || [];
-      const exItem = exList.find(item => item.name === exName);
-      if (!exItem) return;
-      
-      // Select exactly one exercise card
-      document.querySelectorAll(".exercise-card-item").forEach(c => {
-        c.classList.toggle("selected", c === card);
-      });
-      
-      state.selectedExercise = exItem;
-      updateActionBarStats();
-    });
-
-    // Begin Session Button click
-    els.startSessionBtn?.addEventListener("click", startSession);
-
-    // Next & Finish Workout Buttons
-    els.nextBtn?.addEventListener("click", nextExercise);
-    els.finishBtn?.addEventListener("click", finishWorkout);
-
-    state.initialized = true;
-  } else {
-    // If already initialized but switching back to idle, reset selection
-    if (state.status === "idle") {
-      cancelSelection();
-    }
-  }
-
-  // Render muscle groups categories grid dynamically
-  renderCategoriesGrid();
-  render();
-}
-
-function renderCategoriesGrid() {
-  if (!els.categoriesGrid) return;
-  
-  // Check if we have categories to render
-  const categories = Object.keys(EXERCISE_LIBRARY);
-  if (categories.length === 0) {
-    els.categoriesGrid.innerHTML = '<div class="loading-state">No muscle groups available. Please try refreshing the page.</div>';
-    return;
-  }
-  
-  els.categoriesGrid.innerHTML = categories.map(key => {
-    const meta = CATEGORY_META[key] || { name: key.charAt(0).toUpperCase() + key.slice(1), icon: ICON_MAPPING[key] || '💪' };
-    const count = EXERCISE_LIBRARY[key].length;
-    const isSelected = state.selectedCategory === key;
-    return `
-      <div class="category-card ${isSelected ? 'selected' : ''}" data-category="${key}">
-        <span class="category-icon">${meta.icon}</span>
-        <strong class="category-name">${meta.name}</strong>
-        <span class="category-count">${count} exercises</span>
-      </div>
-    `;
-  }).join("");
-}
-
-function renderExercisesList() {
-  if (!els.exercisesList) return;
-  const exercises = EXERCISE_LIBRARY[state.selectedCategory] || [];
-  
-  if (exercises.length === 0) {
-    els.exercisesList.innerHTML = '<p style="color: rgba(255,255,255,0.5); grid-column: 1/-1; text-align: center; padding: 20px;">No exercises found for this category.</p>';
-    return;
-  }
-  
-  els.exercisesList.innerHTML = exercises.map(ex => {
-    const isSelected = state.selectedExercise && state.selectedExercise.name === ex.name;
-    const difficulty = ex.difficulty || 'Beginner';
-    const reps = ex.reps || 12;
-    const muscle = ex.muscle || 'General';
-    const isSupported = isExerciseSupported(ex.name);
-    const sets = ex.sets || 3;
-    
-    return `
-      <div class="exercise-card-item ${isSelected ? 'selected' : ''} ${!isSupported ? 'disabled' : ''}" 
-           data-name="${ex.name}" 
-           data-supported="${isSupported}">
-        <div class="eci-header">
-          <span class="eci-icon">${ex.icon || '💪'}</span>
-          <span class="eci-difficulty">${difficulty}</span>
-        </div>
-        <strong class="eci-name">${ex.name}</strong>
-        <div class="eci-details">
-          <span class="eci-muscle">${muscle}</span>
-          <span class="eci-sets">${sets} sets × ${reps} reps</span>
-        </div>
-        ${!isSupported ? '<div class="eci-coming-soon">Coming Soon</div>' : ''}
-      </div>
-    `;
-  }).join("");
-}
-
-function updateActionBarStats() {
-  if (state.selectedCategory) {
-    els.actionBar?.classList.remove("hidden");
-  } else {
-    els.actionBar?.classList.add("hidden");
-  }
-
-  if (state.selectedExercise) {
-    if (els.selectionText) els.selectionText.textContent = `Selected: ${state.selectedExercise.name}`;
-    if (els.startSessionBtn) els.startSessionBtn.disabled = false;
-  } else {
-    if (els.selectionText) els.selectionText.textContent = "Selected: None";
-    if (els.startSessionBtn) els.startSessionBtn.disabled = true;
-  }
-}
-
-function cancelSelection() {
-  state.selectedCategory = null;
-  state.selectedExercise = null;
-  state.selectedExercises = [];
-  
-  document.querySelectorAll(".category-card").forEach(c => {
-    c.classList.remove("selected");
+  els.chatSuggestions = document.getElementById("ghost-chat-suggestions");
+  els.chatSuggestions?.addEventListener("click", (e) => {
+    const chip = e.target.closest(".ghost-chip");
+    if (!chip) return;
+    if (chip.dataset.intent === "check-form") return answerCheckFormLocally();
+    if (chip.dataset.msg) sendChat(chip.dataset.msg);
   });
-  
-  els.exercisesSelection?.classList.add("hidden");
-  els.actionBar?.classList.add("hidden");
+
+  elsCached = true;
 }
 
-async function startSession() {
-  if (!state.selectedExercise) return;
-  
-  state.selectedExercises = [state.selectedExercise];
-  
-  // Build and store workout session object
-  const meta = CATEGORY_META[state.selectedCategory] || { name: state.selectedCategory };
-  const session = {
-    category: meta.name,
-    exercises: state.selectedExercises.map(ex => ({ ...ex }))
-  };
-  localStorage.setItem("fc_ghost_session", JSON.stringify(session));
-  
-  els.selectionContainer?.classList.add("hidden");
+// ── Entry point used by the Planner tab (and the Coach chat "start workout"
+// intercept): opens the live camera + exercise + docked-chat session inside
+// the Coach tab, in place of the normal chat view. slotKey ties completion
+// back to the weekly-plan pool (marks it done on finish).
+async function startWithExercises(exercises, label, slotKey) {
+  if (!exercises || !exercises.length) return;
+  cacheEls();
+  state.activeSlotKey = slotKey || null;
+  state.sessionLabel = label || "Workout";
+  state.selectedExercises = exercises;
+
+  els.chatModeShell?.classList.add("hidden");
   els.workoutContainer?.classList.remove("hidden");
-  
+
   state.currentExerciseIndex = 0;
   state.currentSet = 1;
   state.elapsed = 0;
-  
+
+  resetChat(state.sessionLabel);
   loadCurrentWorkoutExercise();
   renderWorkoutQueue();
   await startCamera();
@@ -484,77 +182,191 @@ async function startSession() {
 function loadCurrentWorkoutExercise() {
   const activeEx = state.selectedExercises[state.currentExerciseIndex];
   if (!activeEx) return;
-  
-  state.exercise = activeEx.form_key;
-  state.targetReps = activeEx.reps;
+
+  state.exercise = activeEx.movement_pattern || "full_body_generic";
+  state.targetReps = parseRepsTarget(activeEx.reps);
   state.repState = newRepState_ACTUAL();
   state.reps = 0;
   state.acc = 100;
   state.displayAcc = 100;
   state.feedback = null;
   state.previousAngles = null;
+  state.deltaEma = null;
   state.stabilityScore = 100;
-  
+  state.personDetected = false;
+  state.accHistory = [];
+
   if (els.workoutProgress) {
     els.workoutProgress.textContent = `Exercise ${state.currentExerciseIndex + 1} / ${state.selectedExercises.length}`;
   }
   if (els.workoutExerciseName) {
     els.workoutExerciseName.textContent = activeEx.name;
   }
+  if (els.chatLivebarExercise) {
+    els.chatLivebarExercise.textContent = activeEx.name;
+  }
+  if (els.chatLivebarReps) {
+    els.chatLivebarReps.textContent = `0/${state.targetReps} reps`;
+  }
+  if (els.chatLivebarAcc) {
+    els.chatLivebarAcc.textContent = "—";
+  }
   if (els.workoutSets) {
     els.workoutSets.textContent = `${state.currentSet} of 3`;
   }
-  
+
   if (els.reps) els.reps.textContent = "0";
   if (els.targetReps) els.targetReps.textContent = state.targetReps;
   if (els.accuracy) els.accuracy.textContent = "100%";
   if (els.accuracyLabel) els.accuracyLabel.textContent = "Textbook execution";
-  if (els.brief) els.brief.textContent = EXERCISE_BRIEWS_FALLBACK(state.exercise);
-  
+  if (els.brief) els.brief.textContent = activeEx.trainer_tip || briefFor(state.exercise);
+
   renderWorkoutQueue();
 }
 
 function renderWorkoutQueue() {
   const queueList = document.getElementById("ghost-queue-list");
   const progressText = document.getElementById("ghost-queue-progress-text");
+  const progressFill = document.getElementById("ghost-queue-progress-fill");
   if (!queueList || !state.selectedExercises.length) return;
-  
+
+  const total = state.selectedExercises.length;
   const completedCount = state.currentExerciseIndex;
   if (progressText) {
-    progressText.textContent = `${completedCount} / ${state.selectedExercises.length} Completed`;
+    progressText.textContent = `${completedCount} / ${total} Completed`;
   }
-  
+  if (progressFill) {
+    progressFill.style.width = `${Math.round((completedCount / total) * 100)}%`;
+  }
+
+  // Group by section (warmup / main / cooldown) if the backend tagged them;
+  // exercises without a section tag are treated as "main".
+  let lastSection = null;
   queueList.innerHTML = state.selectedExercises.map((ex, idx) => {
     let iconClass = "dot";
-    let iconText = "●";
+    let iconText = "✔";
     let statusClass = "upcoming";
-    
+
     if (idx < state.currentExerciseIndex) {
       iconClass = "checkmark";
       iconText = "✔";
       statusClass = "completed";
     } else if (idx === state.currentExerciseIndex) {
       iconClass = "active-indicator";
-      iconText = "●";
+      iconText = idx + 1;
       statusClass = "active";
+    } else {
+      iconText = idx + 1;
     }
-    
+
+    const section = ex.section || "main";
+    let header = "";
+    if (section !== lastSection) {
+      lastSection = section;
+      const label = section === "warmup" ? "🔥 Warm-up" : section === "cooldown" ? "❄️ Cool-down" : "🏋 Workout";
+      header = `<div class="ghost-queue-section-header">${label}</div>`;
+    }
+
     return `
+      ${header}
       <div class="ghost-queue-item ${statusClass}">
         <span class="gqi-icon ${iconClass}">${iconText}</span>
         <span class="gqi-name">${ex.name}</span>
+        ${ex.reps ? `<span class="gqi-reps">${ex.reps}</span>` : ""}
       </div>
     `;
   }).join("");
 }
 
-function EXERCISE_BRIEWS_FALLBACK(formKey) {
-  return EXERCISE_BRIEFS[formKey] || "Match the reference profile posture.";
+// ── Docked AI Coach chat (live session — camera + chat side by side) ─────────
+function resetChat(categoryLabel) {
+  const box = document.getElementById("ghost-chat-box");
+  if (!box) return;
+  box.innerHTML = "";
+  document.getElementById("ghost-chat-suggestions")?.classList.remove("hidden");
+  appendChatMessage("bot", `Live session started — **${categoryLabel}**. I can see your reps and form as you go. Say things like "I want to do legs instead" any time and I'll swap the plan for you.`);
 }
 
+function appendChatMessage(role, text) {
+  const box = document.getElementById("ghost-chat-box");
+  if (!box) return;
+  const div = document.createElement("div");
+  div.className = `gcm ${role}`;
+  // Escape first so user/bot text can't inject markup, then re-enable just
+  // **bold** — the coach's replies use markdown-style emphasis that was
+  // otherwise showing up as literal asterisks.
+  const escaped = text.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  div.innerHTML = escaped.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+// "Check my form" is answered from the live tracker state, not the backend
+// chat model — that endpoint is text-only and has no view of the camera, so
+// routing this through it produced generic flattering replies ("your form
+// is looking solid!") even when no one was in frame or moving at all.
+function answerCheckFormLocally() {
+  document.getElementById("ghost-chat-suggestions")?.classList.add("hidden");
+  appendChatMessage("user", "How's my form looking so far?");
+
+  if (!state.personDetected) {
+    appendChatMessage("bot", "I can't actually see you in frame right now — step back so your full body is visible and I'll start tracking your reps and form live.");
+    return;
+  }
+
+  // Report the rolling average rather than this instant's displayAcc — a
+  // single number sampled at the moment you happen to ask can land on
+  // either side of a temporary dip/spike, which is what made two "check my
+  // form" asks seconds apart give noticeably different answers.
+  const history = state.accHistory.length ? state.accHistory : [state.displayAcc];
+  const acc = Math.round(history.reduce((sum, v) => sum + v, 0) / history.length);
+  const exerciseName = state.selectedExercises[state.currentExerciseIndex]?.name || "this exercise";
+  const repsLine = state.reps > 0
+    ? `You're at ${state.reps}/${state.targetReps} reps on **${exerciseName}**.`
+    : `I haven't picked up a rep yet on **${exerciseName}** — go ahead and start the movement and I'll track it live.`;
+  appendChatMessage("bot", `Right now you're at **${acc}% form accuracy** — ${accuracyLabel(acc).toLowerCase()}. ${repsLine}`);
+}
+
+async function sendChat(presetMessage) {
+  const input = document.getElementById("ghost-chat-input");
+  const message = (presetMessage ?? input?.value ?? "").trim();
+  if (!message) return;
+  if (input) input.value = "";
+  document.getElementById("ghost-chat-suggestions")?.classList.add("hidden");
+  appendChatMessage("user", message);
+
+  try {
+    const token = localStorage.getItem("fc_token") || "";
+    const res = await fetch(`${window.API || ""}/api/coach/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+      body: JSON.stringify({ message }),
+    });
+    const data = await res.json();
+    appendChatMessage("bot", data.reply || "");
+
+    // If the coach swapped today's session (e.g. "do legs instead"), reload the
+    // live session with the new exercise list so camera + queue stay in sync.
+    if (data.type === "workout_start" && Array.isArray(data.exercises) && data.exercises.length) {
+      await startWithExercises(data.exercises, data.muscle_group || "Workout", data.slot_key || null);
+    }
+  } catch (err) {
+    console.error("Ghost session chat failed:", err);
+    appendChatMessage("bot", "Sorry, I couldn't reach the coach right now.");
+  }
+}
+
+// ── Camera lifecycle ──────────────────────────────────────────────────────
 async function startCamera() {
   setStatus("loading");
   try {
+    if (!window.isSecureContext) {
+      throw new Error("Camera requires HTTPS (or localhost) — this page isn't a secure context.");
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error("This browser doesn't support camera access (navigator.mediaDevices missing).");
+    }
+
     const landmarker = await getPoseLandmarker();
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { width: 1280, height: 720, facingMode: "user" },
@@ -569,12 +381,13 @@ async function startCamera() {
     els.canvas.width = els.video.videoWidth;
     els.canvas.height = els.video.videoHeight;
     state.lastVideoTime = -1;
-    
+
     setStatus("running");
     startTimer();
     loop(landmarker);
   } catch (err) {
-    console.error(err);
+    console.error("Ghost Trainer camera failed to start:", err);
+    state.lastError = err;
     setStatus("error");
   }
 }
@@ -590,14 +403,18 @@ function stop() {
   if (els.video) els.video.srcObject = null;
 
   const ctx = els.canvas?.getContext("2d");
-  ctx?.clearRect(0, 0, els.canvas.width, els.canvas.height);
+  if (els.canvas) ctx?.clearRect(0, 0, els.canvas.width, els.canvas.height);
   setStatus("idle");
+
+  // Return to the normal chat view.
+  els.workoutContainer?.classList.add("hidden");
+  els.chatModeShell?.classList.remove("hidden");
 }
 
 function nextExercise() {
   state.currentExerciseIndex += 1;
   state.currentSet = 1;
-  
+
   if (state.currentExerciseIndex < state.selectedExercises.length) {
     loadCurrentWorkoutExercise();
   } else {
@@ -606,43 +423,36 @@ function nextExercise() {
 }
 
 async function finishWorkout() {
-  stop();
   await saveWorkoutSession();
-  
-  state.selectedCategory = null;
-  state.selectedExercise = null;
+  stop();
+
   state.selectedExercises = [];
+  state.activeSlotKey = null;
   state.currentExerciseIndex = 0;
   state.currentSet = 1;
-  
-  els.selectionContainer?.classList.remove("hidden");
-  els.workoutContainer?.classList.add("hidden");
-  els.exercisesSelection?.classList.add("hidden");
-  els.actionBar?.classList.add("hidden");
-  
-  // Reset active categories grid highlighting
-  document.querySelectorAll(".category-card").forEach(c => {
-    c.classList.remove("selected");
-  });
-  
+
   if (typeof window.showToast === "function") {
-    window.showToast("🎉 Ghost Workout logged successfully!");
+    window.showToast("🎉 Workout logged successfully!");
   }
 }
 
 async function saveWorkoutSession() {
   if (!state.selectedExercises.length) return;
-  
+
   const elapsedSeconds = state.elapsed;
   const durationMinutes = Math.max(1, Math.round(elapsedSeconds / 60));
+  // Warm-up/cool-down are logged as part of the session but shouldn't inflate
+  // "exercises done" messaging beyond the main workout — log them all anyway
+  // since they're still real activity, just tagged.
   const exerciseNames = state.selectedExercises.map(ex => ex.name).join(", ");
-  
+
   const payload = {
-    muscle_group: (state.selectedCategory || "Full Body").toUpperCase(),
+    muscle_group: (state.sessionLabel || "Workout").toUpperCase(),
     exercises_done: exerciseNames,
     duration: durationMinutes,
     mode: "ghost",
     zone: "green",
+    slot_key: state.activeSlotKey || undefined,
     exercises: state.selectedExercises.map(ex => ({
       name: ex.name,
       sets: [
@@ -660,7 +470,7 @@ async function saveWorkoutSession() {
       if (typeof window.loadProgress === "function") {
         window.loadProgress();
       }
-    }  else {
+    } else {
       await fetch(`${window.API || ""}/api/workouts/log`, {
         method: "POST",
         headers: {
@@ -690,6 +500,7 @@ function loop(landmarker) {
     ctx.scale(-1, 1);
 
     const landmarks = result.landmarks?.[0] ?? [];
+    state.personDetected = landmarks.length > 0;
     if (landmarks.length) {
       const feedback = analyze({ landmarks, exercise: state.exercise });
       if (feedback) {
@@ -704,9 +515,8 @@ function loop(landmarker) {
           feedback,
           stabilityScore: state.stabilityScore,
         });
-        
+
         if (state.reps > previousReps) {
-          pulseRepCompletion();
           if (state.reps >= state.targetReps) {
             if (state.currentSet < 3) {
               state.currentSet += 1;
@@ -852,17 +662,31 @@ function drawAngleLabels(ctx, landmarks, angles, width, height, scoreState) {
   ctx.restore();
 }
 
+// Maps every angle key any of the 13 movement-pattern analyzers can return
+// (see ghost-form-analysis.js) to a screen label + landmark anchor, so the
+// on-screen degree readout works for all of them, not just squat/pushup/curl.
 function angleLabelAnchors(landmarks, angles) {
-  return [
-    { name: "ELBOW", value: angles.leftElbow, point: landmarks[LM_ACTUAL.LEFT_ELBOW], dx: -38, dy: -22 },
-    { name: "ELBOW", value: angles.rightElbow, point: landmarks[LM_ACTUAL.RIGHT_ELBOW], dx: 38, dy: -22 },
-    { name: "KNEE", value: angles.leftKnee, point: landmarks[LM_ACTUAL.LEFT_KNEE], dx: -34, dy: 24 },
-    { name: "KNEE", value: angles.rightKnee, point: landmarks[LM_ACTUAL.RIGHT_KNEE], dx: 34, dy: 24 },
-    { name: "HIP", value: angles.leftHip, point: landmarks[LM_ACTUAL.LEFT_HIP], dx: -34, dy: -24 },
-    { name: "HIP", value: angles.rightHip, point: landmarks[LM_ACTUAL.RIGHT_HIP], dx: 34, dy: -24 },
-    { name: "SHLD", value: angles.leftShoulder, point: landmarks[LM_ACTUAL.LEFT_SHOULDER], dx: -38, dy: -24 },
-    { name: "SHLD", value: angles.rightShoulder, point: landmarks[LM_ACTUAL.RIGHT_SHOULDER], dx: 38, dy: -24 },
-  ].filter((label) => Number.isFinite(label.value));
+  const anchors = [
+    { key: "leftElbow",    name: "ELBOW", point: LM_ACTUAL.LEFT_ELBOW,    dx: -38, dy: -22 },
+    { key: "rightElbow",   name: "ELBOW", point: LM_ACTUAL.RIGHT_ELBOW,   dx: 38,  dy: -22 },
+    { key: "leftKnee",     name: "KNEE",  point: LM_ACTUAL.LEFT_KNEE,     dx: -34, dy: 24 },
+    { key: "rightKnee",    name: "KNEE",  point: LM_ACTUAL.RIGHT_KNEE,    dx: 34,  dy: 24 },
+    { key: "workingKnee",  name: "KNEE",  point: LM_ACTUAL.LEFT_KNEE,     dx: -34, dy: 24 },
+    { key: "leftHip",      name: "HIP",   point: LM_ACTUAL.LEFT_HIP,      dx: -34, dy: -24 },
+    { key: "rightHip",     name: "HIP",   point: LM_ACTUAL.RIGHT_HIP,     dx: 34,  dy: -24 },
+    { key: "leftShoulder", name: "SHLD",  point: LM_ACTUAL.LEFT_SHOULDER, dx: -38, dy: -24 },
+    { key: "rightShoulder",name: "SHLD",  point: LM_ACTUAL.RIGHT_SHOULDER,dx: 38,  dy: -24 },
+    { key: "bodyLine",     name: "LINE",  point: LM_ACTUAL.LEFT_HIP,      dx: -34, dy: -24 },
+    { key: "torso",        name: "TORSO", point: LM_ACTUAL.LEFT_HIP,      dx: -34, dy: -24 },
+    { key: "rightRaise",   name: "RAISE", point: LM_ACTUAL.RIGHT_SHOULDER,dx: 38,  dy: -24 },
+    { key: "leftRaise",    name: "RAISE", point: LM_ACTUAL.LEFT_SHOULDER, dx: -38, dy: -24 },
+    { key: "heelLift",     name: "HEEL",  point: LM_ACTUAL.LEFT_ANKLE,    dx: -34, dy: 24 },
+    { key: "twist",        name: "TWIST", point: LM_ACTUAL.LEFT_SHOULDER, dx: -38, dy: -24 },
+    { key: "posture",      name: "POSE",  point: LM_ACTUAL.LEFT_HIP,      dx: -34, dy: -24 },
+  ];
+  return anchors
+    .map((a) => ({ name: a.name, value: angles[a.key], point: landmarks[a.point], dx: a.dx, dy: a.dy }))
+    .filter((label) => Number.isFinite(label.value));
 }
 
 function getIdealGhost(landmarks, width, height, exercise) {
@@ -879,7 +703,14 @@ function getIdealGhost(landmarks, width, height, exercise) {
   const spread = Math.max(60, Math.abs(leftShoulder.x - rightShoulder.x) * width);
 
   const p = {};
-  if (exercise === "squat") {
+  // Group the 13 movement patterns onto the two hand-built skeleton poses that
+  // are the closest visual match — squat-family (lower-body, hip-driven) vs
+  // push-family (upper-body pressing); everything else uses the generic pose.
+  const squatFamily = ["squat", "lunge", "hip_hinge", "calf_raise"];
+  const pushFamily = ["horizontal_push", "vertical_push", "core_isometric", "core_flex"];
+  const patternGroup = squatFamily.includes(exercise) ? "squat" : pushFamily.includes(exercise) ? "pushup" : "generic";
+
+  if (patternGroup === "squat") {
     p.ls = { x: centerX - spread * .55, y: hipY - body * 1.15 };
     p.rs = { x: centerX + spread * .55, y: hipY - body * 1.15 };
     p.lh = { x: centerX - spread * .42, y: hipY };
@@ -892,7 +723,7 @@ function getIdealGhost(landmarks, width, height, exercise) {
     p.re = { x: p.rs.x + spread * .18, y: p.rs.y + body * .34 };
     p.lw = { x: p.le.x, y: p.le.y + body * .42 };
     p.rw = { x: p.re.x, y: p.re.y + body * .42 };
-  } else if (exercise === "pushup") {
+  } else if (patternGroup === "pushup") {
     const y = hipY + body * .25;
     p.ls = { x: centerX - spread * .55, y };
     p.rs = { x: centerX + spread * .55, y };
@@ -954,8 +785,29 @@ function setStatus(status) {
   render();
 }
 
+// Human-readable message per real failure mode, instead of a single generic
+// "Camera blocked" for every possible error.
+function cameraErrorMessage(err) {
+  const name = err?.name || "";
+  if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+    return { title: "Camera permission denied", body: "Allow camera access for this site in your browser's address-bar/site settings, then try again." };
+  }
+  if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+    return { title: "No camera found", body: "This device doesn't have an accessible camera, or it's disabled in your OS settings." };
+  }
+  if (name === "NotReadableError" || name === "TrackStartError") {
+    return { title: "Camera in use", body: "Another app or browser tab is using the camera. Close it and try again." };
+  }
+  if (err?.message?.includes("HTTPS")) {
+    return { title: "Insecure connection", body: err.message };
+  }
+  if (err?.message?.includes("mediaDevices")) {
+    return { title: "Unsupported browser", body: err.message };
+  }
+  return { title: "Camera failed to start", body: err?.message || "Unknown error — check the browser console for details." };
+}
+
 function render() {
-  if (!state.initialized) return;
   const running = state.status === "running";
   const loading = state.status === "loading";
   const error = state.status === "error";
@@ -969,28 +821,53 @@ function render() {
       if (h3) h3.textContent = "Loading the model...";
       if (p) p.textContent = "Please wait while we initialize pose estimation.";
     } else if (error) {
-      if (h3) h3.textContent = "Camera blocked";
-      if (p) p.textContent = "Please check your browser permissions.";
+      const { title, body } = cameraErrorMessage(state.lastError);
+      if (h3) h3.textContent = title;
+      if (p) p.textContent = body;
     } else {
       if (h3) h3.textContent = "Starting Camera...";
       if (p) p.textContent = "Ensure your full body is visible in the frame.";
     }
   }
 
-  state.displayAcc += (state.acc - state.displayAcc) * 0.22;
+  // Gentler easing (was 0.22) — the raw per-frame score still has some
+  // natural noise even after smoothing calculateStability(), and the faster
+  // constant let that show up as a visibly flickering number.
+  state.displayAcc += (state.acc - state.displayAcc) * 0.1;
   const displayAcc = Math.round(state.displayAcc);
+  if (state.personDetected) {
+    state.accHistory.push(state.displayAcc);
+    if (state.accHistory.length > 90) state.accHistory.shift();
+  }
   const scoreState = getScoreState(displayAcc);
 
   if (els.reps) els.reps.textContent = String(state.reps);
   if (els.targetReps) els.targetReps.textContent = state.targetReps;
-  if (els.accuracy) els.accuracy.textContent = `${displayAcc}%`;
-  if (els.accuracyLabel) els.accuracyLabel.textContent = accuracyLabel(displayAcc);
+
+  // Nobody in frame yet (camera just started, or they've stepped out) — say so
+  // plainly instead of showing a leftover/default "100% Textbook execution",
+  // which used to render even though nothing was actually being measured.
+  const noOneFramed = running && !state.personDetected;
+  if (els.accuracy) els.accuracy.textContent = noOneFramed ? "—" : `${displayAcc}%`;
+  if (els.accuracyLabel) els.accuracyLabel.textContent = noOneFramed ? "Step into frame" : accuracyLabel(displayAcc);
 
   if (els.liveCue) {
-    const cue = state.feedback?.cues?.[0] || "Good posture";
+    const cue = noOneFramed ? "Step into frame" : (state.feedback?.cues?.[0] || "Good posture");
     els.liveCue.textContent = cue;
-    els.liveCue.classList.toggle("good", Boolean(state.feedback && !state.feedback.cues.length));
+    els.liveCue.classList.toggle("good", !noOneFramed && Boolean(state.feedback && !state.feedback.cues.length));
     els.liveCue.classList.toggle("hidden", !running);
+  }
+
+  // Keep the AI Coach panel's live-stats strip honest and in sync — same
+  // numbers the "Check my form" reply is built from.
+  if (els.chatLivebarExercise) {
+    els.chatLivebarExercise.textContent = state.selectedExercises[state.currentExerciseIndex]?.name || "—";
+  }
+  if (els.chatLivebarReps) {
+    els.chatLivebarReps.textContent = `${state.reps}/${state.targetReps} reps`;
+  }
+  if (els.chatLivebarAcc) {
+    els.chatLivebarAcc.textContent = noOneFramed ? "not in frame" : `${displayAcc}% form`;
   }
 }
 
@@ -1012,38 +889,27 @@ function calculateStability(angles) {
   if (!angles) return 100;
   if (!state.previousAngles) {
     state.previousAngles = { ...angles };
+    state.deltaEma = 0;
     return 100;
   }
   const keys = Object.keys(angles).filter((key) => Number.isFinite(angles[key]) && Number.isFinite(state.previousAngles[key]));
   const delta = keys.reduce((sum, key) => sum + Math.abs(angles[key] - state.previousAngles[key]), 0) / Math.max(keys.length, 1);
   state.previousAngles = { ...angles };
-  return Math.max(35, Math.min(100, 100 - delta * 4.5));
+
+  // A raw single-frame delta swings wildly during the normal working part of
+  // a rep (the joint is *supposed* to move fast there) — scoring off that
+  // instant made the accuracy number flicker every frame instead of
+  // reflecting sustained shakiness. Smoothing it with an EMA keeps one quick
+  // frame from cratering the score, then bouncing right back the next.
+  state.deltaEma = state.deltaEma == null ? delta : state.deltaEma * 0.75 + delta * 0.25;
+  return Math.max(35, Math.min(100, 100 - state.deltaEma * 3.2));
 }
 
 function getScoreState(value) {
   return SCORE_STATES.find((item) => value >= item.min) || SCORE_STATES[SCORE_STATES.length - 1];
 }
 
-function pulseRepCompletion() {
-  // Option pulse effects
-}
-
-window.fitCoachGhostTrainer = { init, start: startSession, stop };
-
-// Auto-initialize when DOM is ready if on trainer tab
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    const trainerTab = document.getElementById('tab-trainer');
-    if (trainerTab && trainerTab.classList.contains('active')) {
-      window.fitCoachGhostTrainer.init();
-    }
-  });
-} else {
-  const trainerTab = document.getElementById('tab-trainer');
-  if (trainerTab && trainerTab.classList.contains('active')) {
-    window.fitCoachGhostTrainer.init();
-  }
-}
+window.fitCoachGhostTrainer = { startWithExercises, stop, sendChat };
 
 window.addEventListener("beforeunload", stop);
 })();

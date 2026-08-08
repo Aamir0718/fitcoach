@@ -35,6 +35,7 @@ class WorkoutLogRequest(BaseModel):
     zone: Optional[str] = None
     notes: Optional[str] = None
     date: Optional[date] = None
+    slot_key: Optional[str] = None
 
 
 class WorkoutResponse(BaseModel):
@@ -62,9 +63,8 @@ class WeeklyPlanResponse(BaseModel):
         from_attributes = True
 
 
-class SwapRequest(BaseModel):
-    from_day: int
-    to_day: int
+class SlotSelectRequest(BaseModel):
+    slot_key: str
 
 
 class WorkoutFinishRequest(BaseModel):
@@ -74,6 +74,7 @@ class WorkoutFinishRequest(BaseModel):
     zone: Optional[str] = "green"
     notes: Optional[str] = None
     exercises: Optional[List[Any]] = []
+    slot_key: Optional[str] = None
 
 
 class PRRequest(BaseModel):

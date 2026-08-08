@@ -31,6 +31,15 @@ async def _load_context(current_user: Auth, db: AsyncSession):
     if not profile:
         raise HTTPException(status_code=400, detail="Profile not found. Complete onboarding first.")
 
+    # Self-heal: an existing account with real profile data shouldn't be
+    # walled back into onboarding just because this flag was never flipped
+    # (e.g. legacy accounts, or profiles set up through another path).
+    if not profile.onboarding_complete:
+        from app.services.plan_service import profile_has_usable_data
+        if profile_has_usable_data(profile):
+            profile.onboarding_complete = True
+            await db.commit()
+
     recovery_result = await db.execute(
         select(RecoveryLog)
         .where(RecoveryLog.user_id == current_user.id)

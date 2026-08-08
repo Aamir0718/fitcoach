@@ -7,7 +7,7 @@ import json
 import asyncio
 import logging
 import io
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -19,8 +19,9 @@ from app.models.profile import Profile
 from app.models.workout import AIMemory, WeeklyPlan, PlannedWorkout, Exercise
 from app.schemas.workout import ChatResponse
 from app.services.plan_service import (
-    generate_weekly_plan, get_todays_slot, get_exercises_for_slot,
-    swap_today_slot, MUSCLE_TO_SLOT, SESSION_LABELS,
+    generate_weekly_plan, get_slot, get_exercises_for_slot, build_full_session,
+    select_pool_slot, mark_slot_done, unmark_slot_done,
+    MUSCLE_TO_SLOT, SESSION_LABELS,
 )
 
 logger = logging.getLogger(__name__)
@@ -259,13 +260,18 @@ async def handle_onboarding_message(
         db.add(plan)
         await db.commit()
 
-        today_slot = get_todays_slot(plan_data)
-        muscle = today_slot.get("label", "Full Body") if today_slot else "Full Body"
+        pool = plan_data.get("pool", [])
+        first_label = pool[0]["label"] if pool else "Full Body"
 
         return ChatResponse(
-            reply=f"You're all set, {profile.name}! 🎉\n\nYour personalised plan is ready. Today's focus: **{muscle}**\n\nSay 'start' when you're ready to begin!",
+            reply=(
+                f"You're all set, {profile.name}! 🎉\n\n"
+                f"Your weekly plan is ready — **{len(pool)} sessions**: "
+                f"{' · '.join(item['label'] for item in pool)}\n\n"
+                f"Say 'start' when you're ready to begin with **{first_label}**!"
+            ),
             type="onboarding_complete",
-            data={"plan": plan_data, "today": today_slot}
+            data={"plan": plan_data, "pool": pool}
         )
 
     await db.commit()
@@ -314,7 +320,7 @@ async def handle_workout_command(
 
     # ── Start workout ─────────────────────────────────────────────────────────
     if intent == "start_workout":
-        return await _start_workout(user_id, profile, zone, mode, db)
+        return await _start_workout(user_id, message, profile, zone, mode, db)
 
     # ── Next set ──────────────────────────────────────────────────────────────
     if intent == "next_set" and user_id in _workout_sessions:
@@ -340,7 +346,10 @@ async def handle_workout_command(
 async def _handle_swap(
     user_id: int, message: str, profile: Profile, zone: str, db: AsyncSession
 ) -> ChatResponse:
-    """Handle 'I want to do legs instead' type requests — swaps plan + serves exercises."""
+    """Handle 'I want to do legs instead' type requests against the weekly pool:
+    starts the slot if it's already an undone pool item, un-marks + restarts it if
+    it was already done this week, or swaps it into the pool if it's not part of
+    this week's split at all — then serves exercises for it."""
     target_slot = _extract_target_muscle(message)
 
     if not target_slot:
@@ -359,7 +368,6 @@ async def _handle_swap(
                 target_slot = "full_body"
             else:
                 target_slot = slot_raw.strip().lower().replace(" ", "_")
-                # Validate it's a known slot
                 if target_slot not in SESSION_LABELS:
                     target_slot = "full_body"
         else:
@@ -376,18 +384,26 @@ async def _handle_swap(
     else:
         plan_data = plan_row.plan
 
-    # Swap today in the plan
-    updated_plan = swap_today_slot(plan_data, target_slot)
-    plan_row.plan = updated_plan
+    existing = get_slot(plan_data, target_slot)
+    redo_note = ""
+    if existing and existing.get("done"):
+        # Already trained this week — allow a flexible redo
+        plan_data = unmark_slot_done(plan_data, target_slot)
+        redo_note = "You already smashed this one this week — let's go again! 🔁 "
+    else:
+        # Ensures it's in the pool, swapping in for the first undone slot if new
+        plan_data = select_pool_slot(plan_data, target_slot)
+
+    plan_row.plan = plan_data
     await db.commit()
 
-    # Get exercises for new slot
-    exercises = get_exercises_for_slot(target_slot, profile, zone)
+    # Get exercises for new slot (full session — warm-up + main + cool-down)
+    exercises = build_full_session(target_slot, profile, zone)
     label = SESSION_LABELS.get(target_slot, target_slot.replace("_", " ").title())
 
     if not exercises:
         return ChatResponse(
-            reply=f"Switched today to **{label}**! 📅\n\nI've updated your plan. Head to the Workout tab and press Start to begin.",
+            reply=f"{redo_note}Switched to **{label}**! 📅\n\nHead to the Planner tab and tap it to begin.",
             type="plan_swapped",
             data={"new_slot": target_slot, "label": label}
         )
@@ -396,6 +412,7 @@ async def _handle_swap(
     _workout_sessions[user_id] = {
         "exercises": exercises,
         "muscle_group": label,
+        "slot_key": target_slot,
         "current_index": 0,
         "current_set": 1,
         "start_time": datetime.now().isoformat(),
@@ -415,7 +432,7 @@ async def _handle_swap(
         ex_lines += f"\n...and {len(exercises)-6} more"
 
     reply = (
-        f"Switched to **{label}** today! ✅ Plan updated.\n\n"
+        f"{redo_note}Switched to **{label}**! ✅ Plan updated.\n\n"
         f"{intensity}\n\n"
         f"Here's your session:\n{ex_lines}\n\n"
         f"Starting with **{ex['name']}** — say **'next'** after each set, **'done'** when finished!"
@@ -426,6 +443,7 @@ async def _handle_swap(
         type="workout_start",
         data={
             "muscle_group": label,
+            "slot_key": target_slot,
             "exercises": exercises,
             "current_exercise": ex,
             "current_exercise_index": 0,
@@ -438,6 +456,8 @@ async def _handle_swap(
 
 
 async def _build_greeting(user_id: int, profile: Profile, zone: str, db: AsyncSession) -> ChatResponse:
+    from app.services.plan_service import maybe_reset_week
+
     plan_result = await db.execute(select(WeeklyPlan).where(WeeklyPlan.user_id == user_id))
     plan_row = plan_result.scalar_one_or_none()
 
@@ -447,11 +467,14 @@ async def _build_greeting(user_id: int, profile: Profile, zone: str, db: AsyncSe
         db.add(plan_row)
         await db.commit()
     else:
-        plan_data = plan_row.plan
+        plan_data = maybe_reset_week(plan_row.plan, profile)
+        if plan_data is not plan_row.plan:
+            plan_row.plan = plan_data
+            await db.commit()
 
-    today_slot = get_todays_slot(plan_data)
-    muscle = today_slot.get("label", "Full Body") if today_slot else "Full Body"
-    is_rest = today_slot.get("rest", False) if today_slot else False
+    pool = plan_data.get("pool", [])
+    done_count = sum(1 for item in pool if item.get("done"))
+    remaining = [item for item in pool if not item.get("done")]
 
     h = datetime.now().hour
     tod = "Morning" if h < 12 else ("Afternoon" if h < 17 else "Evening")
@@ -463,74 +486,84 @@ async def _build_greeting(user_id: int, profile: Profile, zone: str, db: AsyncSe
         "red":    "Low recovery 🔴 — Light session recommended.",
     }
 
-    # Build personalized context
     goal_display = (profile.goal or "general_fitness").replace("_", " ").title()
     mode_display = profile.active_mode.replace("_", " ").title()
 
-    if is_rest:
+    # Preview exercises for the next slot the user would start (first remaining,
+    # or the first slot overall if everything's done and they want to redo one).
+    next_slot = remaining[0] if remaining else (pool[0] if pool else None)
+    exercises = get_exercises_for_slot(next_slot, profile, zone) if next_slot else []
+
+    if pool and not remaining:
         reply = (
             f"Good {tod} {tod_emoji}, **{profile.name}**!\n\n"
-            f"Today is your **Rest Day** — recovery is where the gains actually happen. 😴\n\n"
+            f"🎉 You've completed all **{len(pool)}** sessions in this week's plan! "
             f"Recovery: {zone_labels.get(zone, zone)}\n\n"
-            f"Use the time to eat well, sleep enough, and come back stronger tomorrow. "
-            f"You can still ask me anything about nutrition, form, or your plan!"
+            f"Want to go again? Just tell me which one — I'll let you redo any of them."
         )
     else:
-        # Count remaining exercises
-        exercises = get_exercises_for_slot(today_slot, profile, zone) if today_slot else []
-        ex_count = len(exercises)
+        remaining_labels = " · ".join(item["label"] for item in remaining[:4])
+        if len(remaining) > 4:
+            remaining_labels += f" · +{len(remaining)-4} more"
 
-        # Build exercise preview
+        ex_count = len(exercises)
         ex_preview = ""
         if exercises:
-            first_three = exercises[:3]
-            ex_preview = "**Today's exercises:** " + " · ".join(e["name"] for e in first_three)
+            ex_preview = "**Up next (" + next_slot["label"] + "):** " + " · ".join(e["name"] for e in exercises[:3])
             if ex_count > 3:
                 ex_preview += f" · +{ex_count-3} more"
             ex_preview = "\n\n" + ex_preview
 
         reply = (
             f"Good {tod} {tod_emoji}, **{profile.name}**! 💪\n\n"
-            f"**Today: {muscle}** ({mode_display} · {goal_display})\n"
+            f"**This week: {done_count}/{len(pool)} sessions done** ({mode_display} · {goal_display})\n"
+            f"Remaining: {remaining_labels}\n"
             f"Recovery: {zone_labels.get(zone, zone)}"
             f"{ex_preview}\n\n"
-            f"Say **'start'** to begin your session, or tell me if you want to train something different!"
+            f"Say **'start'** to begin, or tell me if you want to train something different!"
         )
 
     return ChatResponse(
         reply=reply,
         type="daily_plan",
-        data={"today": today_slot, "plan": plan_data, "zone": zone, "muscle": muscle}
+        data={
+            "pool": pool, "plan": plan_data, "zone": zone, "done_count": done_count, "total": len(pool),
+            "exercises": exercises,
+            "current_exercise": exercises[0] if exercises else None,
+            "total_exercises": len(exercises),
+            "muscle_group": next_slot["label"] if next_slot else None,
+            "slot_key": next_slot["key"] if next_slot else None,
+        }
     )
 
 
-async def _start_workout(user_id: int, profile: Profile, zone: str, mode: str, db: AsyncSession) -> ChatResponse:
+async def _start_workout(user_id: int, message: str, profile: Profile, zone: str, mode: str, db: AsyncSession) -> ChatResponse:
     plan_result = await db.execute(select(WeeklyPlan).where(WeeklyPlan.user_id == user_id))
     plan_row = plan_result.scalar_one_or_none()
     plan_data = plan_row.plan if plan_row else generate_weekly_plan(profile)
 
-    today_slot = get_todays_slot(plan_data) or {"label": "Full Body", "db_key": "full_body"}
-    exercises = get_exercises_for_slot(today_slot, profile, zone)
-    muscle_group = today_slot.get("label", "Full Body")
+    pool = plan_data.get("pool", [])
 
-    if today_slot.get("rest"):
-        return ChatResponse(
-            reply=(
-                f"Today is your rest day, {profile.name}! 😴\n\n"
-                "Your body needs this to grow and recover. Trust the process.\n\n"
-                "If you really want to move, try a 20-minute walk or light stretching — nothing intense. "
-                "Say **'start anyway'** if you absolutely want to train."
-            ),
-            type="rest_day",
-            data={"today": today_slot}
-        )
+    # Did the user name a specific slot ("start legs")? Otherwise pick the first undone one.
+    requested = _extract_target_muscle(message)
+    slot = get_slot(plan_data, requested) if requested else None
+    if not slot:
+        slot = next((item for item in pool if not item.get("done")), None)
+    if not slot and pool:
+        slot = pool[0]  # everything's done — let them redo the first one
+    if not slot:
+        slot = {"key": "full_body", "label": "Full Body", "db_key": "full_body", "done": False}
+
+    exercises = build_full_session(slot, profile, zone)
+    muscle_group = slot.get("label", "Full Body")
 
     if not exercises:
-        exercises = get_exercises_for_slot("full_body", profile, zone)
+        exercises = build_full_session("full_body", profile, zone)
 
     _workout_sessions[user_id] = {
         "exercises": exercises,
         "muscle_group": muscle_group,
+        "slot_key": slot.get("key"),
         "current_index": 0,
         "current_set": 1,
         "start_time": datetime.now().isoformat(),
@@ -554,6 +587,7 @@ async def _start_workout(user_id: int, profile: Profile, zone: str, mode: str, d
         type="workout_start",
         data={
             "muscle_group": muscle_group,
+            "slot_key": slot.get("key"),
             "exercises": exercises,
             "current_exercise": ex,
             "current_exercise_index": 0,
@@ -630,12 +664,15 @@ async def _log_and_finish(user_id: int, profile: Profile, db: AsyncSession) -> C
         plan_result = await db.execute(select(WeeklyPlan).where(WeeklyPlan.user_id == user_id))
         plan_row = plan_result.scalar_one_or_none()
         plan_data = plan_row.plan if plan_row else generate_weekly_plan(profile)
-        today_slot = get_todays_slot(plan_data) or {"label": "Full Body", "db_key": "full_body"}
-        exercises = get_exercises_for_slot(today_slot, profile, "green")
-        muscle_group = today_slot.get("label", "Full Body")
+        pool = plan_data.get("pool", [])
+        slot = next((item for item in pool if not item.get("done")), None) or \
+            (pool[0] if pool else {"label": "Full Body", "db_key": "full_body", "key": "full_body"})
+        exercises = get_exercises_for_slot(slot, profile, "green")
+        muscle_group = slot.get("label", "Full Body")
         session = {
             "exercises": exercises,
             "muscle_group": muscle_group,
+            "slot_key": slot.get("key"),
             "start_time": (datetime.now() - timedelta(minutes=45)).isoformat(),
             "completed": [ex["name"] for ex in exercises] if exercises else [],
             "mode": "gym",
@@ -657,6 +694,13 @@ async def _log_and_finish(user_id: int, profile: Profile, db: AsyncSession) -> C
     )
     db.add(workout)
     await db.commit()
+
+    if session.get("slot_key"):
+        plan_result = await db.execute(select(WeeklyPlan).where(WeeklyPlan.user_id == user_id))
+        plan_row = plan_result.scalar_one_or_none()
+        if plan_row:
+            plan_row.plan = mark_slot_done(plan_row.plan, session["slot_key"])
+            await db.commit()
 
     total_result = await db.execute(
         select(sqlfunc.count()).where(Workout.user_id == user_id, Workout.completed == True)

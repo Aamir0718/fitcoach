@@ -2,39 +2,54 @@
 Deterministic weekly plan generation.
 Exercise databases match the desktop version exactly, with YouTube demo URLs.
 """
-from datetime import date
+from datetime import date, timedelta
 from app.models.profile import Profile
 
 # ── Weekly plan templates (gender × mode × goal) ──────────────────────────────
+## Each entry is an ordered rotation of ALREADY-DISTINCT session categories —
+## no "rest" filler, no repeated entries. This is what makes the pool model
+## specific rather than generic: gym/home rotations are sized to exactly the 6
+## categories real training splits use (Push/Pull/Legs/Upper/Lower/Full-Body,
+## or the female-goal equivalents), so at any realistic 3-6 day/week frequency
+## every session in the pool is genuinely different — nothing repeats unless a
+## goal's category vocabulary itself has fewer than 6 (sport programs, which
+## legitimately specialize around 5 focuses).
 _PLANS = {
-    ("male", "gym", "muscle_gain"):     ["push", "pull", "legs", "upper_body", "push", "pull", "rest"],
-    ("male", "gym", "strength"):        ["push", "pull", "legs", "rest", "upper_body", "lower_body", "rest"],
-    ("male", "gym", "fat_loss"):        ["full_body", "cardio", "upper_body", "legs", "full_body", "cardio", "rest"],
-    ("male", "gym", "general_fitness"): ["push", "pull", "legs", "full_body", "upper_body", "cardio", "rest"],
-    ("male", "gym", "aesthetics"):      ["push", "pull", "legs", "upper_body", "push", "lower_body", "rest"],
-    ("male", "home", "muscle_gain"):    ["push", "pull", "legs", "full_body", "push", "pull", "rest"],
-    ("male", "home", "fat_loss"):       ["full_body", "full_body", "cardio", "full_body", "full_body", "cardio", "rest"],
-    ("male", "home", "general_fitness"):["push", "pull", "legs", "full_body", "push", "cardio", "rest"],
+    # ── Male / Gym — Push/Pull/Legs/Upper/Lower/Full-Body vocabulary ─────────
+    ("male", "gym", "muscle_gain"):     ["push", "pull", "legs", "upper_body", "lower_body", "full_body"],
+    ("male", "gym", "strength"):        ["legs", "push", "pull", "lower_body", "upper_body", "full_body"],
+    ("male", "gym", "aesthetics"):      ["push", "pull", "legs", "upper_body", "lower_body", "full_body"],
+    ("male", "gym", "fat_loss"):        ["full_body", "cardio", "push", "pull", "legs", "upper_body"],
+    ("male", "gym", "general_fitness"): ["push", "pull", "legs", "full_body", "upper_body", "cardio"],
 
-    ("female", "gym", "fat_loss"):          ["lower_body", "cardio", "glutes", "full_body", "upper_toning", "cardio", "rest"],
-    ("female", "gym", "glute_growth"):      ["glutes", "upper_toning", "glutes", "cardio", "glutes", "full_body", "rest"],
-    ("female", "gym", "hourglass_figure"):  ["glutes", "upper_toning", "core_cardio", "lower_body", "glutes", "full_body", "rest"],
-    ("female", "gym", "lean_physique"):     ["lower_body", "upper_toning", "glutes", "cardio", "full_body", "cardio", "rest"],
-    ("female", "gym", "toned_body"):        ["full_body", "lower_body", "upper_toning", "cardio", "full_body", "cardio", "rest"],
-    ("female", "gym", "muscle_gain"):       ["push", "pull", "legs", "glutes", "upper_toning", "full_body", "rest"],
-    ("female", "gym", "general_fitness"):   ["full_body", "lower_body", "upper_toning", "cardio", "glutes", "cardio", "rest"],
-    ("female", "home", "fat_loss"):         ["full_body", "cardio", "lower_body", "full_body", "cardio", "full_body", "rest"],
-    ("female", "home", "glute_growth"):     ["glutes", "full_body", "glutes", "cardio", "glutes", "full_body", "rest"],
-    ("female", "home", "toned_body"):       ["full_body", "lower_body", "upper_toning", "cardio", "full_body", "cardio", "rest"],
-    ("female", "home", "general_fitness"):  ["full_body", "lower_body", "full_body", "cardio", "glutes", "full_body", "rest"],
+    # ── Male / Home — same vocabulary, bodyweight-driven ─────────────────────
+    ("male", "home", "muscle_gain"):     ["push", "pull", "legs", "full_body", "upper_body", "lower_body"],
+    ("male", "home", "fat_loss"):        ["full_body", "cardio", "push", "pull", "legs", "upper_body"],
+    ("male", "home", "general_fitness"): ["push", "pull", "legs", "full_body", "cardio", "upper_body"],
 
-    # ── Sport plans — use ONLY sport-specific session keys (no gym keys) ─────
-    ("male",   "sport", "cricket"):  ["batting_power", "cricket_mobility", "cricket_conditioning", "rest", "fielding_agility", "bowling_strength", "rest"],
-    ("female", "sport", "cricket"):  ["batting_power", "cricket_mobility", "cricket_conditioning", "rest", "fielding_agility", "bowling_strength", "rest"],
-    ("male",   "sport", "football"): ["football_speed", "football_agility", "football_conditioning", "rest", "football_skill", "football_power", "rest"],
-    ("female", "sport", "football"): ["football_speed", "football_agility", "football_conditioning", "rest", "football_skill", "football_power", "rest"],
-    ("male",   "sport", "running"):  ["easy_run", "running_drills", "tempo_run", "rest", "track_intervals", "long_run", "rest"],
-    ("female", "sport", "running"):  ["easy_run", "running_drills", "tempo_run", "rest", "track_intervals", "long_run", "rest"],
+    # ── Female / Gym — Glutes/Lower/Upper-Toning/Core-Cardio/Full-Body/Cardio,
+    # plus Push/Pull for muscle-gain — 6 distinct categories per goal ────────
+    ("female", "gym", "fat_loss"):          ["full_body", "cardio", "lower_body", "upper_toning", "core_cardio", "glutes"],
+    ("female", "gym", "glute_growth"):      ["glutes", "lower_body", "upper_toning", "core_cardio", "full_body", "cardio"],
+    ("female", "gym", "hourglass_figure"):  ["glutes", "upper_toning", "core_cardio", "lower_body", "full_body", "cardio"],
+    ("female", "gym", "lean_physique"):     ["lower_body", "upper_toning", "glutes", "cardio", "full_body", "core_cardio"],
+    ("female", "gym", "toned_body"):        ["full_body", "lower_body", "upper_toning", "cardio", "glutes", "core_cardio"],
+    ("female", "gym", "muscle_gain"):       ["push", "pull", "glutes", "upper_toning", "full_body", "cardio"],
+    ("female", "gym", "general_fitness"):   ["full_body", "lower_body", "upper_toning", "cardio", "glutes", "core_cardio"],
+
+    # ── Female / Home — 6-category vocabulary (no push/pull without gym kit) ─
+    ("female", "home", "fat_loss"):         ["full_body", "cardio", "lower_body", "upper_toning", "core_cardio", "glutes"],
+    ("female", "home", "glute_growth"):     ["glutes", "lower_body", "upper_toning", "full_body", "core_cardio", "cardio"],
+    ("female", "home", "toned_body"):       ["full_body", "lower_body", "upper_toning", "cardio", "glutes", "core_cardio"],
+    ("female", "home", "general_fitness"):  ["full_body", "lower_body", "glutes", "cardio", "upper_toning", "core_cardio"],
+
+    # ── Sport plans — 5 sport-specific focuses each (no gym keys) ────────────
+    ("male",   "sport", "cricket"):  ["batting_power", "cricket_mobility", "cricket_conditioning", "fielding_agility", "bowling_strength"],
+    ("female", "sport", "cricket"):  ["batting_power", "cricket_mobility", "cricket_conditioning", "fielding_agility", "bowling_strength"],
+    ("male",   "sport", "football"): ["football_speed", "football_agility", "football_conditioning", "football_skill", "football_power"],
+    ("female", "sport", "football"): ["football_speed", "football_agility", "football_conditioning", "football_skill", "football_power"],
+    ("male",   "sport", "running"):  ["easy_run", "running_drills", "tempo_run", "track_intervals", "long_run"],
+    ("female", "sport", "running"):  ["easy_run", "running_drills", "tempo_run", "track_intervals", "long_run"],
 }
 
 SESSION_LABELS = {
@@ -561,6 +576,71 @@ _SESSION_MAPS = {
 }
 
 
+# ── Movement-pattern classification (drives Ghost Trainer's pose analyzer choice) ──
+# Ordered keyword rules; first match wins, checked against the lowercased exercise name.
+# This is a heuristic, not an exhaustive hand-tag of all 212 exercises — many
+# machine/cable/sport-drill exercises are approximated by the closest bodyweight
+# pattern since a single webcam can't read machine resistance or judge sport technique.
+_MOVEMENT_PATTERN_RULES: list[tuple[list[str], str]] = [
+    (["leg curl", "hamstring curl", "nordic"],                                    "hip_hinge"),
+    (["calf raise"],                                                              "calf_raise"),
+    (["leg raise"],                                                               "core_flex"),
+    (["lateral raise", "front raise", "upright row"],                             "lateral_raise"),
+    (["push-up", "push up", "chest fly"],                                        "horizontal_push"),
+    (["pallof"],                                                                  "core_rotation"),
+    (["pull-up", "pull up", "chin-up", "chin up", "pulldown", "lat pull"],        "vertical_pull"),
+    (["row", "face pull", "pull-apart", "pull apart"],                           "horizontal_pull"),
+    (["deadlift", "hip thrust", "glute bridge", "kickback", "good morning",
+      "hip drive", "hip circle", "donkey kick", "fire hydrant", "clamshell",
+      "abductor", "hip abduction"],                                              "hip_hinge"),
+    (["lunge", "split squat", "step-up", "step up"],                             "lunge"),
+    (["squat", "leg press", "hack squat", "sissy squat"],                        "squat"),
+    (["curl"],                                                                   "elbow_flexion"),
+    (["pushdown", "triceps extension", "tricep extension", "skull crusher",
+      "overhead extension", "dip"],                                             "elbow_extension"),
+    (["plank", "wall sit", "hold", "hollow body"],                               "core_isometric"),
+    (["twist", "chop", "windmill"],                                              "core_rotation"),
+    (["crunch", "sit-up", "situp", "rollout", "v-up"],                           "core_flex"),
+    (["jump", "sprint", "run", "walk", "shuttle", "ladder", "burpee",
+      "mountain climber", "jumping jack", "star jump", "skip", "bound",
+      "high knee", "butt kick", "box jump", "interval", "repeat", "conditioning",
+      "dribble", "throw", "swing", "batting", "bowling", "fielding", "footwork",
+      "agility", "drill", "stretch", "mobility", "cool-down", "cooldown",
+      "stairmaster", "treadmill", "rowing machine", "cycling"],                  "cardio_generic"),
+]
+
+_MOVEMENT_PATTERN_CATEGORY_FALLBACK: dict[str, str] = {
+    "push": "horizontal_push", "pull": "horizontal_pull", "legs": "squat",
+    "upper_body": "horizontal_push", "lower_body": "squat", "glutes": "hip_hinge",
+    "upper_toning": "horizontal_push", "core_cardio": "core_flex",
+    "full_body": "full_body_generic", "cardio": "cardio_generic",
+    "upper": "horizontal_push", "lower": "squat",
+}
+
+_VERTICAL_PRESS_QUALIFIERS = ["overhead", "shoulder", "military", "pike", "arnold", "seated"]
+
+
+def classify_movement_pattern(name: str, session_key: str | None = None) -> str:
+    """Best-effort mapping of an exercise name to a biomechanical movement pattern —
+    drives which Ghost Trainer pose analyzer runs for it."""
+    n = (name or "").lower()
+
+    # "Press" exercises are the biggest chest-vs-shoulder ambiguity, and real names
+    # often separate the qualifier word from "press" (e.g. "Overhead Barbell Press",
+    # "Seated Dumbbell Press") so a simple contiguous-phrase match misses them —
+    # check word presence anywhere in the name instead, order-agnostic. Excludes
+    # "leg press" (squat pattern) and "pallof press" (anti-rotation core, not a push).
+    if "press" in n and "leg press" not in n and "pallof" not in n:
+        if any(q in n for q in _VERTICAL_PRESS_QUALIFIERS):
+            return "vertical_push"
+        return "horizontal_push"
+
+    for keywords, pattern in _MOVEMENT_PATTERN_RULES:
+        if any(kw in n for kw in keywords):
+            return pattern
+    return _MOVEMENT_PATTERN_CATEGORY_FALLBACK.get((session_key or "").lower(), "full_body_generic")
+
+
 def _has_injury(profile: Profile) -> bool:
     inj = (profile.injuries or "").strip().lower()
     return bool(inj) and inj not in {"none", "no", "n/a", "na", "-"}
@@ -911,10 +991,11 @@ def _adjust_weight_guide(weight_guide: str, profile: Profile) -> str:
         return weight_guide
 
 
-def _format_exercise(ex: dict, zone: str, level: str = "intermediate", profile: "Profile | None" = None) -> dict:
+def _format_exercise(ex: dict, zone: str, level: str = "intermediate", profile: "Profile | None" = None, session_key: str | None = None) -> dict:
     """Add zone + level adjusted intensity, personalized weight guide, and Ghost Trainer form cues."""
     item = dict(ex)
     base_sets = item.get("sets", 3)
+    item["movement_pattern"] = classify_movement_pattern(item.get("name", ""), session_key)
 
     # ── Zone adjustment ──────────────────────────────────────────────────────────
     if zone == "red":
@@ -995,7 +1076,7 @@ def _get_exercises(category: str, profile: Profile, zone: str) -> list[dict]:
         exercises = list(sport_db.get(category) or _GYM_MALE.get("full_body", []))
         exercises = _filter_by_injury(exercises, profile)
         exercises = _rotate_for_user(exercises, uid, category)
-        return [_format_exercise(ex, zone, level, profile) for ex in exercises[:count]]
+        return [_format_exercise(ex, zone, level, profile, category) for ex in exercises[:count]]
 
     # ── Injury redirect at red zone ──────────────────────────────────────────────
     if _has_injury(profile) and zone == "red":
@@ -1004,7 +1085,7 @@ def _get_exercises(category: str, profile: Profile, zone: str) -> list[dict]:
             else "full_body"
         exercises = list(_INJURY_SAFE.get(family, _INJURY_SAFE["full_body"]))
         exercises = _rotate_for_user(exercises, uid, category)
-        return [_format_exercise(ex, zone, level, profile) for ex in exercises[:4]]
+        return [_format_exercise(ex, zone, level, profile, family) for ex in exercises[:4]]
 
     # ── Normal routing ───────────────────────────────────────────────────────────
     map_key  = (gender, mode)
@@ -1018,83 +1099,155 @@ def _get_exercises(category: str, profile: Profile, zone: str) -> list[dict]:
     # Rotate per user — unique exercise order for every user
     exercises = _rotate_for_user(exercises, uid, category)
 
-    return [_format_exercise(ex, zone, level, profile) for ex in exercises[:count]]
+    return [_format_exercise(ex, zone, level, profile, db_key) for ex in exercises[:count]]
 
 
-def generate_weekly_plan(profile: Profile) -> dict:
+# Normalise goal aliases — shared by build_weekly_pool
+_GOAL_ALIASES = {
+    "weight_loss": "fat_loss", "fat loss": "fat_loss",
+    "toning": "toned_body", "tone": "toned_body",
+    "hourglass": "hourglass_figure", "glute_focus": "glute_growth",
+    "lean_physique": "fat_loss",
+}
+
+
+def _plan_template_for(profile: Profile) -> tuple[str, list[str]]:
+    """Resolve (goal, days_template) for a profile, with fallbacks — shared logic
+    between build_weekly_pool and generate_weekly_plan."""
     gender = (profile.gender or "male").lower()
     if gender not in ("male", "female"):
         gender = "male"
-    mode   = profile.active_mode
-    sport  = profile.sport
-    goal   = profile.goal or "general_fitness"
-    level  = (profile.level or "intermediate").lower()
-    days_per_week = min(6, max(3, profile.days_per_week or 4))
-
-    # Normalise goal aliases
-    _GOAL_ALIASES = {
-        "weight_loss": "fat_loss", "fat loss": "fat_loss",
-        "toning": "toned_body", "tone": "toned_body",
-        "hourglass": "hourglass_figure", "glute_focus": "glute_growth",
-        "lean_physique": "fat_loss",
-    }
-    goal = _GOAL_ALIASES.get(goal, goal)
+    mode  = profile.active_mode
+    sport = profile.sport
+    goal  = _GOAL_ALIASES.get(profile.goal or "general_fitness", profile.goal or "general_fitness")
 
     key = (gender, mode, goal if mode != "sport" else sport)
-    days_template = _PLANS.get(key)
-
-    if not days_template:
+    template = _PLANS.get(key)
+    if not template:
         if mode == "sport":
             key = (gender, "sport", sport or "football")
         else:
             fallback_goal = "fat_loss" if gender == "female" else "general_fitness"
             key = (gender, mode, fallback_goal)
-        days_template = _PLANS.get(key, ["full_body"] * 4 + ["rest"] * 3)
+        template = _PLANS.get(key, ["full_body", "cardio", "push", "pull", "legs", "upper_body"])
+    return goal, template
 
-    # ── Trim to user's available days ────────────────────────────────────────────
-    # Replace excess training days (beyond days_per_week) with rest
-    trimmed: list[str] = []
-    training_count = 0
-    for session_key in days_template:
-        if session_key == "rest":
-            trimmed.append("rest")
-        elif training_count < days_per_week:
-            trimmed.append(session_key)
-            training_count += 1
-        else:
-            trimmed.append("rest")
-    days_template = trimmed
 
-    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-    days = []
-    for i, session_key in enumerate(days_template):
-        is_rest = session_key == "rest"
-        days.append({
-            "day":       day_names[i],
-            "day_index": i,
-            "label":     SESSION_LABELS.get(session_key, session_key.replace("_", " ").title()),
-            "db_key":    session_key,
-            "rest":      is_rest,
-            "muscle":    session_key if not is_rest else None,
-        })
+def build_weekly_pool(profile: Profile) -> list[dict]:
+    """Build this week's pool of distinct session types, sized to days_per_week.
+    Takes the goal template's ordered distinct non-rest session keys and
+    cyclic-pads (repeats the cycle) or truncates to fit days_per_week exactly."""
+    days_per_week = min(6, max(3, profile.days_per_week or 4))
+    _, template = _plan_template_for(profile)
+
+    distinct: list[str] = []
+    for session_key in template:
+        if session_key != "rest" and session_key not in distinct:
+            distinct.append(session_key)
+    if not distinct:
+        distinct = ["full_body"]
+
+    pool_keys = [distinct[i % len(distinct)] for i in range(days_per_week)]
+
+    return [
+        {
+            "key": session_key,
+            "label": SESSION_LABELS.get(session_key, session_key.replace("_", " ").title()),
+            "db_key": session_key,
+            "done": False,
+            "done_date": None,
+        }
+        for session_key in pool_keys
+    ]
+
+
+def _monday_of(d: date) -> date:
+    return d - timedelta(days=d.weekday())
+
+
+def generate_weekly_plan(profile: Profile) -> dict:
+    """Build a fresh weekly pool for this profile, starting this week."""
+    goal, _ = _plan_template_for(profile)
+    level = (profile.level or "intermediate").lower()
+    days_per_week = min(6, max(3, profile.days_per_week or 4))
 
     return {
-        "days":   days,
-        "mode":   mode,
-        "goal":   goal,
-        "sport":  sport,
-        "level":  level,
+        "pool": build_weekly_pool(profile),
+        "week_start": _monday_of(date.today()).isoformat(),
+        "mode": profile.active_mode,
+        "goal": goal,
+        "sport": profile.sport,
+        "level": level,
         "days_per_week": days_per_week,
     }
 
 
-def get_todays_slot(plan: dict) -> dict | None:
-    days      = plan.get("days", [])
-    today_idx = date.today().weekday()  # 0=Monday
-    for d in days:
-        if d.get("day_index") == today_idx:
-            return d
-    return days[today_idx] if today_idx < len(days) else None
+def maybe_reset_week(plan: dict, profile: Profile) -> dict:
+    """If today has rolled into a new week (vs. plan['week_start']) — or this plan
+    predates the pool model entirely (no 'pool' key, e.g. an old 'days'-shaped
+    plan) — rebuild fresh. No-op if still the same week with a valid pool."""
+    current_monday = _monday_of(date.today()).isoformat()
+    if plan.get("week_start") == current_monday and "pool" in plan:
+        return plan
+    return generate_weekly_plan(profile)
+
+
+def profile_has_usable_data(profile: Profile) -> bool:
+    """True if a profile has enough real data to build a plan from, regardless
+    of whether the onboarding_complete flag was ever explicitly set — covers
+    existing/legacy accounts that predate that flag or completed setup through
+    another path. Used to self-heal onboarding_complete rather than forcing
+    already-active users back through the onboarding flow."""
+    return bool(profile.name and profile.goal and profile.gender)
+
+
+def get_slot(plan: dict, slot_key: str) -> dict | None:
+    for item in plan.get("pool", []):
+        if item.get("key") == slot_key:
+            return item
+    return None
+
+
+def select_pool_slot(plan: dict, slot_key: str) -> dict:
+    """Ensure slot_key exists in the pool — swapping it in for the first still-undone
+    slot if it isn't already part of this week's split — without marking anything done."""
+    pool = [dict(item) for item in plan.get("pool", [])]
+    if any(item["key"] == slot_key for item in pool):
+        return {**plan, "pool": pool}
+
+    label = SESSION_LABELS.get(slot_key, slot_key.replace("_", " ").title())
+    new_item = {"key": slot_key, "label": label, "db_key": slot_key, "done": False, "done_date": None}
+
+    for i, item in enumerate(pool):
+        if not item.get("done"):
+            pool[i] = new_item
+            return {**plan, "pool": pool}
+    pool.append(new_item)  # everything's done — grow the pool by one this week
+    return {**plan, "pool": pool}
+
+
+def mark_slot_done(plan: dict, slot_key: str) -> dict:
+    pool = [dict(item) for item in plan.get("pool", [])]
+    for item in pool:
+        if item["key"] == slot_key:
+            item["done"] = True
+            item["done_date"] = date.today().isoformat()
+            break
+    else:
+        label = SESSION_LABELS.get(slot_key, slot_key.replace("_", " ").title())
+        pool.append({"key": slot_key, "label": label, "db_key": slot_key, "done": True, "done_date": date.today().isoformat()})
+    return {**plan, "pool": pool}
+
+
+def unmark_slot_done(plan: dict, slot_key: str) -> dict:
+    """Allow redoing an already-completed slot this week."""
+    pool = [dict(item) for item in plan.get("pool", [])]
+    for item in pool:
+        if item["key"] == slot_key:
+            item["done"] = False
+            item["done_date"] = None
+            break
+    return {**plan, "pool": pool}
 
 
 # ── Label helpers exposed to AI service ───────────────────────────────────────
@@ -1142,50 +1295,106 @@ MUSCLE_TO_SLOT: dict[str, str] = {
 }
 
 
-def swap_today_slot(plan: dict, new_slot_key: str) -> dict:
-    """
-    Replace today's slot with new_slot_key.
-    The displaced workout (if non-rest) is placed on the next rest day so
-    nothing is permanently lost from the weekly plan.
-    """
-    days = [dict(d) for d in plan.get("days", [])]
-    today_idx = date.today().weekday()
-
-    if today_idx >= len(days):
-        return plan
-
-    old_slot = days[today_idx]
-
-    # Build the new slot for today
-    new_label = SESSION_LABELS.get(new_slot_key, new_slot_key.replace("_", " ").title())
-    days[today_idx] = {
-        "day":       old_slot["day"],
-        "day_index": today_idx,
-        "label":     new_label,
-        "db_key":    new_slot_key,
-        "rest":      new_slot_key == "rest",
-        "muscle":    new_slot_key if new_slot_key != "rest" else None,
-    }
-
-    # If old slot was a real workout, bump it to the next rest day
-    if not old_slot.get("rest"):
-        for i in range(today_idx + 1, len(days)):
-            if days[i].get("rest"):
-                days[i] = {
-                    **old_slot,
-                    "day":       days[i]["day"],
-                    "day_index": i,
-                }
-                break
-
-    return {**plan, "days": days}
-
-
 def get_exercises_for_slot(slot, profile: Profile, zone: str) -> list[dict]:
-    """Accept either a slot dict or a plain session-key string."""
+    """Accept either a pool-slot dict or a plain session-key string. Returns the
+    MAIN block only (no warm-up/cool-down) — used both for full sessions (via
+    build_full_session below) and for single-exercise swap pools, where warm-up/
+    cool-down entries would be wrong to offer as an alternative."""
     if isinstance(slot, str):
-        return _get_exercises(slot, profile, zone)
-    if slot.get("rest"):
+        exercises = _get_exercises(slot, profile, zone)
+    elif slot.get("rest"):
         return []
-    db_key = slot.get("db_key", "full_body")
-    return _get_exercises(db_key, profile, zone)
+    else:
+        db_key = slot.get("db_key", "full_body")
+        exercises = _get_exercises(db_key, profile, zone)
+    for ex in exercises:
+        ex.setdefault("section", "main")
+    return exercises
+
+
+# ── Warm-up / cool-down ────────────────────────────────────────────────────────
+# Short, curated, equipment-free blocks — picked by movement focus so a leg day
+# gets a leg-relevant warm-up rather than generic filler. Not pulled from the
+# main exercise catalog since these are deliberately brief (single "set").
+_WARMUP_POOLS: dict[str, list[dict]] = {
+    "lower": [
+        {"name": "Bodyweight Squat", "sets": 1, "reps": "15", "rest": "0s", "muscle": "Legs"},
+        {"name": "Leg Swings", "sets": 1, "reps": "10 ea", "rest": "0s", "muscle": "Hips"},
+        {"name": "Hip Circles", "sets": 1, "reps": "10 ea", "rest": "0s", "muscle": "Hips"},
+    ],
+    "upper": [
+        {"name": "Arm Circles", "sets": 1, "reps": "30s", "rest": "0s", "muscle": "Shoulders"},
+        {"name": "Band Pull-Apart", "sets": 1, "reps": "15", "rest": "0s", "muscle": "Rear Delts"},
+        {"name": "Shoulder Rolls", "sets": 1, "reps": "10 ea", "rest": "0s", "muscle": "Shoulders"},
+    ],
+    "cardio": [
+        {"name": "Jumping Jacks", "sets": 1, "reps": "30s", "rest": "0s", "muscle": "Full Body"},
+        {"name": "High Knees", "sets": 1, "reps": "30s", "rest": "0s", "muscle": "Cardio"},
+    ],
+    "general": [
+        {"name": "Jumping Jacks", "sets": 1, "reps": "30s", "rest": "0s", "muscle": "Full Body"},
+        {"name": "Bodyweight Squat", "sets": 1, "reps": "15", "rest": "0s", "muscle": "Legs"},
+        {"name": "Arm Circles", "sets": 1, "reps": "30s", "rest": "0s", "muscle": "Shoulders"},
+    ],
+}
+_COOLDOWN_POOLS: dict[str, list[dict]] = {
+    "lower": [
+        {"name": "Standing Quad Stretch", "sets": 1, "reps": "30s ea", "rest": "0s", "muscle": "Quads"},
+        {"name": "Seated Hamstring Stretch", "sets": 1, "reps": "30s ea", "rest": "0s", "muscle": "Hamstrings"},
+    ],
+    "upper": [
+        {"name": "Chest Doorway Stretch", "sets": 1, "reps": "30s", "rest": "0s", "muscle": "Chest"},
+        {"name": "Overhead Triceps Stretch", "sets": 1, "reps": "30s ea", "rest": "0s", "muscle": "Triceps"},
+    ],
+    "cardio": [
+        {"name": "Standing Forward Fold", "sets": 1, "reps": "30s", "rest": "0s", "muscle": "Hamstrings/Back"},
+        {"name": "Deep Breathing Recovery", "sets": 1, "reps": "60s", "rest": "0s", "muscle": "Recovery"},
+    ],
+    "general": [
+        {"name": "Child's Pose", "sets": 1, "reps": "45s", "rest": "0s", "muscle": "Back"},
+        {"name": "Standing Quad Stretch", "sets": 1, "reps": "30s ea", "rest": "0s", "muscle": "Quads"},
+    ],
+}
+_SESSION_FOCUS: dict[str, str] = {
+    "push": "upper", "pull": "upper", "upper_body": "upper", "upper_toning": "upper",
+    "legs": "lower", "lower_body": "lower", "glutes": "lower",
+    "cardio": "cardio", "core_cardio": "cardio",
+    "full_body": "general",
+}
+
+
+def _format_warmup_cooldown(ex: dict, section: str) -> dict:
+    item = dict(ex)
+    item["section"] = section
+    item["movement_pattern"] = classify_movement_pattern(item.get("name", ""))
+    item.setdefault("weight_guide", "Bodyweight")
+    item.setdefault("equipment_required", False)
+    item.setdefault(
+        "demo_url",
+        "https://www.youtube.com/results?search_query=" + item.get("name", "exercise").replace(" ", "+"),
+    )
+    item.setdefault(
+        "form_cues",
+        ["Move through a full, controlled range of motion", "Gradually build up intensity"]
+        if section == "warmup"
+        else ["Hold the stretch — don't bounce", "Breathe slowly and relax into it"],
+    )
+    item.setdefault("trainer_tip", "Warm-up primes the joints you're about to load" if section == "warmup"
+                     else "Cool-down stretching aids recovery and next-day soreness")
+    item.setdefault("intensity_label", "Warm-up" if section == "warmup" else "Cool-down")
+    return item
+
+
+def build_full_session(slot, profile: Profile, zone: str) -> list[dict]:
+    """The full user-facing session: warm-up + main workout + cool-down. This is
+    what actually gets shown/started in the live Ghost Trainer session — use
+    get_exercises_for_slot() directly instead when you need just the raw main
+    block (e.g. picking a single-exercise swap alternative)."""
+    main = get_exercises_for_slot(slot, profile, zone)
+    if not main:
+        return []
+    db_key = slot.get("db_key", "full_body") if not isinstance(slot, str) else slot
+    focus = _SESSION_FOCUS.get(db_key, "general")
+    warmup = [_format_warmup_cooldown(e, "warmup") for e in _WARMUP_POOLS.get(focus, _WARMUP_POOLS["general"])[:2]]
+    cooldown = [_format_warmup_cooldown(e, "cooldown") for e in _COOLDOWN_POOLS.get(focus, _COOLDOWN_POOLS["general"])[:2]]
+    return warmup + main + cooldown

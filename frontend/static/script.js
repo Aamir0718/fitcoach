@@ -4,8 +4,12 @@
 // ================================================
 // Backend now lives on Render (separate service) instead of same-origin Flask.
 // TODO: replace with the actual Render service URL once it's deployed.
+// TEMP: pointed at 8010 instead of 8000 — a stale backend process is stuck on
+// 8000 (invisible to process-kill tools but still answering requests with old
+// code). Revert to 8000 once that process is gone (reboot, or find/stop it
+// via Task Manager) and the normal dev backend is running there again.
 const API = (location.hostname === "localhost" || location.hostname === "127.0.0.1")
-  ? "http://localhost:8000"
+  ? "http://localhost:8010"
   : "https://fitcoach-backend.onrender.com";
 window.API = API;
 let authToken    = localStorage.getItem("fc_token") || null;
@@ -905,15 +909,14 @@ function switchTab(tab) {
   if (tab==="progress") loadProgress();
   if (tab==="profile")  loadProfile();
   if (tab==="recovery") loadRecoveryLatest();
+  if (tab==="planner") loadPlanner();
   if (tab==="chat") {
     const chatBox = document.getElementById("chat-box");
     if (chatBox && chatBox.children.length === 0) loadChat();
+  } else {
+    // Leaving Coach — release the camera if a live training session was active.
+    window.fitCoachGhostTrainer?.stop();
   }
-  if (tab==="trainer") {
-    console.log('Switching to trainer tab, calling init...');
-    window.fitCoachGhostTrainer?.init();
-  }
-  if (tab!=="trainer") window.fitCoachGhostTrainer?.stop();
 }
 
 // ── CHAT ──────────────────────────────────────────────────────────────
@@ -990,22 +993,22 @@ function exerciseIcon(exercise) {
 
 function renderCoachResponse(data) {
   const chatBox = document.getElementById("chat-box");
-  
-  if (["workout_start", "workout_next_set", "workout_next_exercise"].includes(data.type)) {
-    transitionToWorkout(data);
-    if (data.reply) {
-      pushPopoverMessage(data.reply);
-    }
-    return null;
-  }
-  
+
+  // Note: "workout_start" is intercepted earlier in handleResponse() and
+  // routed into the merged Ghost Trainer live session, so it never reaches
+  // here. "workout_next_set"/"workout_next_exercise" only fire if the user
+  // manually types "next" in the main Coach chat (e.g. after navigating away
+  // from an active camera session) — with rep counting now camera-driven,
+  // just surface the reply as a normal chat message rather than opening the
+  // old text-only hologram shell.
+
   if (["workout_all_done", "feedback_received", "workout_logged"].includes(data.type)) {
     transitionToComplete(data);
     return null;
   }
 
   // For most responses, just show a simple message like ChatGPT
-  if (!["daily_plan", "workout_start", "workout_next_set", "workout_next_exercise", "workout_all_done", "feedback_received", "workout_logged"].includes(data.type)) {
+  if (!["daily_plan", "workout_all_done", "feedback_received", "workout_logged"].includes(data.type)) {
     const msg = document.createElement("div");
     msg.className = "message bot";
     msg.innerHTML = cleanDisplayText(data.reply)
@@ -1473,6 +1476,19 @@ function handleResponse(data) {
     return;
   }
 
+  // Starting a workout (fresh start, or a chat-driven swap like "do legs
+  // instead") opens the live camera + exercise + docked-chat session in place
+  // within this same Coach tab — one unified experience, no separate tab.
+  if (data.type === "workout_start") {
+    const exercises = data.exercises || (data.current_exercise ? [data.current_exercise] : []);
+    if (exercises.length && window.fitCoachGhostTrainer) {
+      if (data.reply) addMessage(cleanDisplayText(data.reply), "bot");
+      scrollToBottom();
+      window.fitCoachGhostTrainer.startWithExercises(exercises, data.muscle_group || "Workout", data.slot_key || null);
+      return;
+    }
+  }
+
   // Chat messages
   renderCoachResponse(data);
   if (data.options) addCoachOptions(data.options);
@@ -1485,20 +1501,6 @@ function handleResponse(data) {
       showQuickActions();
       hideWorkoutUI();
       if (data.streak > 0) updateStreak(data.streak);
-      break;
-    case "workout_start":
-      workoutActive=true; feedbackMode=false;
-      syncGhostWorkout(data);
-      showWorkoutProgress(data);
-      showExerciseDemo(data.current_exercise, data.current_exercise_index, data.total_exercises, data.zone);
-      hideQuickActions(); showWorkoutButtons(); hideFeedbackButtons();
-      break;
-    case "workout_next_set":
-    case "workout_next_exercise":
-      showWorkoutProgress(data);
-      showExerciseDemo(data.current_exercise, data.current_exercise_index, data.total_exercises);
-      startRestTimer(data.current_exercise?.rest);
-      showWorkoutButtons(); hideFeedbackButtons();
       break;
     case "workout_all_done":
       workoutActive=false; feedbackMode=true;
@@ -2370,6 +2372,151 @@ function stopListening() {
   btn.classList.remove("listening"); btn.textContent="🎤";
 }
 
+// ── WAKE WORD: "Hey FitCoach" — Siri-style hands-free trigger, works from
+// any tab via the floating pill (#wake-word-fab). Two recognizers are used:
+// `wakeRec` runs continuously (restarted on every `onend`) just listening
+// for the wake phrase; once heard, it hands off to a short-lived one-shot
+// recognizer (`wakeCmdRec`) that captures the actual command and is torn
+// down immediately after, so the continuous listener isn't stuck mid-phrase.
+let wakeRec = null;
+let wakeCmdRec = null;
+let wakeActive = false;
+let wakeAwaitingCommand = false;
+const WAKE_PHRASES = ["hey fitcoach", "hey fit coach", "hey coach", "hi fitcoach", "ok fitcoach"];
+const WAKE_GREETINGS = ["Yes? How can I help?", "I'm listening — what do you need?", "Go ahead, I'm here.", "What can I do for you?"];
+
+function wakeWordSupported() {
+  return Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
+
+function setWakeFabState(mode) {
+  // mode: "idle" | "active" | "listening"
+  const fab = document.getElementById("wake-word-fab");
+  const status = document.getElementById("wake-word-status");
+  if (!fab) return;
+  fab.classList.toggle("active", mode === "active" || mode === "listening");
+  fab.classList.toggle("listening-cmd", mode === "listening");
+  if (status) {
+    status.textContent = mode === "listening" ? "Listening…" : mode === "active" ? "Hey FitCoach ✓" : "Hey FitCoach";
+  }
+}
+
+function initWakeWord() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
+  wakeRec = new SR();
+  wakeRec.continuous = true;
+  wakeRec.interimResults = true;
+  wakeRec.lang = "en-US";
+
+  wakeRec.onresult = (e) => {
+    if (wakeAwaitingCommand) return;
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const transcript = e.results[i][0].transcript.toLowerCase().trim();
+      if (WAKE_PHRASES.some((p) => transcript.includes(p))) {
+        handleWakeWordTriggered();
+        break;
+      }
+    }
+  };
+  wakeRec.onerror = (e) => {
+    if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+      wakeActive = false;
+      setWakeFabState("idle");
+      showToast("🎙️ Mic permission denied — 'Hey FitCoach' turned off");
+    }
+    // "no-speech" / "aborted" / "network" are routine on an always-on mic —
+    // onend below restarts it rather than treating them as fatal.
+  };
+  wakeRec.onend = () => {
+    if (wakeActive && !wakeAwaitingCommand) {
+      try { wakeRec.start(); } catch { /* already starting */ }
+    }
+  };
+}
+
+function toggleWakeWord() {
+  if (!wakeWordSupported()) {
+    showToast("⚠️ Voice commands aren't supported in this browser");
+    return;
+  }
+  if (!wakeRec) initWakeWord();
+
+  if (wakeActive) {
+    wakeActive = false;
+    wakeAwaitingCommand = false;
+    try { wakeRec?.stop(); } catch {}
+    try { wakeCmdRec?.stop(); } catch {}
+    setWakeFabState("idle");
+    showToast("🎙️ \"Hey FitCoach\" turned off");
+  } else {
+    wakeActive = true;
+    try { wakeRec.start(); } catch {}
+    setWakeFabState("active");
+    showToast('🎙️ Listening for "Hey FitCoach"…');
+  }
+}
+
+function handleWakeWordTriggered() {
+  if (wakeAwaitingCommand) return;
+  wakeAwaitingCommand = true;
+  try { wakeRec.stop(); } catch {}
+  setWakeFabState("listening");
+
+  const greeting = WAKE_GREETINGS[Math.floor(Math.random() * WAKE_GREETINGS.length)];
+  speak(greeting, currentUser?.gender || onboardingGender);
+  showToast("🎙️ " + greeting);
+
+  // Give the spoken greeting a beat to actually start before opening the
+  // mic for the follow-up command — starting both at once talks over itself.
+  setTimeout(captureWakeCommand, 900);
+}
+
+function captureWakeCommand() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  wakeCmdRec = new SR();
+  wakeCmdRec.continuous = false;
+  wakeCmdRec.interimResults = false;
+  wakeCmdRec.lang = "en-US";
+
+  wakeCmdRec.onresult = (e) => {
+    routeVoiceCommand(e.results[0][0].transcript);
+  };
+  wakeCmdRec.onerror = () => {};
+  wakeCmdRec.onend = () => {
+    wakeAwaitingCommand = false;
+    setWakeFabState(wakeActive ? "active" : "idle");
+    if (wakeActive) { try { wakeRec.start(); } catch {} }
+  };
+  try {
+    wakeCmdRec.start();
+  } catch {
+    wakeAwaitingCommand = false;
+    setWakeFabState(wakeActive ? "active" : "idle");
+  }
+}
+
+// A live camera session gets the command routed straight into its docked
+// chat; otherwise it goes through the normal Coach tab chat.
+function routeVoiceCommand(text) {
+  if (!text || !text.trim()) return;
+  const ghostOpen = !document.getElementById("ghost-workout-container")?.classList.contains("hidden");
+  if (ghostOpen && window.fitCoachGhostTrainer?.sendChat) {
+    window.fitCoachGhostTrainer.sendChat(text);
+    return;
+  }
+  if (typeof switchTab === "function") switchTab("chat");
+  const input = document.getElementById("message");
+  if (input) input.value = text;
+  sendMessage();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  if (!wakeWordSupported()) {
+    document.getElementById("wake-word-fab")?.classList.add("unsupported");
+  }
+});
+
 // ── CALORIES ──────────────────────────────────────────────────────────
 function switchCalTab(tab) {
   document.getElementById("cal-tab-text").classList.toggle("active",tab==="text");
@@ -3200,6 +3347,100 @@ function showCalResult(result){
   document.getElementById("daily-protein-preview").textContent = `${m.protein || 0}g`;
   document.getElementById("daily-carbs-preview").textContent = `${m.carbs || 0}g`;
   document.getElementById("daily-fats-preview").textContent = `${m.fats || 0}g`;
+}
+
+// ── WEEKLY PLANNER ────────────────────────────────────────────────────
+const PLANNER_ICONS = {
+  push: "💪", pull: "🏋", legs: "🦵", upper_body: "💪", lower_body: "🦵",
+  full_body: "🏃", cardio: "🔥", glutes: "🍑", upper_toning: "💪", core_cardio: "🧘",
+};
+let plannerData = null;
+
+async function loadPlanner() {
+  const grid = document.getElementById("planner-pool-grid");
+  const progressText = document.getElementById("planner-progress-text");
+  if (!grid) return;
+  grid.innerHTML = '<div class="loading-state">Loading your plan…</div>';
+  try {
+    const data = await apiFetch("/api/workouts/weekly-plan");
+    plannerData = data.plan;
+    renderPlannerPool();
+  } catch (err) {
+    console.error("Failed to load weekly plan:", err);
+    grid.innerHTML = '<div class="loading-state">Couldn\'t load your plan. Complete onboarding in Coach first, then come back.</div>';
+    if (progressText) progressText.textContent = "";
+  }
+}
+
+function renderPlannerPool() {
+  const grid = document.getElementById("planner-pool-grid");
+  const progressText = document.getElementById("planner-progress-text");
+  const progressFill = document.getElementById("planner-progress-fill");
+  if (!grid || !plannerData) return;
+
+  const pool = plannerData.pool || [];
+  const doneCount = pool.filter(item => item.done).length;
+
+  if (progressText) {
+    progressText.textContent = pool.length
+      ? `${doneCount} of ${pool.length} sessions done this week`
+      : "No plan yet — complete onboarding in Coach first.";
+  }
+  if (progressFill) {
+    progressFill.style.width = pool.length ? `${Math.round((doneCount / pool.length) * 100)}%` : "0%";
+  }
+
+  if (!pool.length) {
+    grid.innerHTML = '<div class="loading-state">No sessions in your plan yet.</div>';
+    return;
+  }
+
+  grid.innerHTML = pool.map(item => {
+    const icon = PLANNER_ICONS[item.key] || "🏋";
+    return `
+      <div class="planner-slot-card ${item.done ? 'done' : ''}" data-slot-key="${item.key}" onclick="selectPlannerSlot('${item.key}')">
+        <span class="planner-slot-icon">${icon}</span>
+        <strong class="planner-slot-name">${item.label}</strong>
+        <span class="planner-slot-status">${item.done ? '✅ Done — tap to redo' : 'Tap to start'}</span>
+      </div>
+    `;
+  }).join("");
+}
+
+async function refreshPlanner() {
+  try {
+    const data = await apiFetch("/api/workouts/weekly-plan/refresh", { method: "POST" });
+    plannerData = data.plan;
+    renderPlannerPool();
+    showToast("✅ Plan regenerated");
+  } catch (err) {
+    console.error("Failed to refresh weekly plan:", err);
+    showToast("Couldn't regenerate your plan — try again.");
+  }
+}
+
+async function selectPlannerSlot(slotKey) {
+  try {
+    const data = await apiFetch("/api/workouts/weekly-plan/select", {
+      method: "POST",
+      body: JSON.stringify({ slot_key: slotKey }),
+    });
+    plannerData = data.plan;
+    renderPlannerPool();
+
+    if (!data.exercises || !data.exercises.length) {
+      showToast("No exercises available for this session.");
+      return;
+    }
+
+    // Jump into the Coach tab's live camera + docked-chat session, pre-loaded
+    // with this session's exercises, replacing the normal chat view.
+    switchTab("chat");
+    window.fitCoachGhostTrainer?.startWithExercises(data.exercises, data.slot?.label || "Workout", slotKey);
+  } catch (err) {
+    console.error("Failed to select planner slot:", err);
+    showToast("Couldn't start that session — try again.");
+  }
 }
 
 // ── PROGRESS ──────────────────────────────────────────────────────────

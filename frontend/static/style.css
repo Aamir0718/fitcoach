@@ -569,9 +569,10 @@ input[type="range"]{width:100%;accent-color:var(--purple);height:6px;border-radi
 .ob-next-btn{width:100%}
 .ob-error{color:#fca5a5;font-size:13px;text-align:center;margin-top:8px}
 
-/* APP LAYOUT */
+/* APP LAYOUT — fixed viewport shell; sidebar and per-tab content each scroll
+   independently within it instead of the whole page scrolling together. */
 #app-screen{display:none}
-#app-screen.active{display:flex;width:100%;min-height:100vh}
+#app-screen.active{display:flex;width:100%;height:100vh;overflow:hidden}
 .sidebar{width:240px;min-width:240px;position:sticky;top:0;height:100vh;overflow-y:auto;overflow-x:hidden;padding:12px 12px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column}
 .sidebar::-webkit-scrollbar{width:4px}
 .sidebar::-webkit-scrollbar-track{background:transparent}
@@ -586,11 +587,11 @@ input[type="range"]{width:100%;accent-color:var(--purple);height:6px;border-radi
 .nav-logout{background:transparent;border:1px solid rgba(239,68,68,.3);border-radius:var(--radius-sm);padding:10px;color:var(--red);cursor:pointer;font-size:13px;transition:all .2s}
 .nav-logout:hover{background:rgba(239,68,68,.1)}
 .bottom-nav{display:none}
-.tab-content{display:none;flex:1;min-width:0}
-.tab-content.active{display:flex;flex-direction:column}
+.tab-content{display:none;flex:1;min-width:0;min-height:0}
+.tab-content.active{display:flex;flex-direction:column;height:100%;overflow-y:auto}
 
 /* CHAT - Premium Minimal Design */
-.chat-shell{display:flex;flex-direction:column;min-height:100vh;background:#0a0a0f}
+.chat-shell{display:flex;flex-direction:column;height:100%;min-height:0;background:#0a0a0f}
 .chat-shell{position:relative;background:
   radial-gradient(circle at 50% 0%,rgba(var(--rgb-primary),.08),transparent 40%),
   linear-gradient(180deg,#0a0a0f 0%,#0d0d12 100%)}
@@ -618,7 +619,7 @@ input[type="range"]{width:100%;accent-color:var(--purple);height:6px;border-radi
 .mode-pill.active{background:linear-gradient(135deg,var(--purple),#2563eb);border-color:transparent;box-shadow:0 0 20px rgba(var(--rgb-primary),.25)}
 
 /* Messages - Clean chat focus */
-.chat-box{flex:1;overflow-y:auto;padding:40px 24px;display:flex;flex-direction:column;gap:20px;scroll-behavior:smooth}
+.chat-box{flex:1;min-height:0;overflow-y:auto;padding:40px 24px;display:flex;flex-direction:column;gap:20px;scroll-behavior:smooth}
 .chat-box::-webkit-scrollbar{width:6px}
 .chat-box::-webkit-scrollbar-track{background:transparent}
 .chat-box::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}
@@ -795,6 +796,11 @@ input[type="range"]{width:100%;accent-color:var(--purple);height:6px;border-radi
 .fb-easy:hover{background:var(--green);color:#fff}
 .fb-hard{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:var(--red)}
 .fb-hard:hover{background:var(--red);color:#fff}
+
+/* Inline quick-reply options attached under a specific chat message (e.g. the
+   "start" button after a workout-related reply) — was completely unstyled
+   before, which let it render at whatever default position the browser chose. */
+.coach-option-panel{display:flex;flex-wrap:wrap;gap:8px;align-self:flex-start;max-width:70%}
 
 /* Quick actions - minimal */
 .quick-actions{display:flex;flex-wrap:wrap;gap:8px;padding:12px 24px;background:rgba(10,10,15,.6);border-top:1px solid rgba(255,255,255,.04);flex-shrink:0}
@@ -5643,26 +5649,543 @@ html[data-theme="ice"] .vo-adaptive-list strong{color:#0f172a}
 }
 
 /* ============================================================
-   GHOST TRAINER — 3-COLUMN WORKSPACE LAYOUT
+   GHOST TRAINER — LIVE SESSION (camera + exercise + queue + chat)
+   These classes were referenced in the HTML/JS but had no styling at
+   all until now — that's what was rendering as unstyled raw buttons
+   and a borderless camera area.
+   ============================================================ */
+.ghost-workout-container {
+  width: 100%;
+  max-width: 1900px;
+  margin: 0 auto;
+  padding: 24px 32px 32px;
+  box-sizing: border-box;
+  min-height: calc(100vh - 24px);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Column 1 — camera stage. Fills the full stretched column height (see
+   .ghost-workout-layout below) instead of being capped by aspect-ratio, so it
+   actually dominates the screen the way a live camera view should — object-fit:
+   cover on the video keeps it undistorted at any resulting box shape. */
+.ghost-stage {
+  position: relative;
+  width: 100%;
+  flex: 1;
+  min-height: 460px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #05060c;
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+.ghost-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.ghost-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.ghost-scan-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(139, 92, 246, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 92, 246, 0.06) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+}
+
+.ghost-idle-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 24px;
+  background: rgba(5, 6, 12, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.ghost-idle-overlay h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.ghost-idle-overlay p {
+  font-size: 0.85rem;
+  color: var(--muted);
+  max-width: 320px;
+  margin: 0;
+}
+
+.ghost-orbit {
+  font-size: 2.2rem;
+  color: var(--purple);
+  animation: ghost-orbit-spin 2.2s linear infinite;
+}
+
+@keyframes ghost-orbit-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.ghost-live-cue {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(7, 7, 15, 0.85);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fbbf24;
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  max-width: calc(100% - 32px);
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.ghost-live-cue.good {
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #34d399;
+}
+
+/* Column 2 — exercise info */
+.gwh-progress {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.gwh-title {
+  font-size: clamp(1.6rem, 2.2vw, 2.1rem);
+  font-weight: 800;
+  color: var(--text);
+  margin: 0 0 4px;
+}
+
+.gsm-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  display: block;
+}
+
+.ghost-center-stat-box strong {
+  font-size: clamp(1.3rem, 1.6vw, 1.6rem);
+  font-weight: 800;
+  color: var(--text);
+  margin-top: 4px;
+}
+
+.ghost-center-stat-box small {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.gsm-rep-box {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.gsm-rep-box strong,
+.gsm-rep-box small {
+  margin-top: 0;
+}
+
+.ghost-workout-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.ghost-next-btn,
+.ghost-finish-btn {
+  flex: 1;
+  padding: 14px 20px;
+  border-radius: 12px;
+  border: none;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: 0.01em;
+}
+
+.ghost-next-btn {
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  color: #fff;
+}
+
+.ghost-next-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4);
+}
+
+.ghost-finish-btn {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.ghost-finish-btn:hover {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+/* Column 3 — workout queue */
+.ghost-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.ghost-queue-progress {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--purple);
+  white-space: nowrap;
+}
+
+/* Thin progress bar under the "Workout Queue" header — gives the panel an
+   at-a-glance sense of completion instead of just a count in text. */
+.ghost-queue-progress-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--card2);
+  overflow: hidden;
+}
+
+.ghost-queue-progress-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #8b5cf6, #6366f1);
+  transition: width 0.4s ease;
+}
+
+/* Live indicator dot next to "AI Coach" */
+.ghost-live-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #34d399;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ghost-live-dot i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.22);
+  animation: ghost-live-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes ghost-live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* Live-stats strip pinned under the AI Coach header — always shows the real
+   exercise/reps/accuracy the coach is actually seeing, so the panel never
+   just sits empty above the chat, and the chat's own claims about form can
+   be checked against real numbers instead of taken on faith. */
+.ghost-chat-livebar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 12px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.gclb-exercise {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.gclb-sep {
+  opacity: 0.5;
+}
+
+/* ============================================================
+   GHOST TRAINER — 4-COLUMN WORKSPACE LAYOUT (camera / info / queue / chat)
+   minmax() so columns actually claim real available width instead of
+   collapsing to a cramped fixed-feeling size on wide desktop screens.
    ============================================================ */
 .ghost-workout-layout {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 0.8fr;
-  gap: 24px;
-  align-items: start;
+  grid-template-columns:
+    minmax(380px, 1.3fr)
+    minmax(320px, 1fr)
+    minmax(260px, 0.8fr)
+    minmax(300px, 1fr);
+  gap: 28px;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+}
+
+@media (max-width: 1280px) {
+  .ghost-workout-layout {
+    grid-template-columns: 1.1fr 0.9fr 0.7fr;
+  }
+  .ghost-column-chat { grid-column: 1 / -1; }
 }
 
 @media (max-width: 1024px) {
+  .ghost-workout-container {
+    min-height: auto;
+    display: block;
+  }
   .ghost-workout-layout {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 20px;
+  }
+  .ghost-column-chat { grid-column: auto; }
+}
+
+@media (max-width: 720px) {
+  .ghost-workout-container {
+    padding: 14px 12px 24px;
+  }
+  .ghost-stage {
+    flex: none;
+    min-height: 0;
+    aspect-ratio: 1 / 1;
+    border-radius: 12px;
+  }
+  .gwh-title {
+    font-size: 1.4rem;
+  }
+  .ghost-center-stats {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .ghost-center-stat-box {
+    padding: 10px 6px;
+  }
+  .ghost-center-stat-box strong {
+    font-size: 1.1rem;
+  }
+  .ghost-workout-actions {
+    flex-direction: column;
+  }
+  .ghost-next-btn, .ghost-finish-btn {
+    padding: 14px;
+  }
+  .ghost-column-chat {
+    min-height: 260px;
+    max-height: 50vh;
+  }
+  .ghost-chat-box {
+    max-height: none;
   }
 }
 
-.ghost-column-left, .ghost-column-center, .ghost-column-right {
+.ghost-column-left, .ghost-column-center, .ghost-column-right, .ghost-column-chat {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Shared card wrapper for the queue and chat columns — without this they
+   were bare text floating directly on the page background with nothing to
+   contain them, which is what read as "incomplete" next to the bordered
+   camera stage. Filling the whole column also removes the large dead gap
+   below short content, since the card's background now occupies that space.
+   Named .ghost-side-panel (not .ghost-panel) — that name is already used by
+   an unrelated older exercise-picker component with its own responsive
+   rules further up this file, which would otherwise silently apply here
+   too on narrower screens. */
+.ghost-side-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px 20px 20px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Center/right columns aren't meant to stretch every child — pin the trailing
+   element (buttons / timer) to the bottom of the stretched column instead of
+   leaving it stranded right under the content with a dead gap below it. */
+.ghost-workout-actions {
+  margin-top: auto;
+}
+
+.ghost-column-right .ghost-queue-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+@media (max-width: 1024px) {
+  .ghost-column-left, .ghost-column-center, .ghost-column-right, .ghost-column-chat {
+    height: auto;
+  }
+}
+
+.ghost-column-chat {
+  min-height: 320px;
+}
+
+/* No max-height here on purpose — this box lives inside .ghost-chat-panel,
+   which is already flex:1 stretched to match the camera column's real
+   height via CSS grid (align-items: stretch). A viewport-relative cap here
+   used to end up shorter than that real height once the header/live-stats
+   bar were added above it, leaving a visible dead strip of panel background
+   under the input row. flex: 1 + min-height: 0 already bounds it correctly
+   and overflow-y still scrolls once messages actually fill it. */
+.ghost-chat-box {
+  flex: 1;
+  min-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 2px;
+}
+
+.ghost-chat-box .gcm {
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  max-width: 92%;
+  word-wrap: break-word;
+}
+
+.ghost-chat-box .gcm.user {
+  align-self: flex-end;
+  background: var(--purple);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.ghost-chat-box .gcm.bot {
+  align-self: flex-start;
+  background: var(--card2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+
+/* Quick-reply chips shown under the welcome message — gives the chat panel
+   useful content (and something to click) instead of one message sitting
+   over a wall of empty space until the user types something themselves. */
+.ghost-chat-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 0 4px;
+  flex-shrink: 0;
+}
+
+.ghost-chip {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 7px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s;
+}
+
+.ghost-chip:hover {
+  background: rgba(139, 92, 246, 0.16);
+  border-color: rgba(139, 92, 246, 0.4);
+  color: var(--text);
+  transform: translateY(-1px);
+}
+
+.ghost-chat-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.ghost-chat-input-row input {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--card2);
+  color: var(--text);
+  font-size: 13.5px;
+}
+
+.ghost-chat-send-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: var(--purple);
+  color: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 14px;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.ghost-chat-send-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
 }
 
 /* Category cards selections */
@@ -5683,43 +6206,110 @@ html[data-theme="ice"] .vo-adaptive-list strong{color:#0f172a}
 .ghost-queue-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-top: 14px;
+  gap: 4px;
+  margin-top: 10px;
 }
 
+.ghost-queue-section-header {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--dim);
+  margin: 16px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ghost-queue-section-header:first-child {
+  margin-top: 0;
+}
+
+/* Each row now reads as a real list item — a background chip instead of
+   bare icon + text floating on nothing — with a rep-target badge on the
+   right so rows aren't left half-empty. */
 .ghost-queue-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   font-size: 13.5px;
-  transition: opacity 0.15s;
+  padding: 9px 10px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
 }
 
 .ghost-queue-item.upcoming {
-  opacity: 0.45;
-  color: #64748b;
+  opacity: 0.55;
+  color: var(--muted);
 }
 
 .ghost-queue-item.active {
-  color: #fff;
+  color: var(--text);
   font-weight: 700;
+  background: rgba(139, 92, 246, 0.1);
+  border-color: rgba(139, 92, 246, 0.28);
 }
 
 .ghost-queue-item.completed {
-  color: #10b981;
+  color: var(--muted);
+}
+
+.ghost-queue-item.completed .gqi-name {
+  text-decoration: line-through;
+  text-decoration-color: rgba(148, 163, 184, 0.4);
 }
 
 .gqi-icon {
-  font-size: 14px;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
   font-weight: 800;
+  background: var(--card2);
+  border: 1px solid var(--border);
+  color: var(--muted);
 }
 
 .gqi-icon.checkmark {
-  color: #10b981;
+  color: #fff;
+  background: #10b981;
+  border-color: #10b981;
+  font-size: 11px;
 }
 
 .gqi-icon.active-indicator {
-  color: #a78bfa;
+  color: #fff;
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  border-color: transparent;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.18);
+}
+
+.gqi-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gqi-reps {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--card2);
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.ghost-queue-item.active .gqi-reps {
+  color: #c4b5fd;
+  background: rgba(139, 92, 246, 0.18);
 }
 
 /* Center stats and actions */
@@ -5734,7 +6324,7 @@ html[data-theme="ice"] .vo-adaptive-list strong{color:#0f172a}
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.04);
   border-radius: 12px;
-  padding: 12px;
+  padding: 18px 14px;
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -5745,24 +6335,25 @@ html[data-theme="ice"] .vo-adaptive-list strong{color:#0f172a}
   background: rgba(255, 255, 255, 0.015);
   border: 1px solid rgba(255, 255, 255, 0.04);
   border-radius: 12px;
-  padding: 16px;
+  padding: 18px 20px;
   margin-bottom: 20px;
 }
 
 .ghost-instructions-box p {
-  font-size: 13.5px;
+  font-size: 14.5px;
   color: #94a3b8;
-  line-height: 1.6;
+  line-height: 1.65;
   margin: 0;
 }
 
 .ghost-workout-timer-card {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: var(--card2);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 16px;
-  margin-top: 24px;
+  margin-top: auto;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .ghost-primary-btn:disabled {
@@ -5800,6 +6391,75 @@ html[data-theme="ice"] .vo-adaptive-list strong{color:#0f172a}
     box-shadow:0 4px 14px rgba(var(--rgb-primary),.28);
   }
   .bnav-btn:active span{transform:scale(.9)}
+}
+
+/* ============================================================
+   GLOBAL VOICE WAKE-WORD — "Hey FitCoach" floating pill, works from any tab
+   ============================================================ */
+.wake-word-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 24px;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px 12px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.35);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.wake-word-fab:hover {
+  transform: translateY(-2px);
+}
+
+.wake-word-fab .wwf-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.wake-word-fab.active {
+  border-color: rgba(124, 58, 237, 0.5);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.22), rgba(99, 102, 241, 0.14));
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.14), 0 12px 34px rgba(0, 0, 0, 0.35);
+}
+
+.wake-word-fab.active .wwf-icon {
+  animation: wake-word-pulse 1.6s ease-in-out infinite;
+}
+
+.wake-word-fab.listening-cmd {
+  border-color: rgba(16, 185, 129, 0.55);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.22), rgba(16, 185, 129, 0.1));
+}
+
+@keyframes wake-word-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.18); opacity: 0.65; }
+}
+
+/* Browser has no SpeechRecognition support — hide rather than offer a dead button. */
+.wake-word-fab.unsupported {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .wake-word-fab {
+    bottom: calc(76px + env(safe-area-inset-bottom));
+    right: 14px;
+    padding: 11px 14px;
+  }
+  .wake-word-fab .wwf-status {
+    display: none;
+  }
 }
 
 /* Profile: logout button (shown on every screen size; lives in Profile) */
@@ -6830,6 +7490,112 @@ html[data-theme="ice"] .vo-adaptive-list strong{color:#0f172a}
   padding: 40px;
   color: #64748b;
   font-size: 1rem;
+}
+
+/* ── WEEKLY PLANNER TAB ── */
+.planner-shell {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.planner-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.planner-progress-track {
+  max-width: 360px;
+  margin: 16px auto 0;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  overflow: hidden;
+}
+
+.planner-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--purple), var(--theme-secondary, #60a5fa));
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.planner-refresh-btn {
+  margin-top: 16px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card2);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.planner-refresh-btn:hover {
+  border-color: var(--purple);
+  background: rgba(139, 92, 246, 0.1);
+}
+
+.planner-pool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.planner-slot-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  text-align: center;
+}
+
+.planner-slot-card:hover {
+  background: rgba(255, 255, 255, 0.045);
+  border-color: rgba(139, 92, 246, 0.3);
+  transform: translateY(-4px);
+}
+
+.planner-slot-card.done {
+  border-color: rgba(16, 185, 129, 0.35);
+  background: rgba(16, 185, 129, 0.06);
+}
+
+.planner-slot-icon { font-size: 2.2rem; }
+
+.planner-slot-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.planner-slot-status {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+
+.planner-slot-card.done .planner-slot-status { color: #10b981; }
+
+.planner-hint {
+  margin-top: 24px;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.9rem;
+  max-width: 560px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* ── GHOST SINGLE EXERCISE SELECTOR CARD LAYOUT ── */
