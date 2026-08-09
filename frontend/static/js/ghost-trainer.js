@@ -168,6 +168,7 @@ async function startWithExercises(exercises, label, slotKey) {
 
   els.chatModeShell?.classList.add("hidden");
   els.workoutContainer?.classList.remove("hidden");
+  setViewMode("cam"); // always start a fresh session on the camera view
 
   state.currentExerciseIndex = 0;
   state.currentSet = 1;
@@ -195,6 +196,7 @@ function loadCurrentWorkoutExercise() {
   state.stabilityScore = 100;
   state.personDetected = false;
   state.accHistory = [];
+  logSets = []; // reseed the manual set tracker for the new exercise
 
   if (els.workoutProgress) {
     els.workoutProgress.textContent = `Exercise ${state.currentExerciseIndex + 1} / ${state.selectedExercises.length}`;
@@ -222,6 +224,7 @@ function loadCurrentWorkoutExercise() {
   if (els.brief) els.brief.textContent = activeEx.trainer_tip || briefFor(state.exercise);
 
   renderWorkoutQueue();
+  if (document.getElementById("ghost-workout-layout")?.dataset.ghostMode === "log") renderLogSets();
 }
 
 function renderWorkoutQueue() {
@@ -909,7 +912,74 @@ function getScoreState(value) {
   return SCORE_STATES.find((item) => value >= item.min) || SCORE_STATES[SCORE_STATES.length - 1];
 }
 
-window.fitCoachGhostTrainer = { startWithExercises, stop, sendChat };
+// ── Log Sets / Form Camera view switch ───────────────────────────────────
+// Purely a local view toggle — the camera keeps running underneath either
+// way (pose tracking doesn't pause), this just swaps what's shown in the
+// left column and doesn't touch the rep/accuracy pipeline.
+function setViewMode(mode) {
+  const layout = document.getElementById("ghost-workout-layout");
+  if (!layout) return;
+  layout.dataset.ghostMode = mode;
+  document.querySelectorAll("[data-ghost-view]").forEach((el) => {
+    el.classList.toggle("hidden", el.dataset.ghostView !== mode);
+  });
+  document.querySelectorAll("#ghost-mode-switch .wm-mode-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.ghostMode === mode);
+  });
+  if (mode === "log") renderLogSets();
+}
+
+// Local-only set tracker for Log Sets mode: weight/reps you type in plus a
+// done toggle, seeded from the current exercise's target reps. This is not
+// a second source of truth for reps/accuracy — that's still the camera's
+// job — it's just the manual-logging view the redesign's spec calls for.
+let logSets = [];
+
+function renderLogSets() {
+  const activeEx = state.selectedExercises[state.currentExerciseIndex];
+  const nameEl = document.getElementById("ghost-log-exercise");
+  if (nameEl) nameEl.textContent = activeEx?.name || "—";
+
+  if (!logSets.length) {
+    logSets = [1, 2, 3].map((n) => ({ n, kg: "", reps: state.targetReps || "", done: false }));
+  }
+  paintLogSets();
+}
+
+function paintLogSets() {
+  const rows = document.getElementById("ghost-log-rows");
+  if (!rows) return;
+  rows.innerHTML = logSets.map((s, i) => `
+    <div class="wlp-row">
+      <span class="wlp-set-n">${s.n}</span>
+      <input type="number" inputmode="decimal" class="wlp-input" placeholder="0" value="${s.kg}" onchange="window.fitCoachGhostTrainer?.updateLogSet(${i},'kg',this.value)"/>
+      <input type="number" inputmode="numeric" class="wlp-input" placeholder="0" value="${s.reps}" onchange="window.fitCoachGhostTrainer?.updateLogSet(${i},'reps',this.value)"/>
+      <button type="button" class="wlp-check ${s.done ? "done" : ""}" onclick="window.fitCoachGhostTrainer?.toggleLogSet(${i})">✔</button>
+    </div>
+  `).join("");
+}
+
+function updateLogSet(i, field, value) {
+  if (!logSets[i]) return;
+  logSets[i][field] = value;
+}
+
+function toggleLogSet(i) {
+  if (!logSets[i]) return;
+  logSets[i].done = !logSets[i].done;
+  paintLogSets();
+}
+
+function addLogSet() {
+  const last = logSets[logSets.length - 1];
+  logSets.push({ n: logSets.length + 1, kg: last?.kg || "", reps: last?.reps || "", done: false });
+  paintLogSets();
+}
+
+window.fitCoachGhostTrainer = {
+  startWithExercises, stop, sendChat,
+  setViewMode, addLogSet, updateLogSet, toggleLogSet,
+};
 
 window.addEventListener("beforeunload", stop);
 })();

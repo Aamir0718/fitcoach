@@ -1484,6 +1484,11 @@ function handleResponse(data) {
     if (exercises.length && window.fitCoachGhostTrainer) {
       if (data.reply) addMessage(cleanDisplayText(data.reply), "bot");
       scrollToBottom();
+      // The workout overlay lives inside #tab-chat, so it stays invisible
+      // (display:none via .tab-content) unless we're actually on that tab —
+      // this handler fires from anywhere a message can be sent (e.g. Home's
+      // "Start Workout" button), so make sure we're there first.
+      switchTab("chat");
       window.fitCoachGhostTrainer.startWithExercises(exercises, data.muscle_group || "Workout", data.slot_key || null);
       return;
     }
