@@ -320,9 +320,9 @@
     <div class="visual-os-shell">
       <header class="visual-os-hero">
         <div>
-          <span class="vo-eyebrow">Appearance</span>
-          <h1>Themes</h1>
-          <p>Pick a theme. It restyles the whole app — colors, cards, glows, and rings.</p>
+          <span class="eyebrow">Appearance</span>
+          <h1 class="tab-title">Themes</h1>
+          <p class="tab-subtitle">Pick a theme — the swatches below show each one's palette.</p>
         </div>
         <button class="vo-auto-toggle theme-auto-btn" id="theme-auto-btn" type="button" onclick="toggleAutoTheme()" aria-pressed="false">
           <span>Auto theme</span>
@@ -360,11 +360,11 @@
 
       <section class="visual-os-settings-grid">
         <article class="vo-settings-card">
-          <span>Atmosphere Controls</span>
-          <h2>Motion, glow, and particle feel</h2>
-          <label><b>Motion intensity</b><input type="range" min="0" max="100" value="62"/></label>
-          <label><b>Glow intensity</b><input type="range" min="0" max="100" value="78"/></label>
-          <label><b>Particle density</b><input type="range" min="0" max="100" value="44"/></label>
+          <span>Atmosphere</span>
+          <h2>Motion, contrast, haptics</h2>
+          <label><b>Motion</b><input type="range" min="0" max="100" value="62"/></label>
+          <label><b>Contrast</b><input type="range" min="0" max="100" value="78"/></label>
+          <label><b>Haptics</b><input type="range" min="0" max="100" value="44"/></label>
         </article>
         <article class="vo-settings-card">
           <span>Layout</span>
@@ -1082,8 +1082,6 @@
   <!-- ===== CALORIES TAB ===== -->
   <div id="tab-calories" class="tab-content">
     <div class="calories-shell">
-      <h2 class="tab-title">🥗 Calorie Counter</h2>
-      <p class="tab-subtitle">Type what you ate, or upload a photo.</p>
       <section class="nutrition-lab-hero">
         <div>
           <div class="cockpit-kicker">Nutrition</div>
