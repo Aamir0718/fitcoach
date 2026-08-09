@@ -60,3 +60,22 @@ class OTPCode(Base):
     __table_args__ = (
         Index("idx_otp_email_purpose", "email", "purpose"),
     )
+
+
+class PasswordResetToken(Base):
+    """Short-lived, single-use token issued only after a 'reset' OTP has been
+    verified. reset-password must present the raw token here — this is what
+    actually proves OTP possession; without it anyone who knows an email could
+    reset the password outright."""
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("idx_reset_tokens_email", "email"),
+    )

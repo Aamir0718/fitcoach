@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 
 from app.database import get_db
-from app.models.auth import Auth, OTPCode, RefreshToken
+from app.models.auth import Auth, OTPCode, RefreshToken, PasswordResetToken
 from app.models.profile import Profile
 from sqlalchemy.orm import selectinload
 from app.schemas.auth import (
@@ -14,7 +14,7 @@ from app.schemas.auth import (
 from app.core.security import (
     hash_password, verify_password, needs_rehash, generate_otp, hash_otp, verify_otp,
     create_access_token, generate_refresh_token, hash_refresh_token,
-    refresh_token_expires,
+    refresh_token_expires, generate_reset_token, hash_reset_token,
 )
 from app.core.email import send_otp_email
 from app.config import settings
@@ -143,12 +143,16 @@ async def send_otp(body: SendOTPRequest, db: AsyncSession = Depends(get_db)):
     await db.commit()
     delivered = await send_otp_email(body.email, otp, body.purpose)
 
-    # Always log OTP — readable from Render dashboard logs
-    print(f"[OTP] {body.email} | purpose={body.purpose} | code={otp} | delivered={delivered}")
+    # The code itself must never appear in a response or a log in production —
+    # this endpoint is unauthenticated, so anyone who can call it with a target's
+    # email would otherwise be able to read back (or log-scrape) their OTP and
+    # skip proving inbox access entirely. Dev/staging keep the fallback for
+    # local testing without email credentials configured.
+    if settings.is_production:
+        print(f"[OTP] {body.email} | purpose={body.purpose} | delivered={delivered}")
+        return {"message": "OTP sent", "email_delivered": delivered}
 
-    # Return OTP in response so the app can display it as a fallback when email fails.
-    # This is intentional — the user is already authenticated to request this code,
-    # and showing it on-screen is safer than not being able to log in at all.
+    print(f"[OTP] {body.email} | purpose={body.purpose} | code={otp} | delivered={delivered}")
     return {"message": "OTP sent", "otp_fallback": otp, "email_delivered": delivered}
 
 
@@ -188,10 +192,17 @@ async def verify_otp_route(body: VerifyOTPRequest, db: AsyncSession = Depends(ge
         return {"message": "Email verified"}
 
     if body.purpose == "reset":
-        # Return a short-lived reset token
-        from app.core.security import generate_reset_token, hash_reset_token
+        # Issue a short-lived, single-use, hashed token bound to this email.
+        # reset-password requires this exact token — it's what proves the
+        # caller actually verified the OTP, since that endpoint never sees
+        # the OTP itself.
         token = generate_reset_token()
-        # Store hashed in DB or memory cache (simplified: return directly, verified by OTP)
+        db.add(PasswordResetToken(
+            email=body.email,
+            token_hash=hash_reset_token(token),
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=15),
+        ))
+        await db.commit()
         return {"message": "OTP verified", "reset_token": token, "email": body.email}
 
     if body.purpose == "login":
@@ -233,20 +244,42 @@ async def otp_login(body: OTPSendRequest, db: AsyncSession = Depends(get_db)):
     ))
     await db.commit()
     delivered = await send_otp_email(body.email, otp, "login")
+
+    if settings.is_production:
+        print(f"[OTP] {body.email} | purpose=login | delivered={delivered}")
+        return {"message": "OTP sent to your email", "email_delivered": delivered}
+
     print(f"[OTP] {body.email} | purpose=login | code={otp} | delivered={delivered}")
     return {"message": "OTP sent to your email", "otp_fallback": otp, "email_delivered": delivered}
 
 
 @router.post("/reset-password")
 async def reset_password(body: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+    if not _check_rate(f"reset-password:{body.email}", 10, 3600):
+        raise HTTPException(status_code=429, detail="Too many attempts. Try again later.")
+
+    token_hash = hash_reset_token(body.reset_token)
+    result = await db.execute(
+        select(PasswordResetToken).where(
+            PasswordResetToken.email == body.email,
+            PasswordResetToken.token_hash == token_hash,
+            PasswordResetToken.used == False,
+            PasswordResetToken.expires_at > datetime.now(timezone.utc),
+        )
+    )
+    reset_record = result.scalar_one_or_none()
+    if not reset_record:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token. Request a new code.")
+
     result = await db.execute(select(Auth).where(Auth.email == body.email, Auth.is_active == True))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    # Token was already validated via verify-otp — here we trust it (stateless reset)
-    # In production: validate the reset_token against a Redis store with TTL
+    reset_record.used = True
     user.password_hash = hash_password(body.new_password)
+    # Password reset invalidates every existing session — force re-login everywhere.
+    await db.execute(delete(RefreshToken).where(RefreshToken.user_id == user.id))
     await db.commit()
     return {"message": "Password reset successfully"}
 

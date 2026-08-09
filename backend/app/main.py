@@ -73,6 +73,10 @@ async def global_exception_handler(request: Request, exc: Exception):
     import traceback
     tb = traceback.format_exc()
     print(f"[500 ERROR] {request.method} {request.url}\n{tb}")
+    if settings.is_production:
+        # Never leak stack traces / exception internals to clients in prod —
+        # Sentry (initialized above) already has the full trace.
+        return JSONResponse(status_code=500, content={"ok": False, "error": "Internal server error"})
     return JSONResponse(
         status_code=500,
         content={"ok": False, "error": str(exc), "detail": tb[-500:]},
