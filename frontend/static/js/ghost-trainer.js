@@ -452,7 +452,7 @@ function nextExercise() {
 }
 
 async function finishWorkout() {
-  await saveWorkoutSession();
+  const saved = await saveWorkoutSession();
   stop();
 
   state.selectedExercises = [];
@@ -461,12 +461,17 @@ async function finishWorkout() {
   state.currentSet = 1;
 
   if (typeof window.showToast === "function") {
-    window.showToast("🎉 Workout logged successfully!");
+    // Used to fire unconditionally regardless of whether the save actually
+    // succeeded — apiFetch() does throw and toast on a server error, but
+    // this toast fired right after it anyway, claiming success either way.
+    window.showToast(saved ? "🎉 Workout logged successfully!" : "⚠️ Workout finished, but saving it failed — it won't show up in your history.");
   }
 }
 
+// Returns true only if the workout actually got saved — callers should not
+// assume success just because this didn't throw.
 async function saveWorkoutSession() {
-  if (!state.selectedExercises.length) return;
+  if (!state.selectedExercises.length) return false;
 
   const elapsedSeconds = state.elapsed;
   const durationMinutes = Math.max(1, Math.round(elapsedSeconds / 60));
@@ -492,6 +497,8 @@ async function saveWorkoutSession() {
 
   try {
     if (typeof window.apiFetch === "function") {
+      // apiFetch() throws on non-2xx (and toasts for 401/429/500+ itself),
+      // so reaching the line after it is the actual success signal.
       await window.apiFetch("/api/workouts/log", {
         method: "POST",
         body: JSON.stringify(payload)
@@ -499,8 +506,9 @@ async function saveWorkoutSession() {
       if (typeof window.loadProgress === "function") {
         window.loadProgress();
       }
+      return true;
     } else {
-      await fetch(`${window.API || ""}/api/workouts/log`, {
+      const res = await fetch(`${window.API || ""}/api/workouts/log`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -508,9 +516,15 @@ async function saveWorkoutSession() {
         },
         body: JSON.stringify(payload)
       });
+      if (!res.ok) {
+        console.error("Failed to log ghost workout:", res.status, await res.text().catch(() => ""));
+        return false;
+      }
+      return true;
     }
   } catch (err) {
     console.error("Failed to log ghost workout:", err);
+    return false;
   }
 }
 

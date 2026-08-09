@@ -3,6 +3,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func as sqlfunc, desc
 from datetime import date, timedelta
 import random
+import re
+
+
+def _safe_int(value) -> int:
+    """Coerce a set's reps/weight to an int, no matter what shape it arrives
+    in. The ghost-trainer session logs sets as {reps: ex.reps, weight: 0}
+    where ex.reps is a raw string like "12", "3x12" or "30s" (whatever the
+    plan's rep scheme says) — `total_reps += "12"` crashes with a
+    TypeError *before* the workout row is ever inserted, so the request
+    500s and nothing gets saved, silently, since the frontend never checks
+    the response status on this call."""
+    if value is None:
+        return 0
+    if isinstance(value, (int, float)):
+        return int(value)
+    match = re.search(r"\d+", str(value))
+    return int(match.group()) if match else 0
 
 from app.database import get_db
 from app.models.auth import Auth
@@ -126,8 +143,7 @@ async def log_workout(
             if exercise.get("sets"):
                 total_sets += len(exercise["sets"])
                 for set_data in exercise["sets"]:
-                    if set_data.get("reps"):
-                        total_reps += set_data["reps"]
+                    total_reps += _safe_int(set_data.get("reps"))
     
     # Estimate calories: ~5-8 calories per minute based on intensity
     if body.duration:
@@ -163,15 +179,19 @@ async def log_workout(
             exercise_name = exercise.get("name")
             if exercise.get("sets"):
                 for set_data in exercise["sets"]:
-                    weight = set_data.get("weight_kg")
-                    reps = set_data.get("reps")
+                    # Accept both keys — the ghost-trainer session sends
+                    # "weight" (see saveWorkoutSession() in ghost-trainer.js),
+                    # not "weight_kg", so that lookup was always silently 0.
+                    weight = set_data.get("weight_kg", set_data.get("weight"))
+                    reps = _safe_int(set_data.get("reps"))
+                    weight = _safe_int(weight) if not isinstance(weight, (int, float)) else weight
                     if weight or reps:
                         await check_personal_records(
-                            current_user.id, 
-                            exercise_name, 
-                            weight or 0, 
-                            reps or 0, 
-                            log_date, 
+                            current_user.id,
+                            exercise_name,
+                            weight or 0,
+                            reps or 0,
+                            log_date,
                             db
                         )
     
