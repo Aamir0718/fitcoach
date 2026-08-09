@@ -270,15 +270,63 @@ async function loadHomeProgressAndWorkout() {
     renderSidebarWeekStrip(weeklyActivity);
 
     const today = data.today_workout;
-    setTxt('home-workout-type', today?.name || 'No workout planned');
-    setTxt('home-workout-duration', today ? `${today.duration || 0} min` : '-- min');
-    setTxt('home-workout-exercises', today ? `${today.exercises || 0} exercises` : '-- exercises');
+    if (today) {
+      // Already completed something today — that's more relevant than the plan.
+      setTxt('home-workout-type', today.name || 'Workout');
+      setTxt('home-workout-duration', `${today.duration || 0} min`);
+      setTxt('home-workout-exercises', `${today.exercises || 0} exercises`);
+    } else {
+      // today_workout is only ever a *completed* workout dated today — it
+      // being empty just means you haven't finished one yet, not that
+      // nothing is planned. Show the next undone session from the real
+      // weekly plan instead of flatly claiming "No workout planned".
+      await loadNextPlannedWorkout();
+    }
   } catch (error) {
     console.error('Failed to load progress dashboard:', error);
     setTxt('hero-streak', '0');
     setTxt('home-streak-display', '0');
     setTxt('home-workouts-display', '0');
     setTxt('sidebar-streak-value', '--');
+    setTxt('home-workout-type', 'No workout planned');
+    setTxt('home-workout-duration', '-- min');
+    setTxt('home-workout-exercises', '-- exercises');
+  }
+}
+
+// Fills the hero title with the next undone session from the real weekly
+// plan pool (GET /api/workouts/weekly-plan) — used whenever today_workout
+// is empty, i.e. you haven't completed anything yet today. The pool has no
+// duration/exercise-count until a session is actually started (those get
+// generated on selection), so this shows an honest "ready to start" state
+// rather than fabricating numbers.
+async function loadNextPlannedWorkout() {
+  try {
+    const response = await fetch(`${API}/api/workouts/weekly-plan`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    const pool = data.plan?.pool || [];
+    const next = pool.find(item => !item.done);
+
+    if (next) {
+      setTxt('home-workout-type', next.label);
+      setTxt('home-workout-duration', 'Ready');
+      setTxt('home-workout-exercises', 'Tap Start Workout');
+    } else if (pool.length) {
+      setTxt('home-workout-type', 'All sessions done this week 🎉');
+      setTxt('home-workout-duration', '-- min');
+      setTxt('home-workout-exercises', '-- exercises');
+    } else {
+      // Onboarding not complete yet / no plan generated — this is the one
+      // case where "No workout planned" is actually true.
+      setTxt('home-workout-type', 'No workout planned');
+      setTxt('home-workout-duration', '-- min');
+      setTxt('home-workout-exercises', '-- exercises');
+    }
+  } catch (error) {
+    console.error('Failed to load weekly plan for Home:', error);
     setTxt('home-workout-type', 'No workout planned');
     setTxt('home-workout-duration', '-- min');
     setTxt('home-workout-exercises', '-- exercises');
