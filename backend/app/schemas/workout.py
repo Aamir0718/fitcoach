@@ -67,6 +67,15 @@ class SlotSelectRequest(BaseModel):
     slot_key: str
 
 
+class RegeneratePlanRequest(BaseModel):
+    # Canonical underscore-form key (fat_loss, muscle_gain, strength,
+    # general_fitness, toned_body, glute_growth, lean_physique,
+    # hourglass_figure) — matches plan_service._PLANS/_GOAL_ALIASES exactly.
+    # Optional so the endpoint still works with an empty body for a plain
+    # "regenerate with whatever goal is already on file" refresh.
+    goal: Optional[str] = None
+
+
 class WorkoutFinishRequest(BaseModel):
     muscle_group: Optional[str] = "Mixed"
     duration_minutes: int = 0

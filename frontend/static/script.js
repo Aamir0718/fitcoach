@@ -3349,7 +3349,9 @@ function renderPlannerPool() {
 
   if (progressText) {
     progressText.textContent = pool.length
-      ? `${doneCount} of ${pool.length} sessions done this week`
+      ? (doneCount >= pool.length
+          ? `All ${pool.length} sessions done — unlocking a fresh set`
+          : `${doneCount} of ${pool.length} sessions done — finish them all to unlock the set again`)
       : "No plan yet — complete onboarding in Coach first.";
   }
   if (progressFill) {
@@ -3363,19 +3365,50 @@ function renderPlannerPool() {
 
   grid.innerHTML = pool.map(item => {
     const icon = PLANNER_ICONS[item.key] || "🏋";
+    // Completed sessions lock instead of offering an immediate "tap to
+    // redo" — they only become selectable again once every other session
+    // in the pool is also done, at which point mark_slot_done() on the
+    // backend resets the whole pool together (see plan_service.py).
+    if (item.done) {
+      return `
+        <div class="planner-slot-card done" data-slot-key="${item.key}" aria-disabled="true">
+          <span class="planner-slot-icon">${icon}</span>
+          <strong class="planner-slot-name">${item.label}</strong>
+          <span class="planner-slot-status">✅ You already completed this workout</span>
+        </div>
+      `;
+    }
     return `
-      <div class="planner-slot-card ${item.done ? 'done' : ''}" data-slot-key="${item.key}" onclick="selectPlannerSlot('${item.key}')">
+      <div class="planner-slot-card" data-slot-key="${item.key}" onclick="selectPlannerSlot('${item.key}')">
         <span class="planner-slot-icon">${icon}</span>
         <strong class="planner-slot-name">${item.label}</strong>
-        <span class="planner-slot-status">${item.done ? '✅ Done — tap to redo' : 'Tap to start'}</span>
+        <span class="planner-slot-status">Tap to start</span>
       </div>
     `;
   }).join("");
 }
 
-async function refreshPlanner() {
+// "Regenerate Plan" now asks for the goal to build the new split around
+// before actually regenerating — see #regenerate-goal-overlay in index.html.
+function openRegenerateGoalModal() {
+  document.getElementById("regenerate-goal-overlay")?.classList.remove("hidden");
+}
+
+function closeRegenerateGoalModal() {
+  document.getElementById("regenerate-goal-overlay")?.classList.add("hidden");
+}
+
+async function submitRegenerateGoal(goal) {
+  closeRegenerateGoalModal();
+  await refreshPlanner(goal);
+}
+
+async function refreshPlanner(goal) {
   try {
-    const data = await apiFetch("/api/workouts/weekly-plan/refresh", { method: "POST" });
+    const data = await apiFetch("/api/workouts/weekly-plan/refresh", {
+      method: "POST",
+      body: JSON.stringify(goal ? { goal } : {}),
+    });
     plannerData = data.plan;
     renderPlannerPool();
     showToast("✅ Plan regenerated");

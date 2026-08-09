@@ -1236,6 +1236,18 @@ def mark_slot_done(plan: dict, slot_key: str) -> dict:
     else:
         label = SESSION_LABELS.get(slot_key, slot_key.replace("_", " ").title())
         pool.append({"key": slot_key, "label": label, "db_key": slot_key, "done": True, "done_date": date.today().isoformat()})
+
+    # Full cycle complete — every session in the pool has been done at least
+    # once — so unlock a fresh cycle immediately rather than leaving every
+    # card locked until the calendar happens to roll into a new week
+    # (maybe_reset_week only fires on a Monday boundary). This is what makes
+    # a completed slot re-selectable again: it's never redoable on its own,
+    # only once the whole pool has been cleared together.
+    if pool and all(item.get("done") for item in pool):
+        for item in pool:
+            item["done"] = False
+            item["done_date"] = None
+
     return {**plan, "pool": pool}
 
 

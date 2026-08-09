@@ -840,12 +840,12 @@
         <div class="planner-progress-track">
           <div class="planner-progress-fill" id="planner-progress-fill" style="width:0%"></div>
         </div>
-        <button class="planner-refresh-btn" onclick="refreshPlanner()">↻ Regenerate Plan</button>
+        <button class="planner-refresh-btn" onclick="openRegenerateGoalModal()">↻ Regenerate Plan</button>
       </div>
       <div class="planner-pool-grid" id="planner-pool-grid">
         <div class="loading-state">Loading your plan…</div>
       </div>
-      <p class="planner-hint">Tap any session to start it — done sessions can be redone any time. Ask your coach mid-session to swap to something else and I'll update this automatically.</p>
+      <p class="planner-hint">Tap any session to start it — completed sessions lock until you've finished every session in the set, then the whole set unlocks together. Ask your coach mid-session to swap to something else and I'll update this automatically.</p>
     </div>
   </div>
 
@@ -1413,6 +1413,31 @@
       <span class="notice-lightbulb">💡</span>
       <p class="notice-footer-text">AI can confuse visually similar foods like paneer, cheese and pizza. Confirming the correct food improves nutrition accuracy.</p>
     </div>
+  </div>
+</div>
+
+<!-- ==================== REGENERATE PLAN — GOAL PICKER ====================
+     Shown when "Regenerate Plan" is tapped in the Planner tab. The pool
+     template is keyed on (gender, mode, goal) server-side, so picking a
+     new goal here (gender stays whatever's already on the profile) genuinely
+     produces a different split, not just a reshuffle. Only touches
+     profile.goal + the plan's pool — past workout history is untouched. -->
+<div id="regenerate-goal-overlay" class="onboarding-overlay hidden">
+  <div class="onboarding-card">
+    <span class="mono-label">Regenerate Plan</span>
+    <div class="ob-question" style="margin-top:8px">What's your goal now?</div>
+    <p class="tab-subtitle" style="margin-bottom:20px">Your new split will be built around this — everything you've already logged stays exactly as it is.</p>
+    <div class="ob-options" id="regenerate-goal-options">
+      <button class="ob-option" onclick="submitRegenerateGoal('fat_loss')">Fat Loss</button>
+      <button class="ob-option" onclick="submitRegenerateGoal('muscle_gain')">Muscle Gain</button>
+      <button class="ob-option" onclick="submitRegenerateGoal('strength')">Strength</button>
+      <button class="ob-option" onclick="submitRegenerateGoal('general_fitness')">General Fitness</button>
+      <button class="ob-option" onclick="submitRegenerateGoal('toned_body')">Toned Body</button>
+      <button class="ob-option" onclick="submitRegenerateGoal('glute_growth')">Glute Growth</button>
+      <button class="ob-option" onclick="submitRegenerateGoal('lean_physique')">Lean Physique</button>
+      <button class="ob-option" onclick="submitRegenerateGoal('hourglass_figure')">Hourglass Figure</button>
+    </div>
+    <button class="btn-outline" style="width:100%" onclick="closeRegenerateGoalModal()">Cancel</button>
   </div>
 </div>
 

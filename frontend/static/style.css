@@ -1760,6 +1760,15 @@ textarea { resize: vertical; line-height: 1.5; }
   text-transform: uppercase;
   color: var(--accent);
 }
+/* Locked — completed this cycle, not selectable again until the whole pool
+   clears together (see mark_slot_done() in plan_service.py). */
+.planner-slot-card.done {
+  cursor: not-allowed;
+  opacity: 0.55;
+  background: var(--paper);
+}
+.planner-slot-card.done:hover { border-color: var(--line); }
+.planner-slot-card.done .planner-slot-icon { background: var(--line-strong); }
 .planner-slot-card.done .planner-slot-status { color: var(--muted); }
 .planner-hint { color: var(--muted); font-size: 13px; max-width: 640px; line-height: 1.6; }
 .loading-state { color: var(--muted); font-size: 14px; padding: 20px 0; }

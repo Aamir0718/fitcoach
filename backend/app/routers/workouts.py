@@ -29,7 +29,7 @@ from app.models.progress import ActivityLog, Streak, PersonalRecord
 from app.schemas.workout import (
     WorkoutLogRequest, WorkoutResponse, SlotSelectRequest, WorkoutFinishRequest,
     SetLogRequest, SetLogResponse, ProgressiveOverloadResponse,
-    FCMTokenRequest, ExerciseSwapRequest,
+    FCMTokenRequest, ExerciseSwapRequest, RegeneratePlanRequest,
 )
 from app.core.security import get_current_verified_user
 from app.routers.progress import check_and_award_badges
@@ -566,15 +566,27 @@ async def get_weekly_plan(
 
 @router.post("/weekly-plan/refresh")
 async def refresh_weekly_plan(
+    body: RegeneratePlanRequest = RegeneratePlanRequest(),
     current_user: Auth = Depends(get_current_verified_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Force-regenerate the weekly plan pool (e.g. after profile changes),
-    preserving 'done' status for any slot type that still exists in the new pool."""
+    preserving 'done' status for any slot type that still exists in the new
+    pool. Optionally updates profile.goal first — the template lookup in
+    plan_service is keyed on (gender, mode, goal), so a new goal (with the
+    same on-file gender) genuinely produces a different pool, not just a
+    reshuffle. This only ever touches the profile row and the WeeklyPlan's
+    JSON pool — past Workout/Streak/PersonalRecord rows are never touched,
+    so workout history and streaks survive a regenerate untouched."""
     profile_result = await db.execute(select(Profile).where(Profile.user_id == current_user.id))
     profile = profile_result.scalar_one_or_none()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
+
+    if body.goal:
+        profile.goal = body.goal
+        await db.commit()
+        await db.refresh(profile)
 
     from app.services.plan_service import build_weekly_pool, generate_weekly_plan
 
@@ -587,7 +599,16 @@ async def refresh_weekly_plan(
         for item in new_pool:
             if item["key"] in done_keys:
                 item["done"] = True
-        plan.plan = {**plan.plan, "pool": new_pool, "mode": profile.active_mode}
+        # goal/level/days_per_week are cached alongside the pool at plan-
+        # generation time — a partial rebuild here only touched pool/mode
+        # before, leaving plan.plan["goal"] stale (still the old goal) even
+        # though the pool itself was correctly rebuilt from the new one.
+        plan.plan = {
+            **plan.plan,
+            "pool": new_pool,
+            "mode": profile.active_mode,
+            "goal": profile.goal,
+        }
         plan.mode = profile.active_mode
     else:
         plan_data = generate_weekly_plan(profile)
