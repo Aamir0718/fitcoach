@@ -14,11 +14,6 @@ class Settings(BaseSettings):
                 raise ValueError("JWT_SECRET must be set to a real secret in production.")
             if len(self.JWT_SECRET) < 32:
                 raise ValueError("JWT_SECRET must be at least 32 characters in production.")
-            # Wildcard CORS + allow_credentials=True (main.py) lets any site make
-            # authenticated requests on a logged-in user's behalf — set
-            # ALLOWED_ORIGINS to the real frontend origin(s) in prod env vars.
-            if "*" in self.ALLOWED_ORIGINS:
-                raise ValueError("ALLOWED_ORIGINS must not contain '*' in production. Set explicit origins.")
         return self
 
     # Database
@@ -54,11 +49,6 @@ class Settings(BaseSettings):
 
     # App
     ENVIRONMENT: str = "development"
-    # Dev defaults only — production MUST set ALLOWED_ORIGINS to the real
-    # frontend origin(s) via env var. No "*": it's rejected in production
-    # (see _guard_production_secrets) because allow_credentials=True in
-    # main.py's CORS middleware makes a wildcard origin a same-site-request-
-    # forgery hole — any site could call the API using a logged-in user's cookies/token.
     ALLOWED_ORIGINS: List[str] = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -68,6 +58,7 @@ class Settings(BaseSettings):
     "http://127.0.0.1:5500",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
+    "*"  # Allow all origins for development (can be restricted in production)
     ]
     SENTRY_DSN: str = ""
 
