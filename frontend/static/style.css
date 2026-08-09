@@ -546,6 +546,60 @@ textarea { resize: vertical; line-height: 1.5; }
   color: var(--ink);
 }
 
+/* This-week snapshot — flex:1 so it claims the sidebar's remaining height
+   instead of leaving a dead gap between the nav and the bottom-anchored
+   mode toggle/metrics. Real numbers top, week strip pinned to the bottom
+   of this block via margin-top:auto. */
+.sidebar-stats {
+  flex: 1;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.sidebar-stat-row {
+  display: flex;
+  gap: 16px;
+}
+.sidebar-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sidebar-stat strong {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 32px;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+.sidebar-stat span {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.sidebar-week-strip {
+  display: flex;
+  gap: 4px;
+  align-items: flex-end;
+  height: 40px;
+  margin-top: auto;
+}
+.sidebar-week-strip i {
+  flex: 1;
+  background: var(--line-strong);
+  height: 14px;
+}
+.sidebar-week-strip i.done { background: var(--accent); height: 40px; }
+.sidebar-week-strip i.today { background: var(--ink); height: 40px; }
+
 @media (max-width: 1024px) {
   .sidebar { width: 200px; min-width: 200px; }
 }

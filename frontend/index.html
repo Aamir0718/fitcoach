@@ -189,6 +189,20 @@
       <button class="nav-btn" onclick="switchTab('visualos')" data-tab="visualos"><span class="nav-dot"></span><span>Themes</span></button>
       <button class="nav-btn" onclick="switchTab('profile')" data-tab="profile"><span class="nav-dot"></span><span>Profile</span></button>
     </div>
+
+    <!-- This-week snapshot — grows to fill the sidebar's remaining height
+         instead of leaving it as dead space below the nav. -->
+    <div class="sidebar-stats">
+      <span class="mono-label">This week</span>
+      <div class="sidebar-stat-row">
+        <div class="sidebar-stat"><strong id="sidebar-streak-value">--</strong><span>Day streak</span></div>
+        <div class="sidebar-stat"><strong id="sidebar-recovery-value">--</strong><span>Recovery</span></div>
+      </div>
+      <div class="sidebar-week-strip" id="sidebar-week-strip">
+        <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+      </div>
+    </div>
+
     <!-- Mode toggle in sidebar -->
     <div class="sidebar-mode-toggle" id="sidebar-mode-toggle">
       <button class="mode-btn active" id="mode-gym-btn" onclick="setWorkoutMode('gym')">Gym</button>

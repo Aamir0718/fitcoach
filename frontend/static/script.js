@@ -155,273 +155,132 @@ function setTxt(id, val) {
 }
 
 // ── HOME DASHBOARD ───────────────────────────────────────────────────────
+// This used to be defined twice — the second copy silently shadowed the
+// first (JS keeps only the last `function foo(){}` declaration), so the
+// welcome-message code in the first copy never ran, and BOTH copies called
+// endpoints that don't exist on the backend (`/recovery/latest`,
+// `/progress/summary`, `/workouts/today`, `/nutrition/today` are all
+// missing the `/api` prefix — and the last two aren't real routes at all,
+// prefixed or not). Every one of those calls 404'd, which is why the hero
+// stayed on its static "Loading…" placeholder and everything else showed
+// its fallback dashes. Consolidated into one copy that hits the endpoints
+// that actually exist.
 function loadHomeDashboard() {
-  // Set welcome message
   const greeting = timeGreeting();
   const welcomeTitle = document.getElementById('home-welcome-title');
   const welcomeSubtitle = document.getElementById('home-welcome-subtitle');
-  
+
   if (welcomeTitle) {
     welcomeTitle.textContent = `${greeting}, ${currentUser?.name?.split(' ')[0] || 'Athlete'}`;
   }
   if (welcomeSubtitle) {
     const hour = new Date().getHours();
-    let subtitle = "Ready to train today?";
-    if (hour < 12) subtitle = "Start your day strong";
-    else if (hour < 17) subtitle = "Keep the momentum going";
-    else subtitle = "Evening training session";
-    welcomeSubtitle.textContent = subtitle;
+    welcomeSubtitle.textContent = hour < 12 ? "Start your day strong"
+      : hour < 17 ? "Keep the momentum going"
+      : "Evening training session";
   }
 
-  // Load recovery data
   loadHomeRecovery();
-  
-  // Load calories data
+  loadHomeProgressAndWorkout();
   loadHomeCalories();
-  
-  // Load progress data
-  loadHomeProgress();
-  
-  // Load workout info
-  loadHomeWorkout();
 }
 
 async function loadHomeRecovery() {
   try {
-    const response = await fetch(`${API}/recovery/latest`, {
+    const response = await fetch(`${API}/api/recovery/latest`, {
       headers: { 'Authorization': `Bearer ${authToken}` }
     });
-    
-    if (response.ok) {
-      const data = await response.json();
-      const recoveryDisplay = document.getElementById('home-recovery-display');
-      const recoveryStatus = document.getElementById('home-recovery-status');
-      
-      if (recoveryDisplay && data.recovery_score !== undefined) {
-        recoveryDisplay.textContent = Math.round(data.recovery_score);
-        
-        if (recoveryStatus) {
-          if (data.recovery_score >= 80) {
-            recoveryStatus.textContent = 'Optimal';
-            recoveryStatus.style.color = 'var(--green)';
-          } else if (data.recovery_score >= 60) {
-            recoveryStatus.textContent = 'Good';
-            recoveryStatus.style.color = 'var(--orange)';
-          } else {
-            recoveryStatus.textContent = 'Needs Rest';
-            recoveryStatus.style.color = 'var(--red)';
-          }
-        }
-      }
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    // RecoveryResponse's field is `score` (0-100) + `zone` ("green"/"yellow"/"red") — not recovery_score.
+    if (data.score === null || data.score === undefined) throw new Error('no check-in yet');
+    const score = Math.round(data.score);
+    setTxt('hero-recovery', score);
+    setTxt('home-recovery-display', score);
+    setTxt('sidebar-recovery-value', score);
+    const status = data.zone === 'green' ? 'Optimal' : data.zone === 'yellow' ? 'Good' : data.zone === 'red' ? 'Needs Rest' : 'No data';
+    const statusEl = document.getElementById('home-recovery-status');
+    if (statusEl) {
+      statusEl.textContent = status;
+      statusEl.style.color = data.zone === 'green' ? 'var(--zone-green, #2F6B3A)' : data.zone === 'red' ? 'var(--zone-red, #B23A2A)' : '';
     }
   } catch (error) {
-    console.error('Failed to load recovery data:', error);
+    setTxt('hero-recovery', '--');
     setTxt('home-recovery-display', '--');
     setTxt('home-recovery-status', 'No data');
+    setTxt('sidebar-recovery-value', '--');
   }
 }
 
 async function loadHomeCalories() {
-  try {
-    const response = await fetch(`${API}/nutrition/today`, {
-      headers: { 'Authorization': `Bearer ${authToken}` }
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      const caloriesDisplay = document.getElementById('home-calories-display');
-      const caloriesStatus = document.getElementById('home-calories-status');
-      
-      if (caloriesDisplay && data.total_calories !== undefined) {
-        caloriesDisplay.textContent = Math.round(data.total_calories);
-        
-        if (caloriesStatus) {
-          const goal = data.daily_goal || 2000;
-          const percentage = (data.total_calories / goal) * 100;
-          
-          if (percentage >= 90 && percentage <= 110) {
-            caloriesStatus.textContent = 'On Track';
-            caloriesStatus.style.color = 'var(--green)';
-          } else if (percentage < 90) {
-            caloriesStatus.textContent = 'Below Goal';
-            caloriesStatus.style.color = 'var(--orange)';
-          } else {
-            caloriesStatus.textContent = 'Above Goal';
-            caloriesStatus.style.color = 'var(--red)';
-          }
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Failed to load calories data:', error);
-    setTxt('home-calories-display', '--');
-    setTxt('home-calories-status', 'No data');
-  }
+  // There's no backend endpoint for "today's nutrition total" yet —
+  // app/routers/nutrition.py only exposes POST /api/nutrition/analyze
+  // (one-shot food analysis); nothing sums NutritionLog rows for today.
+  // Showing the honest empty state instead of calling a route that 404s.
+  setTxt('hero-calories', '--');
+  setTxt('home-calories-display', '--');
+  setTxt('home-calories-status', 'No data');
 }
 
-async function loadHomeProgress() {
+async function loadHomeProgressAndWorkout() {
   try {
-    const response = await fetch(`${API}/progress/summary`, {
+    const response = await fetch(`${API}/api/progress/dashboard`, {
       headers: { 'Authorization': `Bearer ${authToken}` }
     });
-    
-    if (response.ok) {
-      const data = await response.json();
-      const streakDisplay = document.getElementById('home-streak-display');
-      const workoutsDisplay = document.getElementById('home-workouts-display');
-      
-      if (streakDisplay && data.current_streak !== undefined) {
-        streakDisplay.textContent = data.current_streak;
-      }
-      
-      if (workoutsDisplay && data.weekly_workouts !== undefined) {
-        workoutsDisplay.textContent = data.weekly_workouts;
-      }
-    }
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+
+    const streak = data.current_streak ?? 0;
+    setTxt('hero-streak', streak);
+    setTxt('home-streak-display', streak);
+    setTxt('sidebar-streak-value', streak);
+
+    const weeklyActivity = Array.isArray(data.weekly_activity) ? data.weekly_activity : [];
+    setTxt('home-workouts-display', weeklyActivity.filter(d => d.completed).length);
+    renderHomeWeekFromActivity(weeklyActivity);
+    renderSidebarWeekStrip(weeklyActivity);
+
+    const today = data.today_workout;
+    setTxt('home-workout-type', today?.name || 'No workout planned');
+    setTxt('home-workout-duration', today ? `${today.duration || 0} min` : '-- min');
+    setTxt('home-workout-exercises', today ? `${today.exercises || 0} exercises` : '-- exercises');
   } catch (error) {
-    console.error('Failed to load progress data:', error);
+    console.error('Failed to load progress dashboard:', error);
+    setTxt('hero-streak', '0');
     setTxt('home-streak-display', '0');
     setTxt('home-workouts-display', '0');
-  }
-}
-
-async function loadHomeWorkout() {
-  try {
-    const response = await fetch(`${API}/workouts/today`, {
-      headers: { 'Authorization': `Bearer ${authToken}` }
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      const workoutType = document.getElementById('home-workout-type');
-      const workoutDuration = document.getElementById('home-workout-duration');
-      const workoutExercises = document.getElementById('home-workout-exercises');
-      
-      if (workoutType && data.name) {
-        workoutType.textContent = data.name;
-      }
-      
-      if (workoutDuration && data.estimated_duration) {
-        workoutDuration.textContent = `${data.estimated_duration} min`;
-      }
-      
-      if (workoutExercises && data.exercises) {
-        workoutExercises.textContent = `${data.exercises.length} exercises`;
-      }
-    }
-  } catch (error) {
-    console.error('Failed to load workout data:', error);
+    setTxt('sidebar-streak-value', '--');
     setTxt('home-workout-type', 'No workout planned');
     setTxt('home-workout-duration', '-- min');
     setTxt('home-workout-exercises', '-- exercises');
   }
 }
 
-// ── HOME DASHBOARD ───────────────────────────────────────────────────────
-function loadHomeDashboard() {
-  // Load recovery data
-  loadHomeRecovery();
-  
-  // Load calories data
-  loadHomeCalories();
-  
-  // Load progress data
-  loadHomeProgress();
-  
-  // Load workout info
-  loadHomeWorkout();
+// Renders the Home hero's week-consistency strip from
+// GET /api/progress/dashboard's weekly_activity (Mon..Sun, {day, completed}).
+function renderHomeWeekFromActivity(weeklyActivity) {
+  const container = document.getElementById('home-week-row');
+  if (!container || !weeklyActivity.length) return;
+  const todayIdx = (new Date().getDay() + 6) % 7; // JS: Sun=0..Sat=6 -> Mon=0..Sun=6
+  container.innerHTML = weeklyActivity.map((d, i) => {
+    const isToday = i === todayIdx;
+    const barClass = isToday ? 'week-bar today' : d.completed ? 'week-bar done' : 'week-bar empty';
+    const height = (d.completed || isToday) ? '32px' : '16px';
+    const label = (d.day || '').slice(0, 3).toUpperCase();
+    return `<div class="week-day"><div class="${barClass}" style="height:${height}"></div><div class="week-label">${label}</div></div>`;
+  }).join('');
 }
 
-async function loadHomeRecovery() {
-  try {
-    const response = await fetch(`${API}/recovery/latest`, {
-      headers: { 'Authorization': `Bearer ${authToken}` }
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      const heroRecovery = document.getElementById('hero-recovery');
-      
-      if (heroRecovery && data.recovery_score !== undefined) {
-        heroRecovery.textContent = Math.round(data.recovery_score);
-      }
-    }
-  } catch (error) {
-    console.error('Failed to load recovery data:', error);
-    setTxt('hero-recovery', '--');
-  }
-}
-
-async function loadHomeCalories() {
-  try {
-    const response = await fetch(`${API}/nutrition/today`, {
-      headers: { 'Authorization': `Bearer ${authToken}` }
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      const heroCalories = document.getElementById('hero-calories');
-      
-      if (heroCalories && data.total_calories !== undefined) {
-        heroCalories.textContent = Math.round(data.total_calories);
-      }
-    }
-  } catch (error) {
-    console.error('Failed to load calories data:', error);
-    setTxt('hero-calories', '--');
-  }
-}
-
-async function loadHomeProgress() {
-  try {
-    const response = await fetch(`${API}/progress/summary`, {
-      headers: { 'Authorization': `Bearer ${authToken}` }
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      const heroStreak = document.getElementById('hero-streak');
-      
-      if (heroStreak && data.current_streak !== undefined) {
-        heroStreak.textContent = data.current_streak;
-      }
-    }
-  } catch (error) {
-    console.error('Failed to load progress data:', error);
-    setTxt('hero-streak', '0');
-  }
-}
-
-async function loadHomeWorkout() {
-  try {
-    const response = await fetch(`${API}/workouts/today`, {
-      headers: { 'Authorization': `Bearer ${authToken}` }
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      const workoutType = document.getElementById('home-workout-type');
-      const workoutDuration = document.getElementById('home-workout-duration');
-      const workoutExercises = document.getElementById('home-workout-exercises');
-      
-      if (workoutType && data.name) {
-        workoutType.textContent = data.name;
-      }
-      
-      if (workoutDuration && data.estimated_duration) {
-        workoutDuration.textContent = `${data.estimated_duration} min`;
-      }
-      
-      if (workoutExercises && data.exercises) {
-        workoutExercises.textContent = `${data.exercises.length} exercises`;
-      }
-    }
-  } catch (error) {
-    console.error('Failed to load workout data:', error);
-    setTxt('home-workout-type', 'No workout planned');
-    setTxt('home-workout-duration', '-- min');
-    setTxt('home-workout-exercises', '-- exercises');
-  }
+// Same weekly_activity data, mirrored into the persistent sidebar (visible
+// on every tab, not just Home) as a compact 7-bar strip.
+function renderSidebarWeekStrip(weeklyActivity) {
+  const container = document.getElementById('sidebar-week-strip');
+  if (!container || !weeklyActivity.length) return;
+  const todayIdx = (new Date().getDay() + 6) % 7;
+  container.innerHTML = weeklyActivity.map((d, i) => {
+    const cls = i === todayIdx ? 'today' : d.completed ? 'done' : '';
+    return `<i class="${cls}" title="${d.day || ''}"></i>`;
+  }).join('');
 }
 
 // ── MOTIVATIONAL QUOTES (kept for potential use) ─────────────────────────
