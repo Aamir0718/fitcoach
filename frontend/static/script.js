@@ -213,13 +213,42 @@ async function loadHomeRecovery() {
 }
 
 async function loadHomeCalories() {
-  // There's no backend endpoint for "today's nutrition total" yet —
-  // app/routers/nutrition.py only exposes POST /api/nutrition/analyze
-  // (one-shot food analysis); nothing sums NutritionLog rows for today.
-  // Showing the honest empty state instead of calling a route that 404s.
-  setTxt('hero-calories', '--');
-  setTxt('home-calories-display', '--');
-  setTxt('home-calories-status', 'No data');
+  try {
+    const response = await fetch(`${API}/api/nutrition/today`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    const total = Math.round(data.total_calories || 0);
+    setTxt('hero-calories', total);
+    setTxt('home-calories-display', total);
+
+    const statusEl = document.getElementById('home-calories-status');
+    if (statusEl) {
+      if (!data.meals || !data.meals.length) {
+        statusEl.textContent = 'Nothing logged yet';
+        statusEl.style.color = '';
+      } else {
+        const goal = data.daily_goal || 2000;
+        const pct = (total / goal) * 100;
+        if (pct >= 90 && pct <= 110) {
+          statusEl.textContent = 'On Track';
+          statusEl.style.color = 'var(--zone-green, #2F6B3A)';
+        } else if (pct < 90) {
+          statusEl.textContent = 'Below Goal';
+          statusEl.style.color = '';
+        } else {
+          statusEl.textContent = 'Above Goal';
+          statusEl.style.color = 'var(--zone-red, #B23A2A)';
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load nutrition data:', error);
+    setTxt('hero-calories', '--');
+    setTxt('home-calories-display', '--');
+    setTxt('home-calories-status', 'No data');
+  }
 }
 
 async function loadHomeProgressAndWorkout() {
@@ -281,6 +310,30 @@ function renderSidebarWeekStrip(weeklyActivity) {
     const cls = i === todayIdx ? 'today' : d.completed ? 'done' : '';
     return `<i class="${cls}" title="${d.day || ''}"></i>`;
   }).join('');
+}
+
+// Calories tab's "Daily totals" side card — was only ever updated right
+// after analyzing a meal (showCalResult()), never on opening the tab, so
+// it just sat on "--" the rest of the time. Refreshed from the same
+// GET /api/nutrition/today used on Home.
+async function loadCaloriesDailyTotals() {
+  try {
+    const response = await fetch(`${API}/api/nutrition/today`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    setTxt('daily-calories-preview', `${Math.round(data.total_calories || 0)} kcal`);
+    setTxt('daily-protein-preview', `${Math.round(data.total_protein || 0)}g`);
+    setTxt('daily-carbs-preview', `${Math.round(data.total_carbs || 0)}g`);
+    setTxt('daily-fats-preview', `${Math.round(data.total_fats || 0)}g`);
+  } catch (error) {
+    console.error('Failed to load daily nutrition totals:', error);
+    setTxt('daily-calories-preview', '--');
+    setTxt('daily-protein-preview', '--');
+    setTxt('daily-carbs-preview', '--');
+    setTxt('daily-fats-preview', '--');
+  }
 }
 
 // ── MOTIVATIONAL QUOTES (kept for potential use) ─────────────────────────
@@ -769,6 +822,7 @@ function switchTab(tab) {
   if (tab==="profile")  loadProfile();
   if (tab==="recovery") loadRecoveryLatest();
   if (tab==="planner") loadPlanner();
+  if (tab==="calories") loadCaloriesDailyTotals();
   if (tab==="chat") {
     const chatBox = document.getElementById("chat-box");
     if (chatBox && chatBox.children.length === 0) loadChat();

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 from typing import Optional
@@ -50,6 +51,52 @@ async def log_nutrition(user_id: int, meal_name: str, calories: float, protein: 
     )
     db.add(activity)
     await db.commit()
+
+
+@router.get("/today")
+async def get_today_nutrition(
+    current_user: Auth = Depends(get_current_verified_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Sum of everything logged today via /analyze, for the Home dashboard's
+    daily nutrition card. There's no stored per-user calorie target, so
+    daily_goal is a fixed reasonable default (2000 kcal) rather than
+    something computed — flagging that here since it's a real gap, not an
+    oversight."""
+    today = date.today()
+    result = await db.execute(
+        select(NutritionLog).where(
+            NutritionLog.user_id == current_user.id,
+            NutritionLog.date == today,
+        )
+    )
+    logs = result.scalars().all()
+
+    total_calories = sum(l.calories or 0 for l in logs)
+    total_protein = sum(l.protein or 0 for l in logs)
+    total_carbs = sum(l.carbs or 0 for l in logs)
+    total_fats = sum(l.fats or 0 for l in logs)
+
+    return {
+        "date": str(today),
+        "total_calories": round(total_calories, 1),
+        "total_protein": round(total_protein, 1),
+        "total_carbs": round(total_carbs, 1),
+        "total_fats": round(total_fats, 1),
+        "daily_goal": 2000,
+        "meals": [
+            {
+                "id": l.id,
+                "meal_name": l.meal_name,
+                "calories": l.calories,
+                "protein": l.protein,
+                "carbs": l.carbs,
+                "fats": l.fats,
+                "source": l.source,
+            }
+            for l in logs
+        ],
+    }
 
 
 @router.post("/analyze")
