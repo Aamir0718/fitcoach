@@ -134,9 +134,11 @@ function cacheEls() {
   els.workoutExerciseName = document.getElementById("ghost-workout-exercise-name");
   els.workoutSets = document.getElementById("ghost-workout-sets");
 
+  els.nextSetBtn = document.getElementById("ghost-workout-nextset-btn");
   els.nextBtn = document.getElementById("ghost-workout-next-btn");
   els.finishBtn = document.getElementById("ghost-workout-finish-btn");
 
+  els.nextSetBtn?.addEventListener("click", completeSet);
   els.nextBtn?.addEventListener("click", nextExercise);
   els.finishBtn?.addEventListener("click", finishWorkout);
 
@@ -414,6 +416,30 @@ function stop() {
   els.chatModeShell?.classList.remove("hidden");
 }
 
+// Advances from the current set to the next (or, on the last set, into the
+// next exercise). Called both by the camera's automatic rep-detection (once
+// it sees targetReps hit) and by the manual "Next Set" button — pose-based
+// rep counting is far from perfect, so relying on it as the *only* way to
+// progress meant a missed/miscounted rep could strand someone on set 1 with
+// no way forward except skipping the whole exercise via "Next Exercise".
+function completeSet() {
+  if (state.currentSet < 3) {
+    state.currentSet += 1;
+    state.reps = 0;
+    state.repState = newRepState_ACTUAL();
+    if (els.workoutSets) els.workoutSets.textContent = `${state.currentSet} of 3`;
+    if (els.reps) els.reps.textContent = "0";
+    if (typeof window.showToast === "function") {
+      window.showToast(`💪 Set ${state.currentSet - 1} complete! Prepare for Set ${state.currentSet}.`);
+    }
+  } else {
+    if (typeof window.showToast === "function") {
+      window.showToast("🎉 Exercise complete!");
+    }
+    setTimeout(nextExercise, 1200);
+  }
+}
+
 function nextExercise() {
   state.currentExerciseIndex += 1;
   state.currentSet = 1;
@@ -519,23 +545,8 @@ function loop(landmarker) {
           stabilityScore: state.stabilityScore,
         });
 
-        if (state.reps > previousReps) {
-          if (state.reps >= state.targetReps) {
-            if (state.currentSet < 3) {
-              state.currentSet += 1;
-              state.reps = 0;
-              state.repState = newRepState_ACTUAL();
-              if (els.workoutSets) els.workoutSets.textContent = `${state.currentSet} of 3`;
-              if (typeof window.showToast === "function") {
-                window.showToast(`💪 Set ${state.currentSet - 1} complete! Prepare for Set ${state.currentSet}.`);
-              }
-            } else {
-              if (typeof window.showToast === "function") {
-                window.showToast("🎉 Exercise complete!");
-              }
-              setTimeout(nextExercise, 1500);
-            }
-          }
+        if (state.reps > previousReps && state.reps >= state.targetReps) {
+          completeSet();
         }
         drawCoachingOverlay(ctx, landmarks, els.canvas.width, els.canvas.height, feedback);
       }

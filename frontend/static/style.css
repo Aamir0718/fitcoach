@@ -1262,7 +1262,7 @@ textarea { resize: vertical; line-height: 1.5; }
 }
 .ghost-instructions-box p { font-size: 14px; color: var(--dark-text-2); line-height: 1.55; }
 
-.ghost-workout-actions { margin-top: auto; }
+.ghost-workout-actions { margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
 .ghost-next-btn {
   width: 100%;
   padding: 16px 20px;
@@ -1278,6 +1278,25 @@ textarea { resize: vertical; line-height: 1.5; }
   transition: background 150ms ease;
 }
 .ghost-next-btn:hover { background: var(--accent-hover); }
+
+/* Secondary, lower-emphasis than "Next Set" — this skips the *whole*
+   exercise (remaining sets included), so it shouldn't compete visually
+   with the button people are meant to reach for after every set. */
+.ghost-skip-btn {
+  width: 100%;
+  padding: 12px 20px;
+  background: transparent;
+  color: var(--dark-text-2);
+  border: 1px solid var(--dark-line);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 150ms ease, color 150ms ease;
+}
+.ghost-skip-btn:hover { border-color: #fff; color: #fff; }
 
 /* -- Right: queue + chat panels (dark cards) -- */
 .ghost-side-panel {
