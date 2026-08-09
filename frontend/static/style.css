@@ -2064,3 +2064,272 @@ textarea { resize: vertical; line-height: 1.5; }
   transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
 }
 .profile-logout-btn:hover { background: var(--zone-red); color: #fff; border-color: var(--zone-red); }
+
+/* ============================================================================
+   20. AUTH (#auth-screen) — split hero + form.
+   ============================================================================ */
+.auth-shell { display: flex; min-height: 100vh; }
+
+.auth-hero {
+  flex: 1;
+  background: var(--ink);
+  color: #fff;
+  display: flex;
+  /* flex-start, not center: centering tall stacked content (brand + title +
+     stats + features) in a column shorter than it clips the top off-screen
+     with no way to scroll to it once the row's height is pinned by the
+     (shorter) form column. Starting from the top with real padding avoids
+     that regardless of viewport height. */
+  align-items: flex-start;
+  padding: 60px;
+  overflow-y: auto;
+}
+.auth-hero-content { max-width: 480px; }
+.auth-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 40px; }
+.auth-brand-mark { display: grid; place-items: center; width: 34px; height: 34px; background: #fff; color: var(--ink); font-family: var(--font-display); font-weight: 800; font-size: 13px; }
+.auth-brand-name { font-family: var(--font-display); font-weight: 800; font-size: 19px; }
+.auth-hero-title {
+  font-family: var(--font-display); font-weight: 800; font-size: 48px; line-height: 1.02; letter-spacing: -0.03em; margin-bottom: 20px;
+  /* The global h1-h6 reset sets color:var(--ink) for headings on the (much
+     more common) light-surface case — on this dark hero it needs an
+     explicit override or the text is --ink-on-ink, invisible. */
+  color: #fff;
+}
+.auth-hero-title em { color: var(--accent); font-style: normal; }
+.auth-hero-sub { font-size: 15px; color: rgba(255, 255, 255, 0.65); line-height: 1.6; margin-bottom: 36px; max-width: 400px; }
+.auth-hero-stats { display: flex; gap: 24px; margin-bottom: 36px; padding-bottom: 32px; border-bottom: 1px solid rgba(255, 255, 255, 0.14); }
+.auth-hero-stats div { display: flex; flex-direction: column; gap: 4px; }
+.auth-hero-stats strong { font-family: var(--font-display); font-weight: 800; font-size: 26px; }
+.auth-hero-stats span { font-family: var(--font-mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255, 255, 255, 0.5); }
+.auth-hero-features { display: flex; flex-direction: column; gap: 14px; }
+.hero-feat { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: rgba(255, 255, 255, 0.75); }
+
+@media (max-width: 980px) { .auth-hero { display: none; } }
+
+.auth-panel { flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px 24px; background: var(--paper); min-width: 0; overflow-y: auto; }
+.auth-container { width: 100%; max-width: 420px; }
+
+.auth-mobile-hero { display: none; }
+@media (max-width: 980px) {
+  .auth-mobile-hero { display: block; margin-bottom: 28px; }
+  .amh-brand { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; }
+  .amh-mark { display: grid; place-items: center; width: 28px; height: 28px; background: var(--ink); color: #fff; font-family: var(--font-display); font-weight: 800; font-size: 11px; }
+  .amh-name { font-family: var(--font-display); font-weight: 800; font-size: 16px; }
+  .amh-title { font-family: var(--font-display); font-weight: 800; font-size: 30px; line-height: 1.05; letter-spacing: -0.03em; color: var(--ink); margin-bottom: 10px; }
+  .amh-title em { color: var(--accent); font-style: normal; }
+  .amh-sub { color: var(--muted); font-size: 13.5px; margin-bottom: 14px; }
+  .amh-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .amh-chips span { font-family: var(--font-mono); font-size: 10px; border: 1px solid var(--line-strong); padding: 5px 9px; text-transform: uppercase; }
+}
+.auth-mini-brand { display: none; }
+
+.auth-sheet { background: var(--surface); border: 1px solid var(--line); padding: 32px; }
+@media (max-width: 480px) { .auth-sheet { padding: 24px 20px; border: none; } }
+
+.auth-logo { margin-bottom: 24px; }
+#auth-headline { font-family: var(--font-display); font-weight: 800; font-size: 26px; letter-spacing: -0.02em; color: var(--ink); }
+#auth-headline span { color: var(--accent); }
+#auth-subline { color: var(--muted); font-size: 13.5px; margin-top: 6px; }
+
+.auth-tabs { display: flex; border: 1px solid var(--line-strong); margin-bottom: 24px; }
+.auth-tab {
+  flex: 1; padding: 12px; background: transparent; border: none; cursor: pointer;
+  font-family: var(--font-display); font-weight: 700; font-size: 13px; color: var(--mid);
+}
+.auth-tab:first-child { border-right: 1px solid var(--line-strong); }
+.auth-tab.active { background: var(--ink); color: #fff; }
+
+.auth-form { display: flex; flex-direction: column; gap: 14px; }
+.login-method-toggle { display: flex; border: 1px solid var(--line-strong); }
+.method-btn {
+  flex: 1; padding: 10px; background: transparent; border: none; cursor: pointer;
+  font-family: var(--font-display); font-weight: 600; font-size: 12.5px; color: var(--mid);
+}
+.method-btn:first-child { border-right: 1px solid var(--line-strong); }
+.method-btn.active { background: var(--paper); color: var(--ink); font-weight: 800; }
+.password-toggle { background: none; border: none; cursor: pointer; font-size: 15px; opacity: 0.6; }
+.forgot-link { font-size: 12.5px; color: var(--mid); cursor: pointer; text-align: right; }
+.forgot-link:hover { color: var(--accent); }
+.forgot-title { font-family: var(--font-display); font-weight: 700; font-size: 15px; color: var(--ink); margin-bottom: 4px; }
+
+.auth-error { font-size: 13px; color: var(--zone-red); padding: 10px 0; }
+
+.auth-features { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+.feature-pill { font-family: var(--font-mono); font-size: 10px; font-weight: 600; text-transform: uppercase; border: 1px solid var(--line-strong); padding: 6px 10px; color: var(--mid); }
+
+/* ============================================================================
+   21. ONBOARDING + SPORT SETUP OVERLAYS
+   11-step onboarding (verbatim ONBOARDING_QUESTIONS order from
+   backend/app/services/ai_service.py — untouched, this is styling only)
+   and the 5-step sport setup. Both share this markup/class shape.
+   ============================================================================ */
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--paper);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.onboarding-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 40px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+@media (max-width: 560px) { .onboarding-card { padding: 28px 22px; } }
+
+.ob-progress-bar { height: 3px; background: var(--line-strong); margin-bottom: 20px; }
+.ob-progress-fill { height: 100%; background: var(--accent); transition: width 0.3s ease; }
+.ob-step-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin-bottom: 12px;
+}
+.ob-question { font-family: var(--font-display); font-weight: 800; font-size: 24px; letter-spacing: -0.02em; color: var(--ink); margin-bottom: 24px; line-height: 1.25; }
+.ob-input-area { margin-bottom: 20px; }
+.ob-error { color: var(--zone-red); font-size: 13px; margin-top: 12px; }
+.ob-age-preview { font-family: var(--font-mono); font-size: 12px; color: var(--muted); margin-top: 8px; }
+
+.sport-ob-header { margin-bottom: 8px; }
+.sport-ob-badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  padding: 6px 10px;
+}
+
+/* ============================================================================
+   22. WORKOUT COMPLETE (#workout-complete-screen)
+   ============================================================================ */
+.workout-complete-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: var(--dark-bg);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: fcIn 250ms ease-out;
+}
+.workout-complete-container { width: 100%; max-width: 640px; }
+.complete-header { text-align: center; margin-bottom: 32px; }
+.badge-achievement {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  padding: 7px 14px;
+  margin-bottom: 18px;
+}
+.complete-header h2 { font-family: var(--font-display); font-weight: 800; font-size: 38px; letter-spacing: -0.03em; margin-bottom: 10px; color: #fff; }
+.complete-header p { color: var(--dark-text-2); font-size: 14.5px; }
+
+.complete-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--dark-line);
+  border: 1px solid var(--dark-line);
+  margin-bottom: 28px;
+}
+.complete-metric { background: var(--dark-panel); padding: 22px 14px; text-align: center; display: flex; flex-direction: column; gap: 6px; }
+.complete-metric span { font-family: var(--font-mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dark-text-2); }
+.complete-metric strong { font-family: var(--font-display); font-weight: 800; font-size: 24px; }
+.complete-metric.font-gradient strong { color: var(--accent); }
+
+.badges-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 32px; }
+.achievement-badge {
+  font-size: 12.5px;
+  border: 1px solid var(--dark-line);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-return-coach {
+  display: block;
+  width: 100%;
+  padding: 16px 20px;
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid var(--accent);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.btn-return-coach:hover { background: var(--accent-hover); }
+
+@media (max-width: 720px) { .workout-complete-screen { z-index: 30; } }
+
+/* ============================================================================
+   23. AI FOOD-CONFIRMATION POPUP (low-confidence detection state)
+   ============================================================================ */
+.ai-confirm-modal {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 28px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 88vh;
+  overflow-y: auto;
+  position: relative;
+}
+.ai-close-modal-btn { position: absolute; top: 14px; right: 14px; background: none; border: none; font-size: 20px; cursor: pointer; color: var(--muted); }
+.ai-confirm-header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+.ai-confirm-icon-glow { width: 44px; height: 44px; display: grid; place-items: center; background: var(--ink); font-size: 20px; flex-shrink: 0; }
+.ai-confirm-title { font-family: var(--font-display); font-weight: 800; font-size: 17px; }
+.ai-confirm-subtitle { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+.ai-section-card { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 16px; }
+.ai-preview-food-info { display: flex; justify-content: space-between; margin-bottom: 12px; gap: 10px; }
+.ai-preview-label { display: block; font-family: var(--font-mono); font-size: 9.5px; text-transform: uppercase; color: var(--faint); margin-bottom: 4px; }
+.ai-preview-value-main { font-size: 15px; font-weight: 700; color: var(--ink); }
+.ai-preview-value-conf { font-family: var(--font-mono); font-weight: 700; font-size: 15px; }
+.conf-red { color: var(--zone-red); } .conf-orange { color: var(--zone-yellow); } .conf-green { color: var(--zone-green); }
+.ai-confidence-bar-container { height: 4px; background: var(--line-strong); margin-bottom: 10px; }
+.ai-confidence-bar-fill { height: 100%; background: var(--zone-red); }
+.ai-confidence-bar-fill.bg-red { background: var(--zone-red); } .ai-confidence-bar-fill.bg-orange { background: var(--zone-yellow); } .ai-confidence-bar-fill.bg-green { background: var(--zone-green); }
+.ai-confidence-status-text { font-size: 12px; font-weight: 600; }
+.ai-warning-card { display: flex; gap: 8px; background: rgba(178, 58, 42, 0.08); border: 1px solid var(--zone-red); padding: 10px 12px; margin-top: 10px; font-size: 12.5px; color: var(--zone-red); }
+.ai-confirm-question { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 10px; }
+.ai-possible-foods-pills, .examples-tags-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.possible-food-pill, .example-tag-btn {
+  font-family: var(--font-display); font-size: 12.5px; font-weight: 600;
+  border: 1px solid var(--line-strong); padding: 7px 12px; cursor: pointer; background: var(--surface); color: var(--mid);
+}
+.possible-food-pill.selected, .example-tag-btn.selected { background: var(--ink); color: #fff; border-color: var(--ink); }
+.examples-label { display: block; font-family: var(--font-mono); font-size: 9.5px; text-transform: uppercase; color: var(--faint); margin-bottom: 10px; }
+.search-input-wrapper { position: relative; display: flex; align-items: center; }
+.search-icon-inside { position: absolute; left: 12px; opacity: 0.5; }
+#ai-food-search-input { padding-left: 34px; }
+.clear-btn { position: absolute; right: 10px; background: none; border: none; cursor: pointer; font-size: 16px; color: var(--muted); }
+.ai-suggestions-list-premium { border: 1px solid var(--line-strong); margin-top: 4px; background: var(--surface); }
+.ai-action-buttons-group { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+.ai-action-btn-primary { padding: 14px; background: var(--accent); color: #fff; border: none; font-family: var(--font-display); font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; cursor: pointer; }
+.ai-action-btn-secondary, .ai-action-btn-text-only { padding: 14px; background: transparent; border: 1px solid var(--line-strong); color: var(--ink); font-family: var(--font-display); font-weight: 700; font-size: 13px; cursor: pointer; }
+.ai-action-btn-cancel { padding: 12px; background: none; border: none; color: var(--muted); font-size: 13px; cursor: pointer; }
+.ai-confidence-footer-notice { display: flex; gap: 8px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
