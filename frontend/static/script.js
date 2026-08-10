@@ -4,12 +4,8 @@
 // ================================================
 // Backend now lives on Render (separate service) instead of same-origin Flask.
 // TODO: replace with the actual Render service URL once it's deployed.
-// TEMP: pointed at 8010 instead of 8000 — a stale backend process is stuck on
-// 8000 (invisible to process-kill tools but still answering requests with old
-// code). Revert to 8000 once that process is gone (reboot, or find/stop it
-// via Task Manager) and the normal dev backend is running there again.
 const API = (location.hostname === "localhost" || location.hostname === "127.0.0.1")
-  ? "http://localhost:8010"
+  ? "http://localhost:8000"
   : "https://fitcoach-backend.onrender.com";
 window.API = API;
 let authToken    = localStorage.getItem("fc_token") || null;
