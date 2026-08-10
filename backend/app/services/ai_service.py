@@ -850,34 +850,51 @@ def _rule_based_chat(message: str, profile: Profile, zone: str) -> str:
 
 
 # ── Nutrition analysis (YOLOv8 + USDA) ───────────────────────────────────────────
+def _totals(foods: list[dict]) -> dict:
+    return {
+        "total_calories": round(sum(f.get("calories", 0) for f in foods), 1),
+        "total_protein": round(sum(f.get("protein", 0) for f in foods), 1),
+        "total_carbs": round(sum(f.get("carbs", 0) for f in foods), 1),
+        "total_fat": round(sum(f.get("fat", 0) for f in foods), 1),
+        "total_fiber": round(sum(f.get("fiber", 0) for f in foods), 1),
+        "total_sugar": round(sum(f.get("sugar", 0) for f in foods), 1),
+    }
+
+
 async def analyze_food_ai(food_description: str = "", image_base64: str | None = None) -> dict:
     """
     Analyze food image using YOLOv8 for detection and USDA for nutrition data.
 
     Args:
         image_base64: Base64-encoded image string`
-        
+
     Returns:
         Nutrition analysis JSON with detected foods and USDA nutrition data
     """
     import base64
+    from collections import Counter
     from app.services.food_detector import detect_foods
-    from app.services.nutrition_service import get_food_nutrition
-    
+    from app.services.nutrition_service import get_food_nutrition, split_food_items, parse_food_item
+
     logger.info("Received image for nutrition analysis")
     if not image_base64:
-        nutrition = get_food_nutrition(food_description)
+        # Split "2 eggs and a bowl of oats" into separate items so each gets its
+        # own USDA lookup + gram-accurate portion, instead of throwing the whole
+        # sentence at USDA as one (usually unmatchable) query.
+        foods_response = []
+        for item in split_food_items(food_description):
+            name, grams, display = parse_food_item(item)
+            nutrition = await get_food_nutrition(name, grams, display)
+            if nutrition:
+                foods_response.append(nutrition)
 
-        if nutrition is None:
+        if not foods_response:
             return {"error": "Food not found"}
 
         return {
-            "meal_name": nutrition["name"],
-            "foods": [nutrition],
-            "total_calories": nutrition["calories"],
-            "total_protein": nutrition["protein"],
-            "total_carbs": nutrition["carbs"],
-            "total_fat": nutrition["fat"],
+            "meal_name": ", ".join(f["name"] for f in foods_response),
+            "foods": foods_response,
+            **_totals(foods_response),
             "health_score": 80,
             "tips": [
                 "Drink enough water 💧",
@@ -895,72 +912,54 @@ async def analyze_food_ai(food_description: str = "", image_base64: str | None =
 
         logger.info(f"Saved image to {image_path}")
 
-        # Detect foods
-        detected_foods = detect_foods(image_path)
-        
+        # YOLO inference is CPU-bound/blocking — run off the event loop so it
+        # doesn't stall every other request while it runs.
+        detected_foods = await asyncio.to_thread(detect_foods, image_path)
+
         if not detected_foods:
             logger.warning("No recognizable food detected")
             return {
                 "error": "No recognizable food detected."
             }
-        
+
         logger.info(f"YOLO detected: {detected_foods}")
-        
-        # Get nutrition data from USDA
-        # Get nutrition from USDA
-        nutrition_data = []
-        for food in detected_foods:
-            nutrition = get_food_nutrition(food)
-            if nutrition:
-                nutrition_data.append(nutrition)
-        logger.info(f"USDA nutrition data: {nutrition_data}")
-        
-        # Calculate totals
-        total_calories = sum(f.get("calories", 0) for f in nutrition_data)
-        total_protein = sum(f.get("protein", 0) for f in nutrition_data)
-        total_carbs = sum(f.get("carbs", 0) for f in nutrition_data)
-        total_fat = sum(f.get("fat", 0) for f in nutrition_data)
-        
-        # Calculate health score and tips
-        health_score = 80
-        tips = [
-            "Drink enough water 💧",
-            "Add vegetables for a balanced meal 🥗",
-            "Include a good protein source 💪"
-        ]
-        
-        # Generate meal name from detected foods
-        meal_name = ", ".join(detected_foods)
-        
-        # Build response
+
+        # Multiple boxes of the same class (e.g. 2 rotis) count as multiple
+        # portions rather than being collapsed into a single default serving.
+        counts = Counter(detected_foods)
+
         foods_response = []
-        foods_response.append({
-            "name": nutrition["name"],
-            "quantity": nutrition["quantity"],
-            "calories": nutrition["calories"],
-            "protein": nutrition["protein"],
-            "carbs": nutrition["carbs"],
-            "fat": nutrition["fat"],
-            "fiber": nutrition["fiber"],
-            "sugar": nutrition["sugar"]
-        })
-        
+        for food_name, count in counts.items():
+            name, grams, display = parse_food_item(f"{count} {food_name}")
+            nutrition = await get_food_nutrition(name, grams, display)
+            if nutrition:
+                foods_response.append(nutrition)
+
+        if not foods_response:
+            return {"error": "Detected food not found in nutrition database."}
+
+        logger.info(f"USDA nutrition data: {foods_response}")
+
+        meal_name = ", ".join(
+            f"{count}x {food_name}" if count > 1 else food_name
+            for food_name, count in counts.items()
+        )
+
         result = {
             "meal_name": meal_name,
             "foods": foods_response,
-            "total_calories": total_calories,
-            "total_protein": total_protein,
-            "total_carbs": total_carbs,
-            "total_fat": total_fat,
-            "total_fiber": sum(f["fiber"] for f in nutrition_data),
-            "total_sugar": sum(f["sugar"] for f in nutrition_data),
-            "health_score": health_score,
-            "tips": tips
+            **_totals(foods_response),
+            "health_score": 80,
+            "tips": [
+                "Drink enough water 💧",
+                "Add vegetables for a balanced meal 🥗",
+                "Include a good protein source 💪"
+            ]
         }
-        
+
         logger.info(f"Final nutrition result: {result}")
         return result
-        
+
     except Exception as e:
         logger.error(f"Nutrition analysis failed: {e}", exc_info=True)
         return {

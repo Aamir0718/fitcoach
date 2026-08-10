@@ -16,4 +16,6 @@ def detect_foods(image_path):
             cls = int(box.cls[0])
             detected.append(model.names[cls])
 
-    return list(set(detected))
+    # Keep duplicates (e.g. 2 boxes of "roti") instead of collapsing to unique
+    # classes — the caller uses the counts to scale portions/calories correctly.
+    return detected
