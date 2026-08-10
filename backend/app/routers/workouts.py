@@ -561,7 +561,7 @@ async def get_weekly_plan(
             plan.plan = reset_plan
             await db.commit()
 
-    return {"plan": plan.plan, "mode": plan.mode, "updated_at": plan.updated_at}
+    return {"plan": plan.plan, "mode": plan.mode, "updated_at": str(plan.updated_at)}
 
 
 @router.post("/weekly-plan/refresh")
