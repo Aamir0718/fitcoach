@@ -470,6 +470,7 @@ async def _build_greeting(user_id: int, profile: Profile, zone: str, db: AsyncSe
         plan_data = maybe_reset_week(plan_row.plan, profile)
         if plan_data is not plan_row.plan:
             plan_row.plan = plan_data
+            plan_row.mode = profile.active_mode  # keep the ORM column in sync with plan_data["mode"]
             await db.commit()
 
     pool = plan_data.get("pool", [])

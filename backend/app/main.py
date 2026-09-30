@@ -40,6 +40,10 @@ async def lifespan(app: FastAPI):
         print(f"[Alembic] Could not run migrations: {e}")
 
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+
+    from app.services import sport_catalog
+    sport_catalog.startup_check()
+
     print(f"🚀 FitCoach API running — {settings.ENVIRONMENT}")
     yield
     print("👋 FitCoach API shutting down")

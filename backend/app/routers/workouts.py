@@ -555,10 +555,18 @@ async def get_weekly_plan(
         await db.commit()
         await db.refresh(plan)
     elif profile:
-        # Roll into a fresh pool if we've crossed into a new week
+        # Rebuild if we've crossed into a new week, OR (the sport-onboarding
+        # stale-plan bug) if plan_signature() no longer matches — see
+        # maybe_reset_week()'s docstring. Either way, `plan.mode` — a
+        # separate ORM column from plan.plan["mode"] — must be updated
+        # alongside the JSON blob: this was a pre-existing gap that a week-
+        # rollover rebuild rarely exposed, but a signature-triggered rebuild
+        # hits on every sport-onboarding / profile-edit, making a stale
+        # `mode` column visible immediately instead of a week later.
         reset_plan = maybe_reset_week(plan.plan, profile)
         if reset_plan is not plan.plan:
             plan.plan = reset_plan
+            plan.mode = profile.active_mode
             await db.commit()
 
     return {"plan": plan.plan, "mode": plan.mode, "updated_at": plan.updated_at}
@@ -588,7 +596,7 @@ async def refresh_weekly_plan(
         await db.commit()
         await db.refresh(profile)
 
-    from app.services.plan_service import build_weekly_pool, generate_weekly_plan
+    from app.services.plan_service import build_weekly_pool, generate_weekly_plan, plan_signature
 
     result = await db.execute(select(WeeklyPlan).where(WeeklyPlan.user_id == current_user.id))
     plan = result.scalar_one_or_none()
@@ -603,11 +611,16 @@ async def refresh_weekly_plan(
         # generation time — a partial rebuild here only touched pool/mode
         # before, leaving plan.plan["goal"] stale (still the old goal) even
         # though the pool itself was correctly rebuilt from the new one.
+        # "sig" MUST be refreshed here too — this is a partial merge, not a
+        # full generate_weekly_plan(), so omitting it leaves the OLD
+        # signature in place and maybe_reset_week() rebuilds again (dropping
+        # the done-flag carry-over just applied above) on the very next GET.
         plan.plan = {
             **plan.plan,
             "pool": new_pool,
             "mode": profile.active_mode,
             "goal": profile.goal,
+            "sig": plan_signature(profile),
         }
         plan.mode = profile.active_mode
     else:

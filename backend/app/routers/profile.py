@@ -22,6 +22,7 @@ def _enrich_profile(profile: Profile) -> dict:
     data["xp_to_next"] = info["xp_to_next"]
     data["bmi"] = profile.bmi
     data["active_mode"] = profile.active_mode
+    data["workout_mode"] = (profile.preferences or {}).get("workout_mode")
     return data
 
 
@@ -62,6 +63,14 @@ async def update_profile(
 
     # Pull out explicit onboarding_complete before applying other fields
     explicit_onboarding = update_data.pop("onboarding_complete", None)
+
+    # workout_mode isn't a real column — it lives in the JSON `preferences`
+    # blob, so it must be a dict REASSIGNMENT, never in-place mutation.
+    # SQLAlchemy doesn't track in-place changes to a plain JSON column, so
+    # `profile.preferences["workout_mode"] = v` would silently not persist.
+    workout_mode = update_data.pop("workout_mode", None)
+    if workout_mode is not None:
+        profile.preferences = {**(profile.preferences or {}), "workout_mode": workout_mode}
 
     for key, value in update_data.items():
         setattr(profile, key, value)

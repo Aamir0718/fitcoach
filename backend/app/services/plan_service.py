@@ -2,8 +2,12 @@
 Deterministic weekly plan generation.
 Exercise databases match the desktop version exactly, with YouTube demo URLs.
 """
+import hashlib
+import re
+from functools import lru_cache
 from datetime import date, timedelta
 from app.models.profile import Profile
+from app.services import sport_catalog
 
 # ── Weekly plan templates (gender × mode × goal) ──────────────────────────────
 ## Each entry is an ordered rotation of ALREADY-DISTINCT session categories —
@@ -77,6 +81,9 @@ SESSION_LABELS = {
     "tempo_run":     "Tempo Run",
     "track_intervals":"Track Intervals",
     "long_run":      "Long Run",
+    # ── Role-specific sessions (sport_catalog.py — cricket WK / football GK) ──
+    "keeping_agility": "Keeper Agility",
+    "gk_reaction":      "GK Reaction Training",
 }
 
 # ── Rich Exercise Databases (matching desktop exactly, with demo_url) ─────────
@@ -932,6 +939,172 @@ _INJURY_SKIP: dict[str, list[str]] = {
 }
 
 
+# ── Age-band scaling ───────────────────────────────────────────────────────────
+# Declarative table, matching the file's existing keyword-table idiom
+# (_INJURY_SKIP above) rather than scattered if/else. (min_age, max_age) is
+# inclusive; sets/reps/rest are deltas or multipliers applied on top of the
+# existing zone+level adjustment, never replacing it.
+_AGE_BANDS: list[tuple[str, int, int, dict]] = [
+    ("youth",       0, 17,  {"sets_delta": -1, "rest_mult": 1.00, "reps_delta": 2, "load_mult": 0.70, "exclude": frozenset({"heavy_axial", "max_effort"})}),
+    ("prime",      18, 29,  {"sets_delta": 0,  "rest_mult": 1.00, "reps_delta": 0, "load_mult": 1.00, "exclude": frozenset()}),
+    ("peak",       30, 39,  {"sets_delta": 0,  "rest_mult": 1.10, "reps_delta": 0, "load_mult": 1.00, "exclude": frozenset()}),
+    ("master",     40, 49,  {"sets_delta": 0,  "rest_mult": 1.25, "reps_delta": 2, "load_mult": 0.90, "exclude": frozenset({"max_effort"})}),
+    ("master_plus",50, 59,  {"sets_delta": -1, "rest_mult": 1.40, "reps_delta": 4, "load_mult": 0.80, "exclude": frozenset({"max_effort", "high_impact"})}),
+    ("senior",     60, 200, {"sets_delta": -1, "rest_mult": 1.50, "reps_delta": 6, "load_mult": 0.70, "exclude": frozenset({"max_effort", "high_impact", "heavy_axial"})}),
+]
+
+_AGE_NOTES = {
+    "youth":       "Youth-adjusted: lighter load, technique-first.",
+    "master":      "Age-adjusted (40+): slightly longer rests, sub-maximal loads.",
+    "master_plus": "Age-adjusted (50+): longer rests, lighter loads — joints before ego.",
+    "senior":      "Age-adjusted (60+): longer rests, lighter loads, high-impact work removed.",
+}
+
+# Risk tags derived from the exercise NAME by keyword, not hand-tagged on
+# all 223+ exercises — same idiom as _MOVEMENT_PATTERN_RULES above.
+_MOVEMENT_RISK_TAGS: dict[str, list[str]] = {
+    "heavy_axial": ["back squat", "front squat", "overhead press", "overhead barbell",
+                     "deadlift", "good morning", "bent-over row", "hack squat"],
+    "high_impact": ["jump", "plyo", "burpee", "bound", "depth", "skater", "sprint", "tuck jump"],
+    "max_effort":  ["weighted pull-up", "power clean", "snatch", "clean", "1rm", "explosive"],
+}
+
+
+def age_band(age: int | None) -> str:
+    a = age if isinstance(age, int) else 25
+    for name, lo, hi, _cfg in _AGE_BANDS:
+        if lo <= a <= hi:
+            return name
+    return "prime"
+
+
+def _age_band_config(age: int | None) -> dict:
+    a = age if isinstance(age, int) else 25
+    for _name, lo, hi, cfg in _AGE_BANDS:
+        if lo <= a <= hi:
+            return cfg
+    return _AGE_BANDS[1][3]  # "prime" — the no-op default
+
+
+@lru_cache(maxsize=512)
+def _risk_tags_for(name: str) -> frozenset:
+    n = name.lower()
+    tags = set()
+    for tag, keywords in _MOVEMENT_RISK_TAGS.items():
+        if any(kw in n for kw in keywords):
+            tags.add(tag)
+    return frozenset(tags)
+
+
+def _filter_by_age(exercises: list[dict], profile: Profile) -> list[dict]:
+    """Remove exercises whose risk tags are excluded for this age band.
+    Same safety rule as _filter_by_injury below: never return fewer than 4 —
+    an over-strict exclusion falls back to the original list rather than
+    starving the session."""
+    exclude = _age_band_config(getattr(profile, "age", None))["exclude"]
+    if not exclude:
+        return exercises
+    filtered = [ex for ex in exercises if not (_risk_tags_for(ex.get("name", "")) & exclude)]
+    return filtered if len(filtered) >= 4 else exercises
+
+
+_REP_RANGE_RE = re.compile(r"^(\d+)\s*-\s*(\d+)$")
+_REP_SINGLE_RE = re.compile(r"^(\d+)$")
+_REST_SECONDS_RE = re.compile(r"^(\d+)s$")
+
+
+def _shift_reps(reps, delta: int):
+    """Shift a plain numeric rep count/range by delta. Anything else ("8 ea",
+    "20 min", "2 min hard / 1 rest", "45-60s") is left untouched on purpose —
+    safer to under-personalize than to mis-parse and crash generation."""
+    if not isinstance(reps, str) or not delta:
+        return reps
+    s = reps.strip()
+    m = _REP_RANGE_RE.match(s)
+    if m:
+        lo, hi = int(m.group(1)), int(m.group(2))
+        return f"{max(1, lo + delta)}-{max(lo + delta + 1, hi + delta)}"
+    m = _REP_SINGLE_RE.match(s)
+    if m:
+        return str(max(1, int(m.group(1)) + delta))
+    return reps
+
+
+def _scale_rest(rest, mult: float):
+    """Scale a plain '90s'-style rest by mult, rounded to the nearest 5s.
+    Leaves '0s' (continuous/cardio sets), '2 min', and anything else alone."""
+    if not isinstance(rest, str) or mult == 1.0:
+        return rest
+    m = _REST_SECONDS_RE.match(rest.strip())
+    if not m:
+        return rest
+    num = int(m.group(1))
+    if num == 0:
+        return rest
+    new_num = max(15, round(num * mult / 5) * 5)
+    return f"{new_num}s"
+
+
+def apply_age_scaling(item: dict, profile: Profile) -> dict:
+    """Adjust sets/reps/rest for this profile's age band, on top of the
+    existing zone+level adjustment already applied to `item`."""
+    cfg = _age_band_config(getattr(profile, "age", None))
+    if cfg["sets_delta"]:
+        item["sets"] = max(1, min(6, item.get("sets", 3) + cfg["sets_delta"]))
+    if cfg["rest_mult"] != 1.0:
+        item["rest"] = _scale_rest(item.get("rest", "60s"), cfg["rest_mult"])
+    if cfg["reps_delta"]:
+        item["reps"] = _shift_reps(item.get("reps", ""), cfg["reps_delta"])
+    band = age_band(getattr(profile, "age", None))
+    note = _AGE_NOTES.get(band)
+    if note:
+        item["age_note"] = note
+    return item
+
+
+_SLUG_RE = re.compile(r"[^a-z0-9]+")
+
+
+def _slugify(name: str) -> str:
+    """Stable identifier for an exercise name, for future demo-asset lookup —
+    e.g. 'Barbell Bench Press' -> 'barbell-bench-press'. Not yet consumed by
+    anything; laid down now so later work has a stable key to build on."""
+    s = _SLUG_RE.sub("-", (name or "").strip().lower()).strip("-")
+    return s or "exercise"
+
+
+_PERSONALIZATION_VERSION = 3  # bump whenever catalog/scoring logic changes,
+                              # so existing weekly_plans rows self-heal on
+                              # next load instead of needing a manual reset.
+
+
+def plan_signature(profile: Profile) -> str:
+    """Fingerprint of every profile field that shapes plan generation. Stored
+    on the weekly_plans row; maybe_reset_week() rebuilds whenever this
+    changes, not only on a week rollover — fixes the sport-onboarding-leaves-
+    a-stale-gym-pool bug at its root instead of patching each call site."""
+    parts = (
+        (profile.gender or "male").lower(),
+        profile.active_mode,
+        _GOAL_ALIASES.get(profile.goal or "general_fitness", profile.goal or "general_fitness"),
+        (profile.level or "intermediate").lower(),
+        min(6, max(3, profile.days_per_week or 4)),
+        profile.workout_place or "gym",
+        bool(profile.plays_sport),
+        (profile.sport or ""),
+        (profile.sport_role or ""),
+        (profile.sport_position or ""),
+        (profile.bowling_type or ""),
+        (profile.sport_focus or ""),
+        (profile.injuries or ""),
+        (profile.sport_injuries or ""),
+        age_band(getattr(profile, "age", None)),
+        _PERSONALIZATION_VERSION,
+        sport_catalog.version(profile.sport) if profile.sport else 0,
+    )
+    return hashlib.sha1("|".join(str(p) for p in parts).encode()).hexdigest()[:12]
+
+
 def _filter_by_injury(exercises: list[dict], profile: Profile) -> list[dict]:
     """Always remove exercises that clash with reported injuries."""
     inj = (profile.injuries or "").lower()
@@ -969,15 +1142,20 @@ def _rotate_for_user(exercises: list[dict], user_id: int, seed: str) -> list[dic
     return exercises[offset:] + exercises[:offset]
 
 
-def _adjust_weight_guide(weight_guide: str, profile: Profile) -> str:
-    """Scale weight guide hints based on user's body weight and level."""
+def _adjust_weight_guide(weight_guide: str, profile: Profile, extra_mult: float = 1.0) -> str:
+    """Scale weight guide hints based on user's body weight, level, and an
+    optional extra multiplier (age-band load scaling — see apply_age_scaling)."""
     if not weight_guide or "bodyweight" in weight_guide.lower() or "band" in weight_guide.lower():
         return weight_guide
     bw = profile.weight or 75.0
     level = (profile.level or "intermediate").lower()
-    scale = {"beginner": 0.65, "intermediate": 1.0, "advanced": 1.25}.get(level, 1.0)
+    level_scale = {"beginner": 0.65, "intermediate": 1.0, "advanced": 1.25}.get(level, 1.0)
+    # Bodyweight scaling — previously computed (`bw`) and never used. A
+    # heavier lifter's weight guide should skew up, a lighter one's down;
+    # dampened with **0.6 so it nudges rather than dominates the range.
+    bw_scale = min(1.30, max(0.75, (bw / 75.0) ** 0.6))
+    scale = level_scale * bw_scale * extra_mult
     # Only scale if the guide contains a numeric range like "60-100kg"
-    import re
     nums = re.findall(r'\d+', weight_guide)
     if not nums:
         return weight_guide
@@ -1028,15 +1206,21 @@ def _format_exercise(ex: dict, zone: str, level: str = "intermediate", profile: 
             item["sets"] = min(6, item["sets"] + 1)
             item["level_note"] = "Advanced: push to near-failure on last 2 sets."
 
-    # ── Personalise weight guide ─────────────────────────────────────────────────
+    # ── Personalise weight guide + age-band scaling ─────────────────────────────
     if profile is not None:
-        item["weight_guide"] = _adjust_weight_guide(item.get("weight_guide", ""), profile)
+        age_cfg = _age_band_config(getattr(profile, "age", None))
+        item["weight_guide"] = _adjust_weight_guide(item.get("weight_guide", ""), profile, age_cfg["load_mult"])
+        item = apply_age_scaling(item, profile)
 
     # ── Ensure demo_url ──────────────────────────────────────────────────────────
     item.setdefault(
         "demo_url",
         "https://www.youtube.com/results?search_query=" + item.get("name", "exercise").replace(" ", "+") + "+form"
     )
+    # Stable slug for future demo-asset lookup — see _slugify() docstring.
+    # NOT the same signal as demo_url (which is always non-null via the
+    # setdefault above, even when nothing real backs it).
+    item["demo_slug"] = _slugify(item.get("name", ""))
 
     # ── Ghost Trainer coaching cues ──────────────────────────────────────────────
     name = item.get("name", "")
@@ -1071,11 +1255,22 @@ def _get_exercises(category: str, profile: Profile, zone: str) -> list[dict]:
         count = max(4, count - 1)
 
     # ── Sport mode ───────────────────────────────────────────────────────────────
+    # Role-aware selection first (sport_catalog.py, JSON-backed); its own
+    # fallback chain is sport-aware and already applies its own rotation.
+    # Only fall through to the legacy flat _SPORT lookup if the JSON catalog
+    # itself failed to load — and even then, NEVER fall back to gym barbell
+    # work: an unmatched session lands on this sport's own data, or failing
+    # that, a bodyweight full-body session. Gym exercises in sport mode was
+    # the single biggest cause of "sport mode looks the same as gym mode".
     if mode == "sport" and profile.sport:
-        sport_db = _SPORT.get((profile.sport or "").lower(), {})
-        exercises = list(sport_db.get(category) or _GYM_MALE.get("full_body", []))
+        sport_key = (profile.sport or "").lower()
+        exercises = sport_catalog.select(sport_key, category, profile, count)
+        if exercises is None:
+            sport_db = _SPORT.get(sport_key, {})
+            exercises = list(sport_db.get(category) or next(iter(sport_db.values()), None) or _HOME_MALE.get("full_body", []))
+            exercises = _rotate_for_user(exercises, uid, category)
         exercises = _filter_by_injury(exercises, profile)
-        exercises = _rotate_for_user(exercises, uid, category)
+        exercises = _filter_by_age(exercises, profile)
         return [_format_exercise(ex, zone, level, profile, category) for ex in exercises[:count]]
 
     # ── Injury redirect at red zone ──────────────────────────────────────────────
@@ -1096,6 +1291,10 @@ def _get_exercises(category: str, profile: Profile, zone: str) -> list[dict]:
 
     # Always filter injuries (not just red zone)
     exercises = _filter_by_injury(exercises, profile)
+    # Age-appropriate filtering (heavy axial load / high impact / max-effort
+    # movements excluded above certain age bands) — same min-4 safety
+    # fallback as the injury filter, so it can never over-restrict.
+    exercises = _filter_by_age(exercises, profile)
     # Rotate per user — unique exercise order for every user
     exercises = _rotate_for_user(exercises, uid, category)
 
@@ -1120,6 +1319,17 @@ def _plan_template_for(profile: Profile) -> tuple[str, list[str]]:
     mode  = profile.active_mode
     sport = profile.sport
     goal  = _GOAL_ALIASES.get(profile.goal or "general_fitness", profile.goal or "general_fitness")
+
+    # ── Role-aware template (sport_catalog.py) ────────────────────────────────
+    # A batsman, a fast bowler and a wicketkeeper are the same "sport" but must
+    # not train the same five sessions in the same order — read sport_role /
+    # sport_position / bowling_type (captured at onboarding, ignored by every
+    # generation path until now) to pick a role-specific session order.
+    if mode == "sport" and sport:
+        role_key, _sub_role = sport_catalog.normalize_role(profile)
+        role_tpl = sport_catalog.role_template((sport or "").lower(), role_key)
+        if role_tpl:
+            return goal, role_tpl
 
     key = (gender, mode, goal if mode != "sport" else sport)
     template = _PLANS.get(key)
@@ -1179,17 +1389,39 @@ def generate_weekly_plan(profile: Profile) -> dict:
         "sport": profile.sport,
         "level": level,
         "days_per_week": days_per_week,
+        "sig": plan_signature(profile),
     }
 
 
 def maybe_reset_week(plan: dict, profile: Profile) -> dict:
-    """If today has rolled into a new week (vs. plan['week_start']) — or this plan
-    predates the pool model entirely (no 'pool' key, e.g. an old 'days'-shaped
-    plan) — rebuild fresh. No-op if still the same week with a valid pool."""
+    """Rebuild the pool if today has rolled into a new week, if this plan
+    predates the pool model entirely (no 'pool' key), OR if the profile's
+    plan_signature() no longer matches (goal/level/injuries/age-band changed,
+    or — the bug this fixes — sport onboarding just set plays_sport/sport/
+    sport_role for the first time). No-op only if the week AND the
+    signature both still match.
+
+    A signature-triggered rebuild (same week, new signature) carries over
+    'done' flags and week_start so a profile edit never silently wipes
+    progress already logged this week — a full weekly rollover still resets
+    normally, matching prior behaviour."""
     current_monday = _monday_of(date.today()).isoformat()
-    if plan.get("week_start") == current_monday and "pool" in plan:
+    current_sig = plan_signature(profile)
+    same_week = plan.get("week_start") == current_monday and "pool" in plan
+    same_sig = plan.get("sig") == current_sig
+
+    if same_week and same_sig:
         return plan
-    return generate_weekly_plan(profile)
+
+    new_plan = generate_weekly_plan(profile)
+    if same_week:
+        new_plan["week_start"] = plan.get("week_start", new_plan["week_start"])
+        done_keys = {item["key"] for item in plan.get("pool", []) if item.get("done")}
+        for item in new_plan["pool"]:
+            if item["key"] in done_keys:
+                item["done"] = True
+                item["done_date"] = date.today().isoformat()
+    return new_plan
 
 
 def profile_has_usable_data(profile: Profile) -> bool:
@@ -1385,6 +1617,7 @@ def _format_warmup_cooldown(ex: dict, section: str) -> dict:
         "demo_url",
         "https://www.youtube.com/results?search_query=" + item.get("name", "exercise").replace(" ", "+"),
     )
+    item["demo_slug"] = _slugify(item.get("name", ""))
     item.setdefault(
         "form_cues",
         ["Move through a full, controlled range of motion", "Gradually build up intensity"]

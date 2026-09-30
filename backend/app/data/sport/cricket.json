@@ -1,0 +1,94 @@
+{
+  "sport": "cricket",
+  "version": 1,
+  "mobility_session": "cricket_mobility",
+  "role_aliases": {
+    "wicket_keeper": "wicketkeeper", "wicket-keeper": "wicketkeeper", "keeper": "wicketkeeper", "wk": "wicketkeeper",
+    "batter": "batsman", "bat": "batsman",
+    "all-rounder": "all_rounder", "allrounder": "all_rounder", "all_round": "all_rounder",
+    "medium": "fast", "medium_fast": "fast", "medium-fast": "fast", "fast_medium": "fast",
+    "off_spin": "spin", "off-spin": "spin", "leg_spin": "spin", "leg-spin": "spin", "spinner": "spin"
+  },
+  "role_templates": {
+    "batsman":     ["batting_power", "fielding_agility", "cricket_mobility", "cricket_conditioning", "bowling_strength"],
+    "fast_bowler": ["bowling_strength", "cricket_conditioning", "cricket_mobility", "fielding_agility", "batting_power"],
+    "spin_bowler": ["bowling_strength", "cricket_mobility", "fielding_agility", "cricket_conditioning", "batting_power"],
+    "all_rounder": ["batting_power", "bowling_strength", "cricket_conditioning", "fielding_agility", "cricket_mobility"],
+    "wicketkeeper":["keeping_agility", "fielding_agility", "cricket_mobility", "cricket_conditioning", "batting_power"]
+  },
+  "session_labels": {
+    "keeping_agility": "Keeper Agility"
+  },
+  "session_fallbacks": {
+    "batting_power": ["cricket_mobility"],
+    "bowling_strength": ["cricket_conditioning"],
+    "fielding_agility": ["cricket_conditioning"],
+    "keeping_agility": ["fielding_agility"]
+  },
+  "sessions": {
+    "batting_power": [
+      {"name": "Shadow Batting Footwork",   "sets": 4, "reps": "90s",    "rest": "60s", "muscle": "Footwork/Coordination", "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=cricket+batting+footwork+drill"},
+      {"name": "Resistance Band Bat Swing", "sets": 4, "reps": "15",     "rest": "60s", "muscle": "Rotational Power",      "weight_guide": "Medium band","equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=cricket+bat+swing+resistance+band+training"},
+      {"name": "Med Ball Rotational Throw", "sets": 4, "reps": "10 ea",  "rest": "90s", "muscle": "Core/Hip Drive",        "weight_guide": "4-6kg ball", "equipment_required": true,  "demo_url": "https://www.youtube.com/results?search_query=medicine+ball+rotational+throw+cricket+batting"},
+      {"name": "Hip Drive Drill",           "sets": 3, "reps": "12",     "rest": "60s", "muscle": "Hips/Glutes",           "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=hip+drive+drill+cricket+batting+power"},
+      {"name": "Wrist Roller",              "sets": 3, "reps": "2 min",  "rest": "60s", "muscle": "Forearms/Wrists",       "weight_guide": "Light weight","equipment_required": true,  "demo_url": "https://www.youtube.com/results?search_query=wrist+roller+exercise+cricket+training"},
+      {"name": "T-Step Batting Drill",      "sets": 4, "reps": "10 ea",  "rest": "45s", "muscle": "Footwork/Agility",      "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=cricket+t+step+batting+footwork+drill"},
+      {"name": "Front/Back-Foot Transfer",  "sets": 4, "reps": "12 ea",  "rest": "45s", "muscle": "Footwork/Balance",      "weight_guide": "Bodyweight", "equipment_required": false, "roles": ["batsman"], "priority": 8, "demo_url": "https://www.youtube.com/results?search_query=cricket+front+foot+back+foot+transfer+drill"},
+      {"name": "Overload-Underload Bat Swings", "sets": 4, "reps": "10 ea", "rest": "60s", "muscle": "Bat Speed/Power",   "weight_guide": "Heavy + light bat", "equipment_required": true, "roles": ["batsman"], "priority": 8, "demo_url": "https://www.youtube.com/results?search_query=overload+underload+bat+swing+training+cricket"},
+      {"name": "Split-Step Reaction Drill", "sets": 4, "reps": "10",     "rest": "45s", "muscle": "Reaction/Footwork",     "weight_guide": "Bodyweight", "equipment_required": false, "roles": ["batsman"], "priority": 7, "demo_url": "https://www.youtube.com/results?search_query=split+step+reaction+drill+cricket+batting"},
+      {"name": "Reaction-Ball Hand-Eye Drill", "sets": 3, "reps": "2 min", "rest": "45s", "muscle": "Hand-Eye Coordination", "weight_guide": "Reaction ball", "equipment_required": true, "roles": ["batsman"], "priority": 7, "demo_url": "https://www.youtube.com/results?search_query=reaction+ball+hand+eye+coordination+cricket"}
+    ],
+    "cricket_mobility": [
+      {"name": "Thoracic Rotation Stretch",   "sets": 3, "reps": "10 ea",  "rest": "30s", "muscle": "Thoracic Spine", "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=thoracic+rotation+stretch+cricket+mobility"},
+      {"name": "Hip 90/90 Stretch",           "sets": 3, "reps": "60s ea", "rest": "20s", "muscle": "Hips",           "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=90+90+hip+stretch+cricket+athlete"},
+      {"name": "Shoulder External Rotation",  "sets": 3, "reps": "15",     "rest": "30s", "muscle": "Rotator Cuff",   "weight_guide": "Light band", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=shoulder+external+rotation+cricket+injury+prevention"},
+      {"name": "Cat-Cow Stretch",             "sets": 3, "reps": "15",     "rest": "20s", "muscle": "Spine",          "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=cat+cow+stretch+cricket+warm+up"},
+      {"name": "Pigeon Pose",                 "sets": 3, "reps": "60s ea", "rest": "0s",  "muscle": "Hip Flexors",    "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=pigeon+pose+cricket+flexibility"},
+      {"name": "World's Greatest Stretch",    "sets": 3, "reps": "6 ea",   "rest": "30s", "muscle": "Full Body",      "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=worlds+greatest+stretch+cricket+warm+up"},
+      {"name": "Wrist Mobility Circles",      "sets": 3, "reps": "20 ea",  "rest": "20s", "muscle": "Wrists",         "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=wrist+mobility+drill+cricket+batting"}
+    ],
+    "cricket_conditioning": [
+      {"name": "17m Sprint Intervals",        "sets": 8, "reps": "17m sprint", "rest": "45s", "muscle": "Speed/Conditioning", "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=cricket+17m+sprint+conditioning+drill"},
+      {"name": "Shuttle Run (wicket width)",  "sets": 6, "reps": "1 min",     "rest": "60s", "muscle": "Speed Endurance",    "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=cricket+shuttle+run+between+wickets+fitness"},
+      {"name": "6-Ball Sprint-Recovery",      "sets": 4, "reps": "6x10m",     "rest": "90s", "muscle": "Match Fitness",      "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=cricket+6+ball+sprint+recovery+fitness"},
+      {"name": "Lateral Speed Ladder",        "sets": 5, "reps": "30s",       "rest": "45s", "muscle": "Footwork/Agility",   "weight_guide": "Agility ladder", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=cricket+agility+ladder+footwork+speed+drill"},
+      {"name": "Skip Rope",                   "sets": 4, "reps": "2 min",     "rest": "60s", "muscle": "Cardio/Footwork",    "weight_guide": "Jump rope", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=jump+rope+cricket+conditioning+training"}
+    ],
+    "fielding_agility": [
+      {"name": "T-Drill (cone)",           "sets": 5, "reps": "1 run", "rest": "60s", "muscle": "Agility/Quickness",   "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=t+drill+cricket+fielding+agility"},
+      {"name": "Figure-8 Cone Drill",       "sets": 4, "reps": "30s",   "rest": "45s", "muscle": "Change of Direction", "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=figure+8+cone+drill+cricket+fielding"},
+      {"name": "Dive and Recover",          "sets": 4, "reps": "8",     "rest": "60s", "muscle": "Full Body Agility",   "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=cricket+fielding+dive+and+recover+drill"},
+      {"name": "Throwing Speed Drill",      "sets": 3, "reps": "10 ea", "rest": "60s", "muscle": "Shoulder/Core",       "weight_guide": "Cricket ball", "equipment_required": true, "demo_url": "https://www.youtube.com/results?search_query=cricket+throwing+speed+accuracy+fielding+drill"},
+      {"name": "Ground Ball Fielding",      "sets": 4, "reps": "10 ea", "rest": "45s", "muscle": "Reaction/Agility",    "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=cricket+ground+fielding+technique+drill"},
+      {"name": "Skater Jump",               "sets": 3, "reps": "12 ea", "rest": "60s", "muscle": "Lateral Power",       "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=skater+jump+lateral+bound+cricket+training"}
+    ],
+    "bowling_strength": [
+      {"name": "Hip Drive Drill (Bowling)",   "sets": 4, "reps": "12",    "rest": "60s", "muscle": "Hips/Glutes",           "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=cricket+bowling+hip+drive+drill"},
+      {"name": "Pallof Press",                "sets": 3, "reps": "12 ea", "rest": "60s", "muscle": "Anti-Rotation Core",    "weight_guide": "Light band", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=pallof+press+cricket+bowling+core"},
+      {"name": "Single-Leg Landing Drill",    "sets": 4, "reps": "8 ea",  "rest": "75s", "muscle": "Ankle/Knee Stability",  "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=single+leg+landing+drill+cricket+bowling"},
+      {"name": "Shoulder External Rotation",  "sets": 3, "reps": "15",    "rest": "45s", "muscle": "Rotator Cuff",          "weight_guide": "Light band", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=shoulder+external+rotation+cricket+bowling+injury"},
+      {"name": "Nordic Hamstring Curl",       "sets": 3, "reps": "6",     "rest": "90s", "muscle": "Hamstrings",            "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=nordic+hamstring+curl+cricket+bowling+prevention"},
+      {"name": "Med Ball Overhead Slam",      "sets": 4, "reps": "8",     "rest": "75s", "muscle": "Core/Total Body Power", "weight_guide": "4-6kg ball", "equipment_required": true, "demo_url": "https://www.youtube.com/results?search_query=medicine+ball+slam+cricket+bowling+power"},
+
+      {"name": "Run-Up Stride Pattern Drill",  "sets": 5, "reps": "1 run",  "rest": "75s", "muscle": "Sprint Mechanics",     "weight_guide": "Bodyweight", "equipment_required": false, "roles": ["fast_bowler"], "sub_roles": ["fast"], "focus": ["power"], "priority": 9, "demo_url": "https://www.youtube.com/results?search_query=cricket+fast+bowling+run+up+stride+pattern+drill"},
+      {"name": "Front-Leg Block Landing",      "sets": 4, "reps": "8 ea",   "rest": "75s", "muscle": "Front Knee/Hip Bracing","weight_guide": "Bodyweight", "equipment_required": false, "roles": ["fast_bowler"], "sub_roles": ["fast"], "focus": ["injury_prevention", "power"], "priority": 9, "demo_url": "https://www.youtube.com/results?search_query=fast+bowling+front+leg+block+landing+drill"},
+      {"name": "Copenhagen Side Plank",        "sets": 3, "reps": "20-30s ea","rest": "45s", "muscle": "Adductors/Hip Stability","weight_guide": "Bodyweight", "equipment_required": false, "roles": ["fast_bowler"], "focus": ["injury_prevention"], "priority": 8, "demo_url": "https://www.youtube.com/results?search_query=copenhagen+plank+fast+bowler+groin+injury+prevention"},
+      {"name": "90/90 Shoulder External Rotation","sets": 3, "reps": "12 ea","rest": "45s", "muscle": "Rotator Cuff/Shoulder", "weight_guide": "Light band", "equipment_required": false, "roles": ["fast_bowler"], "focus": ["injury_prevention"], "priority": 8, "demo_url": "https://www.youtube.com/results?search_query=90+90+shoulder+external+rotation+fast+bowler"},
+      {"name": "Thoracic Seam Rotation Drill",  "sets": 3, "reps": "10 ea", "rest": "45s", "muscle": "Thoracic Spine/Power",  "weight_guide": "Cricket ball", "equipment_required": true, "roles": ["fast_bowler"], "focus": ["power"], "priority": 7, "demo_url": "https://www.youtube.com/results?search_query=thoracic+rotation+seam+position+fast+bowling"},
+      {"name": "Shin/Ankle Plyo Bounds",        "sets": 4, "reps": "8",     "rest": "75s", "muscle": "Ankle Stiffness/Power", "weight_guide": "Bodyweight", "equipment_required": false, "roles": ["fast_bowler"], "focus": ["power"], "priority": 7, "demo_url": "https://www.youtube.com/results?search_query=ankle+plyometric+bounding+fast+bowler+power"},
+
+      {"name": "Finger-Flick Rice Bucket Drill", "sets": 3, "reps": "60s",  "rest": "45s", "muscle": "Finger/Wrist Strength", "weight_guide": "Rice bucket", "equipment_required": true, "roles": ["spin_bowler"], "sub_roles": ["spin"], "focus": ["control"], "priority": 9, "demo_url": "https://www.youtube.com/results?search_query=rice+bucket+finger+strength+spin+bowling"},
+      {"name": "Wrist-Snap Spin Drill",         "sets": 4, "reps": "15",    "rest": "45s", "muscle": "Wrist/Forearm Rotation","weight_guide": "Cricket ball", "equipment_required": true, "roles": ["spin_bowler"], "sub_roles": ["spin"], "focus": ["control"], "priority": 9, "demo_url": "https://www.youtube.com/results?search_query=wrist+snap+drill+spin+bowling+technique"},
+      {"name": "Pivot Footwork Drill",          "sets": 4, "reps": "10 ea", "rest": "45s", "muscle": "Hip Pivot/Footwork",    "weight_guide": "Bodyweight", "equipment_required": false, "roles": ["spin_bowler"], "focus": ["control"], "priority": 8, "demo_url": "https://www.youtube.com/results?search_query=pivot+footwork+drill+spin+bowler"},
+      {"name": "Rotational Hip Drive (Slow)",   "sets": 3, "reps": "12",    "rest": "60s", "muscle": "Hip Rotation/Core",     "weight_guide": "Light band", "equipment_required": false, "roles": ["spin_bowler"], "focus": ["control", "power"], "priority": 7, "demo_url": "https://www.youtube.com/results?search_query=rotational+hip+drive+drill+spin+bowling"},
+      {"name": "Shoulder Circumduction Drill",  "sets": 3, "reps": "15 ea", "rest": "30s", "muscle": "Shoulder Mobility",     "weight_guide": "Light band", "equipment_required": false, "roles": ["spin_bowler"], "focus": ["injury_prevention"], "priority": 7, "demo_url": "https://www.youtube.com/results?search_query=shoulder+circumduction+mobility+spin+bowler"}
+    ],
+    "keeping_agility": [
+      {"name": "Deep-Crouch Hold",          "sets": 4, "reps": "30-45s",  "rest": "45s", "muscle": "Hip/Ankle Endurance",  "weight_guide": "Bodyweight", "equipment_required": false, "priority": 9, "demo_url": "https://www.youtube.com/results?search_query=wicketkeeper+deep+crouch+hold+drill"},
+      {"name": "Up-Down From Crouch",       "sets": 4, "reps": "10",      "rest": "45s", "muscle": "Reactive Power/Legs",  "weight_guide": "Bodyweight", "equipment_required": false, "priority": 9, "demo_url": "https://www.youtube.com/results?search_query=wicketkeeper+up+down+crouch+drill"},
+      {"name": "Glove Reaction Catch Drill","sets": 4, "reps": "15",      "rest": "45s", "muscle": "Hand-Eye/Reaction",    "weight_guide": "Reaction ball", "equipment_required": true, "priority": 8, "demo_url": "https://www.youtube.com/results?search_query=wicketkeeper+glove+reaction+catching+drill"},
+      {"name": "Both-Side Dive Drill",      "sets": 4, "reps": "6 ea",    "rest": "60s", "muscle": "Lateral Power/Agility","weight_guide": "Bodyweight", "equipment_required": false, "priority": 8, "demo_url": "https://www.youtube.com/results?search_query=wicketkeeper+diving+drill+both+sides"},
+      {"name": "Deep-Squat Hip/Ankle Mobility","sets": 3, "reps": "60s",  "rest": "30s", "muscle": "Hip/Ankle Mobility",   "weight_guide": "Bodyweight", "equipment_required": false, "priority": 7, "demo_url": "https://www.youtube.com/results?search_query=deep+squat+mobility+wicketkeeper"}
+    ]
+  }
+}
