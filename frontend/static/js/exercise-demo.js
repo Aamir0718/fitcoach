@@ -261,20 +261,29 @@
   // rep pauses briefly at the squeeze/lockout point).
   function standingLegs(hipA, kneeA) { return { hipAngle: hipA, kneeAngle: kneeA }; }
 
+  // Angle-convention note (this is what was wrong before): 0 = straight
+  // DOWN, 180 = straight up. An arm hanging naturally at a standing
+  // figure's side is close to 0, not close to 180 — every "resting arm"
+  // pose below was previously written near 170-178 (i.e. pointing the arm
+  // up alongside the head) instead of near 5-15 (pointing down at the
+  // side). Rewritten throughout, verified against real Playwright
+  // screenshots this time, not just reasoned about.
+  var HANG = { shoulderAngle: 10, elbowAngle: 12 }; // arms relaxed at the sides
+
   var PATTERN_POSES = {
     squat: {
-      ready: { hip: { x: 150, y: 116 }, torsoAngle: 185, legL: standingLegs(8, 8), legR: standingLegs(8, 8), armL: { shoulderAngle: 100, elbowAngle: 40 }, armR: { shoulderAngle: 100, elbowAngle: 40 } },
-      working: { hip: { x: 147, y: 152 }, torsoAngle: 202, legL: standingLegs(76, 344), legR: standingLegs(76, 344), armL: { shoulderAngle: 100, elbowAngle: 40 }, armR: { shoulderAngle: 100, elbowAngle: 40 } },
+      ready: { hip: { x: 150, y: 116 }, torsoAngle: 174, legL: standingLegs(8, 8), legR: standingLegs(8, 8), armL: HANG, armR: HANG },
+      working: { hip: { x: 146, y: 150 }, torsoAngle: 158, legL: standingLegs(76, 344), legR: standingLegs(76, 344), armL: HANG, armR: HANG },
       hold: 0.08,
     },
     lunge: {
-      ready: { hip: { x: 150, y: 116 }, torsoAngle: 182, legL: standingLegs(16, 10), legR: standingLegs(2, 6), armL: { shoulderAngle: 172, elbowAngle: 172 }, armR: { shoulderAngle: 172, elbowAngle: 172 } },
-      working: { hip: { x: 148, y: 140 }, torsoAngle: 190, legL: standingLegs(62, 306), legR: standingLegs(340, 28), armL: { shoulderAngle: 172, elbowAngle: 172 }, armR: { shoulderAngle: 172, elbowAngle: 172 } },
+      ready: { hip: { x: 150, y: 116 }, torsoAngle: 175, legL: standingLegs(14, 10), legR: standingLegs(2, 6), armL: HANG, armR: HANG },
+      working: { hip: { x: 149, y: 128 }, torsoAngle: 170, legL: standingLegs(58, 300), legR: standingLegs(320, 250), armL: HANG, armR: HANG },
       hold: 0.06,
     },
     hip_hinge: {
-      ready: { hip: { x: 150, y: 116 }, torsoAngle: 182, legL: standingLegs(10, 10), legR: standingLegs(10, 10), armL: { shoulderAngle: 176, elbowAngle: 176 }, armR: { shoulderAngle: 176, elbowAngle: 176 } },
-      working: { hip: { x: 150, y: 122 }, torsoAngle: 112, legL: standingLegs(26, 26), legR: standingLegs(26, 26), armL: { shoulderAngle: 176, elbowAngle: 176 }, armR: { shoulderAngle: 176, elbowAngle: 176 } },
+      ready: { hip: { x: 150, y: 116 }, torsoAngle: 174, legL: standingLegs(10, 10), legR: standingLegs(10, 10), armL: { shoulderAngle: 8, elbowAngle: 8 }, armR: { shoulderAngle: 8, elbowAngle: 8 } },
+      working: { hip: { x: 150, y: 122 }, torsoAngle: 108, legL: standingLegs(26, 26), legR: standingLegs(26, 26), armL: { shoulderAngle: 40, elbowAngle: 40 }, armR: { shoulderAngle: 40, elbowAngle: 40 } },
       hold: 0.05,
     },
     horizontal_push: {
@@ -283,58 +292,58 @@
       hold: 0.1,
     },
     vertical_push: {
-      ready: { hip: { x: 150, y: 116 }, torsoAngle: 184, legL: standingLegs(10, 10), legR: standingLegs(10, 10), armL: { shoulderAngle: 80, elbowAngle: 30 }, armR: { shoulderAngle: 80, elbowAngle: 30 } },
-      working: { hip: { x: 150, y: 116 }, torsoAngle: 188, legL: standingLegs(10, 10), legR: standingLegs(10, 10), armL: { shoulderAngle: 172, elbowAngle: 172 }, armR: { shoulderAngle: 172, elbowAngle: 172 } },
+      ready: { hip: { x: 150, y: 116 }, torsoAngle: 176, legL: standingLegs(10, 10), legR: standingLegs(10, 10), armL: { shoulderAngle: 70, elbowAngle: 170 }, armR: { shoulderAngle: 70, elbowAngle: 170 } },
+      working: { hip: { x: 150, y: 116 }, torsoAngle: 172, legL: standingLegs(10, 10), legR: standingLegs(10, 10), armL: { shoulderAngle: 178, elbowAngle: 178 }, armR: { shoulderAngle: 178, elbowAngle: 178 } },
       hold: 0.12,
     },
     horizontal_pull: {
-      ready: { hip: { x: 150, y: 122 }, torsoAngle: 140, legL: standingLegs(20, 20), legR: standingLegs(20, 20), armL: { shoulderAngle: 95, elbowAngle: 95 }, armR: { shoulderAngle: 95, elbowAngle: 95 } },
-      working: { hip: { x: 150, y: 122 }, torsoAngle: 140, legL: standingLegs(20, 20), legR: standingLegs(20, 20), armL: { shoulderAngle: 165, elbowAngle: 205 }, armR: { shoulderAngle: 165, elbowAngle: 205 } },
+      ready: { hip: { x: 150, y: 122 }, torsoAngle: 110, legL: standingLegs(20, 20), legR: standingLegs(20, 20), armL: { shoulderAngle: 45, elbowAngle: 45 }, armR: { shoulderAngle: 45, elbowAngle: 45 } },
+      working: { hip: { x: 150, y: 122 }, torsoAngle: 110, legL: standingLegs(20, 20), legR: standingLegs(20, 20), armL: { shoulderAngle: 135, elbowAngle: 225 }, armR: { shoulderAngle: 135, elbowAngle: 225 } },
       hold: 0.14,
     },
     vertical_pull: {
-      ready: { hip: { x: 150, y: 120 }, torsoAngle: 175, legL: standingLegs(15, 70), legR: standingLegs(15, 70), armL: { shoulderAngle: 172, elbowAngle: 172 }, armR: { shoulderAngle: 172, elbowAngle: 172 } },
-      working: { hip: { x: 150, y: 120 }, torsoAngle: 178, legL: standingLegs(15, 70), legR: standingLegs(15, 70), armL: { shoulderAngle: 108, elbowAngle: 55 }, armR: { shoulderAngle: 108, elbowAngle: 55 } },
+      ready: { hip: { x: 150, y: 120 }, torsoAngle: 176, legL: standingLegs(15, 70), legR: standingLegs(15, 70), armL: { shoulderAngle: 174, elbowAngle: 174 }, armR: { shoulderAngle: 174, elbowAngle: 174 } },
+      working: { hip: { x: 150, y: 120 }, torsoAngle: 178, legL: standingLegs(15, 70), legR: standingLegs(15, 70), armL: { shoulderAngle: 25, elbowAngle: 340 }, armR: { shoulderAngle: 25, elbowAngle: 340 } },
       hold: 0.12,
     },
     elbow_flexion: {
-      ready: { hip: { x: 150, y: 116 }, torsoAngle: 184, legL: standingLegs(8, 8), legR: standingLegs(8, 8), armL: { shoulderAngle: 175, elbowAngle: 175 }, armR: { shoulderAngle: 175, elbowAngle: 175 } },
-      working: { hip: { x: 150, y: 116 }, torsoAngle: 184, legL: standingLegs(8, 8), legR: standingLegs(8, 8), armL: { shoulderAngle: 175, elbowAngle: 35 }, armR: { shoulderAngle: 175, elbowAngle: 35 } },
+      ready: { hip: { x: 150, y: 116 }, torsoAngle: 176, legL: standingLegs(8, 8), legR: standingLegs(8, 8), armL: { shoulderAngle: 10, elbowAngle: 12 }, armR: { shoulderAngle: 10, elbowAngle: 12 } },
+      working: { hip: { x: 150, y: 116 }, torsoAngle: 176, legL: standingLegs(8, 8), legR: standingLegs(8, 8), armL: { shoulderAngle: 10, elbowAngle: 172 }, armR: { shoulderAngle: 10, elbowAngle: 172 } },
       hold: 0.14,
     },
     elbow_extension: {
-      ready: { hip: { x: 150, y: 116 }, torsoAngle: 186, legL: standingLegs(8, 8), legR: standingLegs(8, 8), armL: { shoulderAngle: 100, elbowAngle: 35 }, armR: { shoulderAngle: 100, elbowAngle: 35 } },
-      working: { hip: { x: 150, y: 116 }, torsoAngle: 186, legL: standingLegs(8, 8), legR: standingLegs(8, 8), armL: { shoulderAngle: 100, elbowAngle: 178 }, armR: { shoulderAngle: 100, elbowAngle: 178 } },
+      ready: { hip: { x: 150, y: 116 }, torsoAngle: 172, legL: standingLegs(8, 8), legR: standingLegs(8, 8), armL: { shoulderAngle: 30, elbowAngle: 170 }, armR: { shoulderAngle: 30, elbowAngle: 170 } },
+      working: { hip: { x: 150, y: 116 }, torsoAngle: 172, legL: standingLegs(8, 8), legR: standingLegs(8, 8), armL: { shoulderAngle: 30, elbowAngle: 20 }, armR: { shoulderAngle: 30, elbowAngle: 20 } },
       hold: 0.1,
     },
     lateral_raise: {
-      ready: { hip: { x: 150, y: 116 }, torsoAngle: 184, legL: standingLegs(8, 8), legR: standingLegs(8, 8), armL: { shoulderAngle: 172, elbowAngle: 172 }, armR: { shoulderAngle: 172, elbowAngle: 172 } },
-      working: { hip: { x: 150, y: 116 }, torsoAngle: 184, legL: standingLegs(8, 8), legR: standingLegs(8, 8), armL: { shoulderAngle: 92, elbowAngle: 96 }, armR: { shoulderAngle: 92, elbowAngle: 96 } },
+      ready: { hip: { x: 150, y: 116 }, torsoAngle: 176, legL: standingLegs(8, 8), legR: standingLegs(8, 8), armL: { shoulderAngle: 12, elbowAngle: 15 }, armR: { shoulderAngle: 12, elbowAngle: 15 } },
+      working: { hip: { x: 150, y: 116 }, torsoAngle: 176, legL: standingLegs(8, 8), legR: standingLegs(8, 8), armL: { shoulderAngle: 92, elbowAngle: 96 }, armR: { shoulderAngle: 92, elbowAngle: 96 } },
       hold: 0.12,
     },
     calf_raise: {
-      ready: { hip: { x: 150, y: 116 }, torsoAngle: 184, legL: standingLegs(8, 8), legR: standingLegs(8, 8), armL: { shoulderAngle: 178, elbowAngle: 178 }, armR: { shoulderAngle: 178, elbowAngle: 178 } },
-      working: { hip: { x: 150, y: 108 }, torsoAngle: 184, legL: standingLegs(8, 8), legR: standingLegs(8, 8), armL: { shoulderAngle: 178, elbowAngle: 178 }, armR: { shoulderAngle: 178, elbowAngle: 178 } },
+      ready: { hip: { x: 150, y: 116 }, torsoAngle: 178, legL: standingLegs(8, 8), legR: standingLegs(8, 8), armL: HANG, armR: HANG },
+      working: { hip: { x: 150, y: 108 }, torsoAngle: 178, legL: standingLegs(8, 8), legR: standingLegs(8, 8), armL: HANG, armR: HANG },
       hold: 0.16,
     },
     core_isometric: {
-      ready: { hip: { x: 150, y: 150 }, torsoAngle: 270, legL: standingLegs(88, 92), legR: standingLegs(92, 88), armL: { shoulderAngle: 190, elbowAngle: 100 }, armR: { shoulderAngle: 190, elbowAngle: 100 } },
-      working: { hip: { x: 150, y: 148 }, torsoAngle: 268, legL: standingLegs(88, 92), legR: standingLegs(92, 88), armL: { shoulderAngle: 190, elbowAngle: 100 }, armR: { shoulderAngle: 190, elbowAngle: 100 } },
+      ready: { hip: { x: 150, y: 150 }, torsoAngle: 270, legL: standingLegs(88, 92), legR: standingLegs(92, 88), armL: { shoulderAngle: 20, elbowAngle: 95 }, armR: { shoulderAngle: 20, elbowAngle: 95 } },
+      working: { hip: { x: 150, y: 148 }, torsoAngle: 268, legL: standingLegs(88, 92), legR: standingLegs(92, 88), armL: { shoulderAngle: 20, elbowAngle: 95 }, armR: { shoulderAngle: 20, elbowAngle: 95 } },
       hold: 0.7,
     },
     core_flex: {
-      ready: { hip: { x: 150, y: 150 }, torsoAngle: 270, legL: standingLegs(60, 300), legR: standingLegs(60, 300), armL: { shoulderAngle: 200, elbowAngle: 140 }, armR: { shoulderAngle: 200, elbowAngle: 140 } },
-      working: { hip: { x: 150, y: 150 }, torsoAngle: 240, legL: standingLegs(60, 300), legR: standingLegs(60, 300), armL: { shoulderAngle: 200, elbowAngle: 140 }, armR: { shoulderAngle: 200, elbowAngle: 140 } },
+      ready: { hip: { x: 150, y: 150 }, torsoAngle: 270, legL: standingLegs(60, 300), legR: standingLegs(60, 300), armL: { shoulderAngle: 220, elbowAngle: 250 }, armR: { shoulderAngle: 220, elbowAngle: 250 } },
+      working: { hip: { x: 150, y: 150 }, torsoAngle: 240, legL: standingLegs(60, 300), legR: standingLegs(60, 300), armL: { shoulderAngle: 220, elbowAngle: 250 }, armR: { shoulderAngle: 220, elbowAngle: 250 } },
       hold: 0.14,
     },
     core_rotation: {
-      ready: { hip: { x: 150, y: 122 }, torsoAngle: 184, legL: standingLegs(15, 70), legR: standingLegs(15, 70), armL: { shoulderAngle: 105, elbowAngle: 60 }, armR: { shoulderAngle: 105, elbowAngle: 60 } },
-      working: { hip: { x: 150, y: 122 }, torsoAngle: 162, legL: standingLegs(15, 70), legR: standingLegs(15, 70), armL: { shoulderAngle: 105, elbowAngle: 60 }, armR: { shoulderAngle: 105, elbowAngle: 60 } },
+      ready: { hip: { x: 150, y: 122 }, torsoAngle: 176, legL: standingLegs(15, 70), legR: standingLegs(15, 70), armL: { shoulderAngle: 105, elbowAngle: 60 }, armR: { shoulderAngle: 105, elbowAngle: 60 } },
+      working: { hip: { x: 150, y: 122 }, torsoAngle: 154, legL: standingLegs(15, 70), legR: standingLegs(15, 70), armL: { shoulderAngle: 105, elbowAngle: 60 }, armR: { shoulderAngle: 105, elbowAngle: 60 } },
       hold: 0.1,
     },
     cardio_generic: {
-      ready: { hip: { x: 150, y: 116 }, torsoAngle: 184, legL: standingLegs(350, 300), legR: standingLegs(20, 330), armL: { shoulderAngle: 80, elbowAngle: 90 }, armR: { shoulderAngle: 280, elbowAngle: 260 } },
-      working: { hip: { x: 150, y: 108 }, torsoAngle: 178, legL: standingLegs(60, 300), legR: standingLegs(330, 30), armL: { shoulderAngle: 200, elbowAngle: 260 }, armR: { shoulderAngle: 80, elbowAngle: 90 } },
+      ready: { hip: { x: 150, y: 116 }, torsoAngle: 176, legL: standingLegs(350, 300), legR: standingLegs(20, 330), armL: { shoulderAngle: 80, elbowAngle: 90 }, armR: { shoulderAngle: 280, elbowAngle: 260 } },
+      working: { hip: { x: 150, y: 108 }, torsoAngle: 170, legL: standingLegs(60, 300), legR: standingLegs(330, 30), armL: { shoulderAngle: 200, elbowAngle: 260 }, armR: { shoulderAngle: 80, elbowAngle: 90 } },
       hold: 0,
     },
   };
@@ -523,5 +532,12 @@
     renderDemo: renderDemo,
     motionParams: deriveParams,
     mount: mount,
+    // QA-only: set a mounted instance to an exact t (0..1), bypassing the
+    // shared rAF clock, so visual review isn't at the mercy of wall-clock
+    // timing across many cards. Not used by the app itself.
+    _debugSetFrame: function (svg, t) {
+      var inst = REGISTRY.get(svg);
+      if (inst) inst.frame(t);
+    },
   };
 })();
