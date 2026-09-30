@@ -605,15 +605,27 @@ _MOVEMENT_PATTERN_RULES: list[tuple[list[str], str]] = [
     (["curl"],                                                                   "elbow_flexion"),
     (["pushdown", "triceps extension", "tricep extension", "skull crusher",
       "overhead extension", "dip"],                                             "elbow_extension"),
-    (["plank", "wall sit", "hold", "hollow body"],                               "core_isometric"),
+    (["plank", "wall sit", "hold", "hollow body", "pigeon pose", "wrist roller"], "core_isometric"),
     (["twist", "chop", "windmill"],                                              "core_rotation"),
     (["crunch", "sit-up", "situp", "rollout", "v-up"],                           "core_flex"),
+    # ── Added alongside the demo renderer to close the full_body_generic gap
+    # the coverage tool found (22 exercises with no real rep pattern) — same
+    # keyword additions made in exercise-demo.js's classifier so both sides
+    # resolve a given exercise name to the same pattern.
+    (["external rotation"],                                                     "lateral_raise"),
+    (["front-foot", "back-foot", "foot transfer"],                              "lunge"),
+    (["slam"],                                                                  "vertical_push"),
+    (["block landing", "landing drill"],                                       "lunge"),
+    (["up-down", "crouch"],                                                     "squat"),
     (["jump", "sprint", "run", "walk", "shuttle", "ladder", "burpee",
       "mountain climber", "jumping jack", "star jump", "skip", "bound",
       "high knee", "butt kick", "box jump", "interval", "repeat", "conditioning",
       "dribble", "throw", "swing", "batting", "bowling", "fielding", "footwork",
       "agility", "drill", "stretch", "mobility", "cool-down", "cooldown",
-      "stairmaster", "treadmill", "rowing machine", "cycling"],                  "cardio_generic"),
+      "stairmaster", "treadmill", "rowing machine", "cycling", "inchworm",
+      "bear crawl", "sprawl", "dive and recover", "yo-yo", "passing",
+      "receiving", "heading", "kicking", "negative split", "acceleration start",
+      "ankle circles", "block save", "save technique", "striking"],             "cardio_generic"),
 ]
 
 _MOVEMENT_PATTERN_CATEGORY_FALLBACK: dict[str, str] = {

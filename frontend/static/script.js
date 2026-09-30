@@ -1114,7 +1114,7 @@ function buildExerciseCard(ex, idx, activeIdx, responseType) {
   const tip = Array.isArray(ex?.progression) ? ex.progression[0] : (ex?.weight_guide || "Move with clean control and own every rep.");
   return `
     <article class="exercise-ai-card ${isActive ? "active" : ""} ${isDone ? "complete" : ""}" draggable="true">
-      <div class="exercise-visual"><span>${exerciseIcon(ex)}</span></div>
+      <div class="exercise-visual">${window.FCDemo ? window.FCDemo.renderDemo(ex, { size: "thumb" }) : `<span>${exerciseIcon(ex)}</span>`}</div>
       <div class="exercise-card-main">
         <div class="exercise-topline">
           <h4>${escapeHtml(ex?.name || "Exercise")}</h4>
@@ -3779,8 +3779,15 @@ function transitionToWorkout(data) {
     }
     
     if (exerciseIconEl) {
-      const type = exerciseMotionType(active);
-      exerciseIconEl.innerHTML = renderExerciseHologram(type, active, data.zone);
+      // window.FCDemo guard is load-bearing, not optional: if exercise-demo.js
+      // ever 404s (a bad deploy, a CDN hiccup), the live session must not go
+      // blank — fall back to the original stick-figure hologram.
+      if (window.FCDemo) {
+        exerciseIconEl.innerHTML = window.FCDemo.renderDemo(active, { size: "hero", zone: data.zone });
+      } else {
+        const type = exerciseMotionType(active);
+        exerciseIconEl.innerHTML = renderExerciseHologram(type, active, data.zone);
+      }
     }
     
     if (instructionsEl) {
