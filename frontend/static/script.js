@@ -2392,7 +2392,14 @@ function initWakeWord() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) return;
   wakeRec = new SR();
-  wakeRec.continuous = true;
+  // continuous:true looks right for an always-on listener, but Chrome's
+  // implementation of it is unreliable here: it keeps reporting itself as
+  // running (button stays "active") while silently no longer delivering
+  // onresult or even onend, so the auto-restart below never fires and the
+  // wake phrase just stops being heard after the first short burst. Chained
+  // continuous:false sessions — each restarted the instant it ends (onend
+  // below) — is the workaround that actually stays alive.
+  wakeRec.continuous = false;
   wakeRec.interimResults = true;
   wakeRec.lang = "en-US";
 
