@@ -59,6 +59,14 @@
     [["slam"], "vertical_push"],
     [["block landing", "landing drill"], "lunge"],
     [["up-down", "crouch"], "squat"],
+    // Closes the "Full Body (generic)" gap: these were all falling through
+    // to full_body_generic -> cardio_generic's running-figure pose, which
+    // is wrong for a held stretch or a breathing drill. Mapped to the
+    // closest existing pattern instead of inventing a 17th one.
+    [["child's pose", "childs pose", "deep breathing"], "core_isometric"],
+    [["forward fold", "frog pump"], "hip_hinge"],
+    [["leg extension"], "squat"], // + support==="seated" below -> leg-machine pose
+    [["arm circle", "shoulder roll"], "lateral_raise"],
     [["jump", "sprint", "run", "walk", "shuttle", "ladder", "burpee", "mountain climber",
       "jumping jack", "star jump", "skip", "bound", "high knee", "butt kick", "box jump",
       "interval", "repeat", "conditioning", "dribble", "throw", "swing", "batting", "bowling",
@@ -326,6 +334,25 @@
       working: { hip: { x: 150, y: 108 }, torsoAngle: 178, legL: standingLegs(8, 8), legR: standingLegs(8, 8), armL: HANG, armR: HANG },
       hold: 0.16,
     },
+    // Hip thrust / glute bridge / donkey kicks / frog pumps are lying on the
+    // back with knees bent, driving the hips up — a completely different
+    // position from a standing deadlift-style hinge, even though the hip
+    // extension is biomechanically the same pattern. Selected by name match
+    // in createInstance, not by a separate pattern key, since the camera's
+    // analyzer only knows "hip_hinge".
+    hip_hinge_lying: {
+      ready: { hip: { x: 150, y: 165 }, torsoAngle: 270, legL: standingLegs(80, 290), legR: standingLegs(80, 290), armL: { shoulderAngle: 190, elbowAngle: 190 }, armR: { shoulderAngle: 190, elbowAngle: 190 } },
+      working: { hip: { x: 150, y: 148 }, torsoAngle: 270, legL: standingLegs(80, 290), legR: standingLegs(80, 290), armL: { shoulderAngle: 190, elbowAngle: 190 }, armR: { shoulderAngle: 190, elbowAngle: 190 } },
+      hold: 0.15,
+    },
+    // Wall sit: back against a wall, knees bent ~90 deg, static hold — not
+    // the same silhouette as a prone plank even though both are
+    // core_isometric holds.
+    wall_sit: {
+      ready: { hip: { x: 150, y: 130 }, torsoAngle: 165, legL: standingLegs(85, 285), legR: standingLegs(85, 285), armL: HANG, armR: HANG },
+      working: { hip: { x: 150, y: 130 }, torsoAngle: 165, legL: standingLegs(85, 285), legR: standingLegs(85, 285), armL: HANG, armR: HANG },
+      hold: 0.8,
+    },
     core_isometric: {
       ready: { hip: { x: 150, y: 150 }, torsoAngle: 270, legL: standingLegs(88, 92), legR: standingLegs(92, 88), armL: { shoulderAngle: 20, elbowAngle: 95 }, armR: { shoulderAngle: 20, elbowAngle: 95 } },
       working: { hip: { x: 150, y: 148 }, torsoAngle: 268, legL: standingLegs(88, 92), legR: standingLegs(92, 88), armL: { shoulderAngle: 20, elbowAngle: 95 }, armR: { shoulderAngle: 20, elbowAngle: 95 } },
@@ -471,7 +498,14 @@
     // position, not a standing squat, even though the knee/hip motion is
     // the same pattern — swap the whole pose set, not just the equipment.
     var useSeatedSquat = params.pattern === "squat" && params.support === "seated";
-    var poseKey = useSeatedSquat ? "squat_seated" : params.pattern;
+    var exName = ((exercise && exercise.name) || "").toLowerCase();
+    var useLyingHipHinge = params.pattern === "hip_hinge" &&
+      /hip thrust|glute bridge|donkey kick|frog pump/.test(exName);
+    var useWallSit = params.pattern === "core_isometric" && /wall sit/.test(exName);
+    var poseKey = useSeatedSquat ? "squat_seated"
+      : useLyingHipHinge ? "hip_hinge_lying"
+      : useWallSit ? "wall_sit"
+      : params.pattern;
     var poses = PATTERN_POSES[poseKey] || PATTERN_POSES.full_body_generic;
 
     var skeleton = buildSkeleton(svg);
@@ -495,7 +529,7 @@
         // to a light dumbbell rather than leave it ambiguous. Genuinely
         // bodyweight-only names (push-up, pull-up, bodyweight squat) still
         // show nothing: "none" here only fires for implement-ambiguous ones.
-        handProp = /bodyweight|push-up|push up|pull-up|pull up|chin-up|chin up|air squat/i.test(exercise && exercise.name || "") ? null : { type: "dumbbell" };
+        handProp = /bodyweight|push-up|push up|pull-up|pull up|chin-up|chin up|air squat|arm circle|shoulder roll/i.test(exercise && exercise.name || "") ? null : { type: "dumbbell" };
       }
     }
 
