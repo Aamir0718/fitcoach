@@ -70,6 +70,13 @@ class Settings(BaseSettings):
     STORAGE_BACKEND: str = "local"
     UPLOAD_DIR: str = "./uploads"
 
+    # Camera form-scoring thresholds (0-100 precision score) — the frontend's
+    # skeleton overlay turns green at/above GOOD, amber at/above WARN, red
+    # below that. Configurable here (env override) instead of hardcoded in
+    # ghost-trainer.js so this can be tuned without a frontend deploy.
+    FORM_SCORE_GOOD_THRESHOLD: int = 40
+    FORM_SCORE_WARN_THRESHOLD: int = 20
+
     @property
     def is_production(self) -> bool:
         return self.ENVIRONMENT == "production"

@@ -69,15 +69,34 @@ function briefFor(pattern) {
   return EXERCISE_BRIEFS[pattern] || EXERCISE_BRIEFS.full_body_generic;
 }
 
-// Green at 60%+ — a real rep with recognizable form should read as "good",
-// not just a textbook-perfect one. The old 82% floor combined with the
-// stability score's penalty on fast/dynamic movement meant green was
-// rarely reachable even when the exercise was being done correctly.
+// Thresholds default here but are overwritten from the backend (see
+// loadFormConfig below) — GET /api/config/camera — so they can be tuned
+// without a frontend deploy. Defaults mirror Settings.FORM_SCORE_*_THRESHOLD.
 const SCORE_STATES = [
-  { min: 60, key: "good", color: "rgb(16, 185, 129)", glow: "rgba(16, 185, 129, .42)" },
-  { min: 35, key: "warn", color: "rgb(245, 158, 11)", glow: "rgba(245, 158, 11, .42)" },
+  { min: 40, key: "good", color: "rgb(16, 185, 129)", glow: "rgba(16, 185, 129, .42)" },
+  { min: 20, key: "warn", color: "rgb(245, 158, 11)", glow: "rgba(245, 158, 11, .42)" },
   { min: 0, key: "poor", color: "rgb(239, 68, 68)", glow: "rgba(239, 68, 68, .42)" },
 ];
+
+let formConfigPromise = null;
+function loadFormConfig() {
+  if (formConfigPromise) return formConfigPromise;
+  formConfigPromise = (async () => {
+    try {
+      const res = await fetch(`${window.API || ""}/api/config/camera`);
+      if (!res.ok) return;
+      const cfg = await res.json();
+      const good = SCORE_STATES.find((s) => s.key === "good");
+      const warn = SCORE_STATES.find((s) => s.key === "warn");
+      if (typeof cfg.form_score_good_threshold === "number") good.min = cfg.form_score_good_threshold;
+      if (typeof cfg.form_score_warn_threshold === "number") warn.min = cfg.form_score_warn_threshold;
+    } catch (e) {
+      // Offline/unreachable — keep the defaults above.
+    }
+  })();
+  return formConfigPromise;
+}
+loadFormConfig();
 
 const state = {
   status: "idle", // "idle", "loading", "running", "error"
@@ -169,6 +188,9 @@ function cacheEls() {
 // back to the weekly-plan pool (marks it done on finish).
 async function startWithExercises(exercises, label, slotKey) {
   if (!exercises || !exercises.length) return;
+  // Bounded wait so the very first session of a page load still gets the
+  // backend-configured thresholds instead of racing the fetch in loadFormConfig().
+  await Promise.race([loadFormConfig(), new Promise((r) => setTimeout(r, 800))]);
   cacheEls();
   state.activeSlotKey = slotKey || null;
   state.sessionLabel = label || "Workout";
