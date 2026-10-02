@@ -111,12 +111,9 @@ function newRepState() {
   return {
     reps: 0,
     phase: "up",
-    stateName: "READY", // READY -> DOWN -> UP
-    pendingState: null,
-    pendingStateTime: 0,
+    stateName: "READY",   // READY <-> WORKING — see tick()'s peak/valley model
+    repExtreme: null,     // angle extreme reached during the current WORKING excursion
     lastRepTime: 0,
-    lastAngle: null,
-    angleTrend: 0,
     goodFrames: 0,
     totalFrames: 0,
     depthSamples: [],
@@ -124,6 +121,8 @@ function newRepState() {
     holdSeconds: 0,       // used by core_isometric only
     activeSeconds: 0,     // used by cardio_generic / full_body_generic only
     lastTickTime: 0,
+    lastRepROM: null,     // 0-1+ achieved range-of-motion of the most recently completed rep
+    shallowReps: 0,       // reps completed but below the full-ROM floor — counted, not discarded
   };
 }
 
@@ -701,13 +700,26 @@ const PATTERN_ROM = {
   core_rotation:    { ready: 85,  down: 55,  up: 70,  invert: true },
 };
 
+// Below this fraction of the ready->down range, a "rep" is rejected outright
+// rather than merely flagged shallow — this is the floor that keeps a twitch
+// near the ready position from registering as a rep at all.
+const MIN_REP_ROM = 0.35;
+// Below this fraction, a completed rep still counts (nothing is silently
+// dropped — see B1) but is tagged shallow so the UI/summary can flag it.
+const FULL_REP_ROM = 0.75;
+
 function tick(state, fb) {
   const next = {
     ...state,
     totalFrames: state.totalFrames + 1,
     goodFrames: state.goodFrames + (fb.good ? 1 : 0),
     depthSamples: [...state.depthSamples.slice(-80), fb.depthPct],
-    angleScores: [...state.angleScores.slice(-80), fb.precision ?? 100],
+    // Store precision on the SAME 0-100 scale as everything else scoreForm()
+    // combines it with. Analyzers return precision as a 0-1 fraction
+    // (targetScore()/scoreTargets()); storing that fraction directly here
+    // (with a same-scale-mismatched "100" fallback) is what silently capped
+    // displayed form accuracy at ~70% even on a textbook rep — see scoreForm().
+    angleScores: [...state.angleScores.slice(-80), (fb.precision ?? 1) * 100],
   };
 
   const now = Date.now();
@@ -716,8 +728,6 @@ function tick(state, fb) {
 
   // If the frame is invalid (low visibility or bad landmarks), pause transitions and return
   if (!fb.good && fb.errors && fb.errors.includes("low_visibility")) {
-    next.pendingState = null;
-    next.pendingStateTime = 0;
     return next;
   }
 
@@ -740,71 +750,77 @@ function tick(state, fb) {
   const rom = PATTERN_ROM[exercise];
   if (!rom) return next; // unknown pattern — no rep counting, just visibility/precision tracking
 
-  const COOLDOWN = 700; // ms, prevents double counting
-  const lastRepTime = state.lastRepTime || 0;
-  if (now - lastRepTime < COOLDOWN) {
-    next.pendingState = null;
-    next.pendingStateTime = 0;
-    return next;
-  }
+  // ── Peak/valley rep counting ──────────────────────────────────────────────
+  // Replaces a 3-zone (READY/DOWN/UP) state machine that required the angle
+  // to land inside a narrow ~10° window AND hold there for 300ms to register
+  // a rep — a real ascent crosses that window in ~100-150ms, so most
+  // completed reps were silently swallowed (the state jumped DOWN -> READY
+  // directly, never passing through a committed "UP"). This model instead
+  // just tracks the extreme angle reached during one WORKING excursion and
+  // grades the achieved range-of-motion when the athlete returns to ready —
+  // no narrow window, no hold-to-commit, and no per-frame direction gate (so
+  // it behaves identically at 30fps and 60fps — a fixed angle THRESHOLD
+  // crossing needs no dt normalization, unlike the old frame-to-frame trend
+  // check it replaces).
+  const angle = fb.primaryAngle;
+  const span = Math.abs(rom.ready - rom.down) || 1;
+  // Small guard band around "ready" so sensor jitter right at the top can't
+  // repeatedly flick WORKING on/off; NOT a narrow commit window like before —
+  // entering WORKING only requires crossing past it once.
+  const deadband = span * 0.15;
 
-  const primaryAngle = fb.primaryAngle;
-  const currentStateName = state.stateName || "READY";
+  const COOLDOWN = 350; // ms — pure double-count guard; unlike before, it does
+                        // NOT freeze an in-progress rep, only re-arming READY.
+  const cooling = now - (state.lastRepTime || 0) < COOLDOWN;
 
-  // Track angle trend (increasing/decreasing) to require real motion, not noise
-  const prevAngle = state.lastAngle;
-  let angleTrend = state.angleTrend || 0;
-  if (prevAngle !== null) {
-    const diff = primaryAngle - prevAngle;
-    if (Math.abs(diff) > 2.0) angleTrend = diff > 0 ? 1 : -1;
-  }
-  next.lastAngle = primaryAngle;
-  next.angleTrend = angleTrend;
+  // True hysteresis: the exit boundary sits BETWEEN the entry boundary and
+  // "ready" itself (closer to ready), not on ready's far side — the top of a
+  // rep never overshoots past its own starting angle, it only returns to it.
+  // A single shared boundary would flicker WORKING on/off on any noise
+  // sitting right on that line; two boundaries with a gap between them
+  // don't, while still not requiring the athlete to fully lock out at the
+  // exact starting angle to get credit for the rep.
+  const enteringWorking = rom.invert ? angle > rom.ready + deadband : angle < rom.ready - deadband;
+  const returnedToReady = rom.invert ? angle < rom.ready + deadband * 0.4 : angle > rom.ready - deadband * 0.4;
 
-  // Target-state determination, generalized across normal and inverted-ROM patterns
-  let targetState = null;
-  if (!rom.invert) {
-    if (primaryAngle > rom.ready) targetState = "READY";
-    else if (primaryAngle < rom.down && angleTrend === -1) targetState = "DOWN";
-    else if (primaryAngle > rom.up && currentStateName === "DOWN" && angleTrend === 1) targetState = "UP";
-  } else {
-    if (primaryAngle < rom.ready) targetState = "READY";
-    else if (primaryAngle > rom.down && angleTrend === 1) targetState = "DOWN";
-    else if (primaryAngle < rom.up && currentStateName === "DOWN" && angleTrend === -1) targetState = "UP";
-  }
-
-  // Stability check (300ms) before committing a state transition, to reject jitter
-  if (targetState && targetState !== currentStateName) {
-    if (targetState !== state.pendingState) {
-      next.pendingState = targetState;
-      next.pendingStateTime = now;
-    } else if (now - (state.pendingStateTime || 0) >= 300) {
-      if (currentStateName === "UP" && targetState === "READY") {
-        next.reps = state.reps + 1;
-        next.lastRepTime = now;
-      }
-      next.stateName = targetState;
-      next.pendingState = null;
-      next.pendingStateTime = 0;
+  if (state.stateName !== "WORKING") {
+    if (enteringWorking && !cooling) {
+      next.stateName = "WORKING";
+      next.repExtreme = angle;
     }
   } else {
-    next.pendingState = null;
-    next.pendingStateTime = 0;
+    next.repExtreme = rom.invert
+      ? Math.max(state.repExtreme ?? angle, angle)
+      : Math.min(state.repExtreme ?? angle, angle);
+
+    if (returnedToReady) {
+      const achieved = rom.invert
+        ? (next.repExtreme - rom.ready) / (rom.down - rom.ready)
+        : (rom.ready - next.repExtreme) / (rom.ready - rom.down);
+      if (achieved >= MIN_REP_ROM) {
+        next.reps = state.reps + 1;
+        next.lastRepTime = now;
+        next.lastRepROM = achieved;
+        if (achieved < FULL_REP_ROM) {
+          next.shallowReps = (state.shallowReps || 0) + 1;
+          fb.cues = ["Nice — go a little deeper next rep for full credit", ...(fb.cues || [])];
+        }
+      }
+      next.stateName = "READY";
+      next.repExtreme = null;
+    }
   }
 
-  next.phase = next.stateName === "DOWN" ? "down" : "up";
+  next.phase = next.stateName === "WORKING" ? "down" : "up";
 
   // Real-time guide cue, generic across patterns since the exact ROM language
   // already comes from fb.cues (per-analyzer form feedback) — this just orients
-  // the user within the rep (ready / working / finishing).
+  // the user within the rep (ready / working).
   const guideCues = [];
-  const activeState = next.stateName;
-  if (activeState === "READY") {
+  if (next.stateName === "READY") {
     guideCues.push("Ready — begin the movement");
-  } else if (activeState === "DOWN") {
-    guideCues.push("Good range — now reverse the movement");
-  } else if (activeState === "UP") {
-    guideCues.push("Finish the rep — return to the start position");
+  } else if (next.stateName === "WORKING") {
+    guideCues.push("Good — control it back to the start position");
   }
   fb.cues = [...guideCues, ...(fb.cues || [])];
 
@@ -814,7 +830,9 @@ function tick(state, fb) {
 function scoreForm({ state, feedback, stabilityScore }) {
   if (!feedback || !state.totalFrames) return 100;
   const posture = (state.goodFrames / state.totalFrames) * 100;
-  const precision = average(state.angleScores, feedback.precision ?? 100);
+  // Same 0-1-vs-0-100 scale fix as tick()'s angleScores push above — this
+  // fallback only fires if scoreForm() is ever called before a first tick().
+  const precision = average(state.angleScores, (feedback.precision ?? 1) * 100);
   const range = rangeConsistency(state.depthSamples);
   return Math.round(clamp(
     posture * 0.35 + precision * 0.30 + (stabilityScore ?? 100) * 0.20 + range * 0.15,

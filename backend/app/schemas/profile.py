@@ -28,6 +28,14 @@ class ProfileUpdate(BaseModel):
     sport_injuries: Optional[str] = None
     bowling_type: Optional[str] = None
     onboarding_complete: Optional[bool] = None   # allow card-flow to force True
+    workout_mode: Optional[str] = None           # "gym" | "sport" — explicit toggle override
+
+    @field_validator("workout_mode")
+    @classmethod
+    def valid_workout_mode(cls, v):
+        if v and v not in ("gym", "sport"):
+            raise ValueError("workout_mode must be gym or sport")
+        return v
 
     @field_validator("gender")
     @classmethod
@@ -83,11 +91,15 @@ class ProfileResponse(BaseModel):
     sport: Optional[str]
     sport_role: Optional[str]
     sport_focus: Optional[str]
+    sport_position: Optional[str] = None
+    bowling_type: Optional[str] = None
+    sport_injuries: Optional[str] = None
     match_frequency: Optional[str]
     onboarding_complete: bool
     sport_onboarding_complete: bool
     bmi: Optional[float]
     active_mode: str
+    workout_mode: Optional[str] = None
     xp: int = 0
     level_name: Optional[str] = None
     xp_to_next: Optional[int] = None

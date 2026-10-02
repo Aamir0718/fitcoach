@@ -1,0 +1,83 @@
+{
+  "sport": "football",
+  "version": 1,
+  "mobility_session": "football_agility",
+  "role_aliases": {
+    "keeper": "goalkeeper", "gk": "goalkeeper", "goalie": "goalkeeper",
+    "centre_back": "defender", "center_back": "defender", "fullback": "defender", "full_back": "defender", "cb": "defender", "rb": "defender", "lb": "defender",
+    "cm": "midfielder", "cdm": "midfielder", "cam": "midfielder", "winger": "midfielder", "wing": "midfielder",
+    "striker": "forward", "st": "forward", "attacker": "forward", "cf": "forward"
+  },
+  "role_templates": {
+    "goalkeeper": ["gk_reaction", "football_agility", "football_power", "football_speed", "football_conditioning"],
+    "defender":   ["football_power", "football_speed", "football_agility", "football_conditioning", "football_skill"],
+    "midfielder": ["football_conditioning", "football_speed", "football_agility", "football_skill", "football_power"],
+    "forward":    ["football_speed", "football_power", "football_skill", "football_agility", "football_conditioning"]
+  },
+  "session_labels": {
+    "gk_reaction": "GK Reaction Training"
+  },
+  "session_fallbacks": {
+    "gk_reaction": ["football_agility"]
+  },
+  "sessions": {
+    "football_speed": [
+      {"name": "10m Acceleration Sprint",  "sets": 6, "reps": "10m", "rest": "90s",  "muscle": "Sprint Speed",   "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=10m+sprint+acceleration+football+training"},
+      {"name": "Resisted Sprint (band)",   "sets": 5, "reps": "15m", "rest": "90s",  "muscle": "Sprint Power",   "weight_guide": "Resistance band", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=resisted+sprint+band+football+speed+training"},
+      {"name": "Falling Start Sprint",     "sets": 5, "reps": "20m", "rest": "90s",  "muscle": "Explosive Start","weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=falling+start+sprint+drill+football"},
+      {"name": "Fly 30m Sprint",           "sets": 4, "reps": "30m", "rest": "120s", "muscle": "Top-End Speed",  "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=fly+30m+sprint+top+end+speed+football"},
+      {"name": "Stride-Out Run",           "sets": 4, "reps": "60m", "rest": "90s",  "muscle": "Speed Endurance","weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=stride+out+run+speed+endurance+football"}
+    ],
+    "football_agility": [
+      {"name": "5-10-5 Shuttle Run",        "sets": 5, "reps": "1 run", "rest": "75s", "muscle": "Change of Direction",  "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=5-10-5+shuttle+drill+football+agility"},
+      {"name": "L-Drill (Cone)",            "sets": 4, "reps": "1 run", "rest": "75s", "muscle": "Agility/Footwork",     "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=l+drill+football+agility+training"},
+      {"name": "Agility Ladder Footwork",   "sets": 5, "reps": "30s",   "rest": "45s", "muscle": "Foot Speed",           "weight_guide": "Agility ladder", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=agility+ladder+football+footwork+drills"},
+      {"name": "Defensive Shuffle Drill",   "sets": 4, "reps": "10m ea","rest": "60s", "muscle": "Lateral Speed",        "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=defensive+lateral+shuffle+drill+football"},
+      {"name": "Reactive Cone Drill",       "sets": 4, "reps": "30s",   "rest": "60s", "muscle": "Reaction/Agility",     "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=reactive+cone+drill+football+agility"},
+      {"name": "Box Drill (4-Cone)",        "sets": 4, "reps": "1 run", "rest": "60s", "muscle": "Multi-Directional",    "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=4+cone+box+drill+football+speed+agility"}
+    ],
+    "football_conditioning": [
+      {"name": "30s On / 30s Off Intervals","sets": 10, "reps": "30s run", "rest": "30s", "muscle": "Aerobic/Anaerobic", "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=30+30+interval+sprint+football+fitness+conditioning"},
+      {"name": "Box-to-Box Sprint",         "sets": 8, "reps": "68m",     "rest": "60s", "muscle": "Match Fitness",     "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=box+to+box+sprint+football+fitness+conditioning"},
+      {"name": "Yo-Yo Intermittent Test",   "sets": 1, "reps": "12 min",  "rest": "0s",  "muscle": "Aerobic Capacity",  "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=yo+yo+intermittent+test+football+fitness"},
+      {"name": "Slalom Run Through Cones",  "sets": 4, "reps": "30s",     "rest": "45s", "muscle": "Agility/Cardio",    "weight_guide": "Cones",     "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=slalom+cone+run+football+dribbling+agility"},
+      {"name": "Shuttle Run (10-20-30m)",   "sets": 5, "reps": "1 set",   "rest": "60s", "muscle": "Speed Endurance",   "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=10+20+30+shuttle+run+football+conditioning"},
+
+      {"name": "Box-to-Box Shuttle Endurance", "sets": 6, "reps": "1 min", "rest": "45s", "muscle": "Repeat-Sprint Endurance", "weight_guide": "Bodyweight", "equipment_required": false, "roles": ["midfielder"], "focus": ["endurance"], "priority": 8, "demo_url": "https://www.youtube.com/results?search_query=box+to+box+shuttle+endurance+midfielder+drill"},
+      {"name": "First Touch Under Pressure Drill", "sets": 4, "reps": "2 min", "rest": "45s", "muscle": "Ball Control Under Fatigue", "weight_guide": "Football", "equipment_required": true, "roles": ["midfielder"], "focus": ["technique"], "priority": 7, "demo_url": "https://www.youtube.com/results?search_query=first+touch+under+pressure+drill+midfielder"},
+      {"name": "Long-Range Passing Technique",  "sets": 4, "reps": "10",   "rest": "45s", "muscle": "Passing Range/Accuracy", "weight_guide": "Football", "equipment_required": true, "roles": ["midfielder"], "focus": ["technique"], "priority": 7, "demo_url": "https://www.youtube.com/results?search_query=long+range+passing+technique+drill+football"}
+    ],
+    "football_skill": [
+      {"name": "Dribble Through Cones",     "sets": 4, "reps": "30s",     "rest": "45s", "muscle": "Coordination/Touch",   "weight_guide": "Football", "equipment_required": true, "demo_url": "https://www.youtube.com/results?search_query=cone+dribbling+drill+football+close+control"},
+      {"name": "Ball Striking Technique",   "sets": 4, "reps": "15 kicks","rest": "60s", "muscle": "Hip Flexor/Power",     "weight_guide": "Football", "equipment_required": true, "demo_url": "https://www.youtube.com/results?search_query=ball+striking+technique+football+shooting+drill"},
+      {"name": "First Touch Control Drill", "sets": 3, "reps": "2 min",   "rest": "45s", "muscle": "Coordination",         "weight_guide": "Football", "equipment_required": true, "demo_url": "https://www.youtube.com/results?search_query=first+touch+control+drill+football+technique"},
+      {"name": "Receiving and Turning",     "sets": 3, "reps": "2 min",   "rest": "45s", "muscle": "Coordination/Agility", "weight_guide": "Football", "equipment_required": true, "demo_url": "https://www.youtube.com/results?search_query=receiving+and+turning+football+skill+drill"},
+      {"name": "Wall Pass Drill",           "sets": 3, "reps": "3 min",   "rest": "60s", "muscle": "Passing Accuracy",     "weight_guide": "Football/Wall", "equipment_required": true, "demo_url": "https://www.youtube.com/results?search_query=wall+pass+drill+football+passing+technique"},
+
+      {"name": "Finishing Under Pressure Drill", "sets": 4, "reps": "10 shots", "rest": "60s", "muscle": "Composure/Finishing",  "weight_guide": "Football", "equipment_required": true, "roles": ["forward"], "focus": ["finishing"], "priority": 9, "demo_url": "https://www.youtube.com/results?search_query=finishing+under+pressure+drill+striker"},
+      {"name": "Reactive Shooting Drill",       "sets": 4, "reps": "8 shots",  "rest": "60s", "muscle": "Reaction/Finishing",   "weight_guide": "Football", "equipment_required": true, "roles": ["forward"], "focus": ["finishing"], "priority": 8, "demo_url": "https://www.youtube.com/results?search_query=reactive+shooting+drill+striker+training"},
+      {"name": "Off-the-Shoulder Sprint Timing","sets": 5, "reps": "10m",     "rest": "60s", "muscle": "Timed Runs/Speed",     "weight_guide": "Bodyweight", "equipment_required": false, "roles": ["forward"], "focus": ["technique"], "priority": 7, "demo_url": "https://www.youtube.com/results?search_query=off+the+shoulder+run+timing+striker+drill"},
+      {"name": "One-Touch Finishing Drill",     "sets": 4, "reps": "10 shots", "rest": "45s", "muscle": "Quick Finishing",      "weight_guide": "Football", "equipment_required": true, "roles": ["forward"], "focus": ["finishing"], "priority": 7, "demo_url": "https://www.youtube.com/results?search_query=one+touch+finishing+drill+striker"}
+    ],
+    "football_power": [
+      {"name": "Broad Jump",              "sets": 4, "reps": "6",    "rest": "90s", "muscle": "Explosive Leg Power", "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=broad+jump+plyometric+football+power"},
+      {"name": "Lateral Bound",           "sets": 4, "reps": "8 ea", "rest": "75s", "muscle": "Lateral Power",       "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=lateral+bound+plyometric+football+training"},
+      {"name": "Drop Jump",               "sets": 4, "reps": "6",    "rest": "90s", "muscle": "Reactive Strength",   "weight_guide": "Bodyweight", "equipment_required": true, "demo_url": "https://www.youtube.com/results?search_query=drop+jump+reactive+strength+football+plyometric"},
+      {"name": "Explosive Sprint Start",  "sets": 5, "reps": "10m",  "rest": "90s", "muscle": "Starting Speed",      "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=explosive+sprint+start+football+acceleration"},
+      {"name": "Box Jump",                "sets": 4, "reps": "6",    "rest": "90s", "muscle": "Vertical Power",      "weight_guide": "Bodyweight", "equipment_required": true, "demo_url": "https://www.youtube.com/results?search_query=box+jump+vertical+power+football+training"},
+      {"name": "Single-Leg Bound",        "sets": 3, "reps": "6 ea", "rest": "90s", "muscle": "Unilateral Power",    "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=single+leg+bound+football+power+training"},
+
+      {"name": "Jockeying/Backpedal Footwork", "sets": 5, "reps": "10m ea", "rest": "60s", "muscle": "Defensive Footwork",   "weight_guide": "Bodyweight", "equipment_required": false, "roles": ["defender"], "focus": ["technique"], "priority": 8, "demo_url": "https://www.youtube.com/results?search_query=jockeying+backpedal+footwork+defender+drill"},
+      {"name": "Heading Technique & Power",    "sets": 4, "reps": "10",     "rest": "60s", "muscle": "Neck/Core Power",      "weight_guide": "Football", "equipment_required": true, "roles": ["defender"], "focus": ["power"], "priority": 8, "demo_url": "https://www.youtube.com/results?search_query=heading+technique+power+drill+defender"},
+      {"name": "1v1 Defending Drill",          "sets": 5, "reps": "6",      "rest": "75s", "muscle": "Reaction/Tackling",    "weight_guide": "Bodyweight", "equipment_required": false, "roles": ["defender"], "focus": ["technique"], "priority": 7, "demo_url": "https://www.youtube.com/results?search_query=1v1+defending+drill+football+defender"},
+      {"name": "Blocking Technique Drill",     "sets": 4, "reps": "8",      "rest": "60s", "muscle": "Core/Reaction",        "weight_guide": "Football", "equipment_required": true, "roles": ["defender"], "focus": ["technique"], "priority": 7, "demo_url": "https://www.youtube.com/results?search_query=shot+blocking+technique+drill+defender"}
+    ],
+    "gk_reaction": [
+      {"name": "Reaction Dive Drill",              "sets": 5, "reps": "6 ea", "rest": "60s", "muscle": "Reaction/Diving Power", "weight_guide": "Bodyweight", "equipment_required": false, "priority": 9, "demo_url": "https://www.youtube.com/results?search_query=goalkeeper+reaction+diving+save+drill"},
+      {"name": "Shot-Stopping Footwork Drill",     "sets": 4, "reps": "10",   "rest": "60s", "muscle": "Footwork/Positioning",  "weight_guide": "Bodyweight", "equipment_required": false, "priority": 9, "demo_url": "https://www.youtube.com/results?search_query=goalkeeper+shot+stopping+footwork+drill"},
+      {"name": "High-Ball Catching & Jumping",     "sets": 4, "reps": "8",    "rest": "60s", "muscle": "Vertical Power/Catching","weight_guide": "Football", "equipment_required": true, "priority": 8, "demo_url": "https://www.youtube.com/results?search_query=goalkeeper+high+ball+catching+jumping+drill"},
+      {"name": "Low Block Save Technique",         "sets": 4, "reps": "8 ea", "rest": "60s", "muscle": "Lateral Reaction",      "weight_guide": "Bodyweight", "equipment_required": false, "priority": 8, "demo_url": "https://www.youtube.com/results?search_query=goalkeeper+low+block+save+technique+drill"},
+      {"name": "Distribution Kicking Power",       "sets": 4, "reps": "10",   "rest": "60s", "muscle": "Kicking Power/Range",   "weight_guide": "Football", "equipment_required": true, "priority": 7, "demo_url": "https://www.youtube.com/results?search_query=goalkeeper+distribution+kicking+power+drill"}
+    ]
+  }
+}

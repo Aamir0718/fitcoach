@@ -814,7 +814,7 @@ function _btnLock(btnId, loading=true) {
 }
 
 // ── WORKOUT MODE ──────────────────────────────────────────────────────
-function setWorkoutMode(mode) {
+async function setWorkoutMode(mode) {
   // Guard: sport mode requires sport profile
   if (mode === "sport" && !(currentUser?.plays_sport && currentUser?.sport)) {
     showToast("Complete sport setup first!");
@@ -826,6 +826,20 @@ function setWorkoutMode(mode) {
   updateModeUI();
   const modeLabel = mode === "sport" ? "Sport Mode 🏆" : "Gym Mode 🏋️";
   showToast(`Switched to ${modeLabel}`);
+
+  // Persist server-side: active_mode (which drives what the planner
+  // generates) was previously derived ONLY from plays_sport/sport, so this
+  // toggle used to change a label and nothing else — the backend kept
+  // serving whichever mode plays_sport implied. Now it's an explicit
+  // preference the server actually reads (models/profile.py active_mode),
+  // so reload the planner right after so the switch is visibly real.
+  try {
+    await apiFetch("/api/profile/me", { method: "PUT", body: JSON.stringify({ workout_mode: mode }) });
+    if (currentUser) currentUser.workout_mode = mode;
+    await refreshPlanner();
+  } catch (err) {
+    console.error("Failed to persist workout mode:", err);
+  }
 }
 function updateModeUI() {
   const isSport = workoutMode === "sport";
@@ -1100,7 +1114,7 @@ function buildExerciseCard(ex, idx, activeIdx, responseType) {
   const tip = Array.isArray(ex?.progression) ? ex.progression[0] : (ex?.weight_guide || "Move with clean control and own every rep.");
   return `
     <article class="exercise-ai-card ${isActive ? "active" : ""} ${isDone ? "complete" : ""}" draggable="true">
-      <div class="exercise-visual"><span>${exerciseIcon(ex)}</span></div>
+      <div class="exercise-visual">${window.FCDemo ? window.FCDemo.renderDemo(ex, { size: "thumb" }) : `<span>${exerciseIcon(ex)}</span>`}</div>
       <div class="exercise-card-main">
         <div class="exercise-topline">
           <h4>${escapeHtml(ex?.name || "Exercise")}</h4>
@@ -1857,7 +1871,12 @@ async function sportOnboardingNext() {
         headers:{"Content-Type":"application/json","Authorization":`Bearer ${authToken}`},
         body: JSON.stringify({
           sport,
-          role: sportObState.profile.role,
+          // Running's onboarding asks no separate "role" question — it asks
+          // distance_type (sprint/5k/10k/half marathon/marathon) instead,
+          // which was collected locally but never actually sent, so the
+          // backend had no way to tell a sprinter from a marathoner. Reusing
+          // the `role` field for it needs no schema change or migration.
+          role: sport === "running" ? sportObState.profile.distance_type : sportObState.profile.role,
           position: sportObState.profile.position,
           focus: sportObState.profile.primary_focus,
           match_frequency: sportObState.profile.match_frequency,
@@ -3760,8 +3779,15 @@ function transitionToWorkout(data) {
     }
     
     if (exerciseIconEl) {
-      const type = exerciseMotionType(active);
-      exerciseIconEl.innerHTML = renderExerciseHologram(type, active, data.zone);
+      // window.FCDemo guard is load-bearing, not optional: if exercise-demo.js
+      // ever 404s (a bad deploy, a CDN hiccup), the live session must not go
+      // blank — fall back to the original stick-figure hologram.
+      if (window.FCDemo) {
+        exerciseIconEl.innerHTML = window.FCDemo.renderDemo(active, { size: "hero", zone: data.zone });
+      } else {
+        const type = exerciseMotionType(active);
+        exerciseIconEl.innerHTML = renderExerciseHologram(type, active, data.zone);
+      }
     }
     
     if (instructionsEl) {

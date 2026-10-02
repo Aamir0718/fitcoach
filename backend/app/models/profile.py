@@ -64,6 +64,15 @@ class Profile(Base):
 
     @property
     def active_mode(self) -> str:
-        if self.plays_sport and self.sport:
+        # The gym/sport toggle in the UI used to be decorative — the server
+        # derived mode purely from plays_sport/sport, so switching back to
+        # Gym mode after completing sport onboarding did nothing server-side.
+        # An explicit preference (set via PUT /api/profile/me) now wins,
+        # falling back to the old plays_sport-derived default when unset.
+        pref = (self.preferences or {}).get("workout_mode")
+        has_sport = bool(self.plays_sport and self.sport)
+        if pref == "gym":
+            return self.workout_place or "gym"
+        if pref == "sport" and has_sport:
             return "sport"
-        return self.workout_place or "gym"
+        return "sport" if has_sport else (self.workout_place or "gym")

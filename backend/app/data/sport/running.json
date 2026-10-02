@@ -1,0 +1,65 @@
+{
+  "sport": "running",
+  "version": 1,
+  "mobility_session": "easy_run",
+  "role_aliases": {
+    "100m": "sprint", "200m": "sprint", "400m": "sprint", "800m": "sprint", "sprinter": "sprint", "sprints": "sprint",
+    "1500m": "middle", "mile": "middle", "5k": "middle", "5000m": "middle", "10k": "middle", "10000m": "middle",
+    "half_marathon": "long", "half-marathon": "long", "halfmarathon": "long", "marathon": "long", "ultra": "long", "ultramarathon": "long"
+  },
+  "role_templates": {
+    "sprint": ["track_intervals", "running_drills", "easy_run", "tempo_run", "long_run"],
+    "middle": ["track_intervals", "tempo_run", "running_drills", "easy_run", "long_run"],
+    "long":   ["long_run", "easy_run", "tempo_run", "running_drills", "track_intervals"]
+  },
+  "session_fallbacks": {},
+  "sessions": {
+    "easy_run": [
+      {"name": "Easy Conversational Run", "sets": 1, "reps": "30-40 min", "rest": "0s",  "muscle": "Aerobic Base",     "weight_guide": "60-65% max HR", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=easy+run+pace+aerobic+base+training"},
+      {"name": "Cadence Focus Drill",     "sets": 3, "reps": "5 min",     "rest": "2 min","muscle": "Running Economy",  "weight_guide": "Own pace",       "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=running+cadence+180+steps+drill"},
+      {"name": "Walking Recovery",        "sets": 2, "reps": "5 min",     "rest": "0s",   "muscle": "Active Recovery",  "weight_guide": "Walk pace",      "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=active+recovery+walking+after+run"}
+    ],
+    "running_drills": [
+      {"name": "A-Skip Drill",             "sets": 3, "reps": "20m", "rest": "45s", "muscle": "Running Mechanics",   "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=a+skip+running+drill+mechanics"},
+      {"name": "B-Skip Drill",             "sets": 3, "reps": "20m", "rest": "45s", "muscle": "Running Mechanics",   "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=b+skip+running+drill+mechanics"},
+      {"name": "High Knees Running Drill", "sets": 3, "reps": "20m", "rest": "45s", "muscle": "Cadence/Hip Flexors", "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=high+knees+running+drill+form"},
+      {"name": "Butt Kicks Drill",         "sets": 3, "reps": "20m", "rest": "45s", "muscle": "Hamstrings/Cadence",  "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=butt+kicks+running+drill+hamstring"},
+      {"name": "Bounding",                 "sets": 3, "reps": "30m", "rest": "60s", "muscle": "Power/Stride Length", "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=bounding+running+drill+stride+length"},
+      {"name": "Running Strides",          "sets": 6, "reps": "100m","rest": "60s", "muscle": "Speed/Form",          "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=running+strides+speed+form+drill"},
+      {"name": "Ankle Circles",            "sets": 3, "reps": "15 ea","rest": "20s","muscle": "Ankle Mobility",      "weight_guide": "Bodyweight", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=ankle+mobility+exercise+running+warm+up"}
+    ],
+    "tempo_run": [
+      {"name": "Tempo Run",           "sets": 1, "reps": "20-30 min", "rest": "0s",   "muscle": "Lactate Threshold", "weight_guide": "75-80% max HR",  "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=tempo+run+training+guide+lactate+threshold"},
+      {"name": "Pace Pickup Drill",   "sets": 4, "reps": "5 min",     "rest": "2 min","muscle": "Rhythm/Pace",       "weight_guide": "Tempo effort",    "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=pace+pickup+running+tempo+drill"},
+      {"name": "Threshold Intervals", "sets": 3, "reps": "8 min",     "rest": "3 min","muscle": "Aerobic Power",     "weight_guide": "Comfortably hard","equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=threshold+running+intervals+tempo+training"},
+
+      {"name": "Lactate Threshold Pace Judgment Run", "sets": 1, "reps": "25 min", "rest": "0s",   "muscle": "Pace Judgment/Threshold", "weight_guide": "Threshold pace", "equipment_required": false, "roles": ["middle"], "sub_roles": ["middle"], "focus": ["endurance"], "priority": 8, "demo_url": "https://www.youtube.com/results?search_query=lactate+threshold+pace+judgment+run+training"},
+      {"name": "VO2max Short-Interval Ladder",         "sets": 6, "reps": "2-4 min","rest": "2 min","muscle": "VO2 Max",                  "weight_guide": "5K-10K pace",     "equipment_required": false, "roles": ["middle"], "sub_roles": ["middle"], "focus": ["speed"], "priority": 8, "demo_url": "https://www.youtube.com/results?search_query=vo2max+interval+ladder+workout+running"},
+      {"name": "Stride-Rate Cadence Drill",            "sets": 4, "reps": "3 min",  "rest": "90s",  "muscle": "Running Economy",         "weight_guide": "Race pace",       "equipment_required": false, "roles": ["middle"], "focus": ["technique"], "priority": 7, "demo_url": "https://www.youtube.com/results?search_query=stride+rate+cadence+drill+5k+10k+runner"}
+    ],
+    "track_intervals": [
+      {"name": "400m Repeats",        "sets": 6, "reps": "400m",    "rest": "90s",  "muscle": "VO2 Max/Speed",     "weight_guide": "Race pace",    "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=400m+repeat+interval+track+training"},
+      {"name": "800m Repeats",        "sets": 4, "reps": "800m",    "rest": "2 min","muscle": "VO2 Max/Endurance", "weight_guide": "5K race pace", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=800m+repeat+interval+workout+training"},
+      {"name": "200m Fast Intervals", "sets": 8, "reps": "200m",    "rest": "90s",  "muscle": "Speed/Anaerobic",   "weight_guide": "Mile race pace","equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=200m+interval+sprint+track+training"},
+      {"name": "Hill Repeats",        "sets": 6, "reps": "30s hard","rest": "90s",  "muscle": "Power Endurance",   "weight_guide": "Hard effort",   "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=hill+repeats+running+power+endurance"},
+
+      {"name": "Blocks/Acceleration Start Technique", "sets": 6, "reps": "20m",  "rest": "2 min","muscle": "Start Mechanics/Power",  "weight_guide": "Max effort", "equipment_required": false, "roles": ["sprint"], "sub_roles": ["sprint"], "focus": ["speed"], "priority": 9, "demo_url": "https://www.youtube.com/results?search_query=sprint+start+block+acceleration+technique+drill"},
+      {"name": "Flying Sprint Mechanics Drill",       "sets": 5, "reps": "30m",  "rest": "3 min","muscle": "Top-End Sprint Mechanics","weight_guide": "Max effort", "equipment_required": false, "roles": ["sprint"], "sub_roles": ["sprint"], "focus": ["speed"], "priority": 9, "demo_url": "https://www.youtube.com/results?search_query=flying+sprint+mechanics+drill+top+end+speed"},
+      {"name": "Resisted Sled Sprint",                "sets": 5, "reps": "20m",  "rest": "2 min","muscle": "Sprint Power",           "weight_guide": "Light sled", "equipment_required": true,  "roles": ["sprint"], "focus": ["power"], "priority": 8, "demo_url": "https://www.youtube.com/results?search_query=resisted+sled+sprint+training+drill"},
+      {"name": "Plyometric Bounding Series",          "sets": 4, "reps": "8",    "rest": "2 min","muscle": "Elastic Power",          "weight_guide": "Bodyweight", "equipment_required": false, "roles": ["sprint"], "focus": ["power"], "priority": 7, "demo_url": "https://www.youtube.com/results?search_query=plyometric+bounding+series+sprinter+training"},
+      {"name": "Sprint-Specific Hip Flexor Drill",    "sets": 3, "reps": "12 ea","rest": "60s",  "muscle": "Hip Flexor Speed",       "weight_guide": "Light band", "equipment_required": false, "roles": ["sprint"], "focus": ["speed"], "priority": 7, "demo_url": "https://www.youtube.com/results?search_query=hip+flexor+speed+drill+sprinter+training"}
+    ],
+    "long_run": [
+      {"name": "Long Slow Distance Run",     "sets": 1, "reps": "45-90 min", "rest": "0s", "muscle": "Aerobic Endurance", "weight_guide": "Easy pace",       "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=long+run+training+tips+aerobic+endurance"},
+      {"name": "Negative Split Run",          "sets": 1, "reps": "40-60 min", "rest": "0s", "muscle": "Pacing/Endurance",  "weight_guide": "Easy to moderate", "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=negative+split+run+pacing+strategy+training"},
+      {"name": "Fartlek Run",                 "sets": 1, "reps": "30-45 min", "rest": "0s", "muscle": "Speed Endurance",   "weight_guide": "Mixed pace",       "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=fartlek+run+speed+endurance+training"},
+      {"name": "Running Mobility Cool-Down",  "sets": 1, "reps": "10 min",    "rest": "0s", "muscle": "Recovery",          "weight_guide": "Bodyweight",       "equipment_required": false, "demo_url": "https://www.youtube.com/results?search_query=running+cool+down+mobility+stretch+recovery"},
+
+      {"name": "Long Run Fueling/Pacing Practice", "sets": 1, "reps": "60-90 min", "rest": "0s", "muscle": "Race Simulation",      "weight_guide": "Marathon pace", "equipment_required": false, "roles": ["long"], "sub_roles": ["long"], "focus": ["endurance"], "priority": 9, "demo_url": "https://www.youtube.com/results?search_query=long+run+fueling+pacing+practice+marathon"},
+      {"name": "Downhill/Uphill Long Run Technique","sets": 1, "reps": "50-70 min","rest": "0s", "muscle": "Eccentric Control/Climbing","weight_guide": "Easy to moderate","equipment_required": false, "roles": ["long"], "focus": ["technique"], "priority": 8, "demo_url": "https://www.youtube.com/results?search_query=downhill+uphill+long+run+technique+marathon+training"},
+      {"name": "Back-to-Back Long Run",             "sets": 1, "reps": "40-60 min","rest": "0s", "muscle": "Fatigue Resistance",    "weight_guide": "Easy pace",       "equipment_required": false, "roles": ["long"], "focus": ["endurance"], "priority": 8, "demo_url": "https://www.youtube.com/results?search_query=back+to+back+long+run+marathon+training"},
+      {"name": "Post-Long-Run Recovery Protocol",   "sets": 1, "reps": "15 min",   "rest": "0s", "muscle": "Recovery",              "weight_guide": "Foam roller",     "equipment_required": true,  "roles": ["long"], "focus": ["recovery"], "priority": 7, "demo_url": "https://www.youtube.com/results?search_query=foam+rolling+recovery+protocol+after+long+run"},
+      {"name": "Mental Pacing/Negative Split Practice","sets": 1, "reps": "45 min", "rest": "0s", "muscle": "Pacing Discipline",     "weight_guide": "Race pace",       "equipment_required": false, "roles": ["long"], "focus": ["endurance"], "priority": 7, "demo_url": "https://www.youtube.com/results?search_query=negative+split+pacing+practice+marathon+training"}
+    ]
+  }
+}
