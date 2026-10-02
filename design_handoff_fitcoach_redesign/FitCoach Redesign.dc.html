@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#EAE7E1}
+*{box-sizing:border-box}
+button{font-family:'Archivo',system-ui,sans-serif}
+a{color:#E8442A;text-decoration:none}a:hover{color:#C7331C}
+@keyframes fcTick{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes fcIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#CFC9BF;border-radius:4px}
+</style>
+</helmet>
+
+<div style="font-family:'Archivo',system-ui,sans-serif;padding:40px;display:flex;flex-direction:column;gap:20px;background:#EAE7E1;color:#14120E">
+  <div style="display:flex;align-items:baseline;gap:14px">
+    <span style="font:800 12px/1 'Archivo';letter-spacing:.16em;text-transform:uppercase;color:#E8442A">Redesign</span>
+    <span style="font:400 13px/1 'Archivo';color:#6D685F">Same 8 tabs, same routes, same flows — new visual language. Click the nav.</span>
+  </div>
+
+  <div style="display:flex;gap:36px;align-items:flex-start;flex-wrap:wrap">
+
+  <!-- ================= DESKTOP ================= -->
+  <div style="width:1440px;min-width:1440px;flex:none;height:920px;background:#F5F3EF;border:1px solid #D8D3CA;display:flex;overflow:hidden;position:relative">
+
+    <!-- SIDEBAR -->
+    <nav style="width:236px;min-width:236px;background:#FFFFFF;border-right:1px solid #E3DFD7;display:flex;flex-direction:column;padding:22px 14px">
+      <div style="display:flex;align-items:center;gap:10px;padding:0 8px 24px">
+        <span style="display:grid;place-items:center;width:30px;height:30px;background:#14120E;color:#fff;font:800 12px/1 'Archivo';letter-spacing:.02em">FC</span>
+        <span style="font:800 17px/1 'Archivo';letter-spacing:-.02em">FitCoach</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="8">
+          <sc-if value="{{ n.active }}" hint-placeholder-val="{{ true }}">
+            <button onClick="{{ n.go }}" style="display:flex;align-items:center;gap:12px;width:100%;min-height:42px;padding:10px 12px;border:none;background:#14120E;color:#FFFFFF;font:700 14px/1 'Archivo';letter-spacing:-.01em;text-align:left;cursor:pointer">
+              <span style="width:6px;height:6px;background:#E8442A"></span>{{ n.label }}
+            </button>
+          </sc-if>
+          <sc-if value="{{ n.inactive }}" hint-placeholder-val="{{ true }}">
+            <button onClick="{{ n.go }}" style="display:flex;align-items:center;gap:12px;width:100%;min-height:42px;padding:10px 12px;border:none;background:transparent;color:#4A463F;font:500 14px/1 'Archivo';letter-spacing:-.01em;text-align:left;cursor:pointer" style-hover="background:#F0EDE7;color:#14120E">
+              <span style="width:6px;height:6px;background:#D8D3CA"></span>{{ n.label }}
+            </button>
+          </sc-if>
+        </sc-for>
+      </div>
+
+      <div style="margin-top:auto;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;border:1px solid #E3DFD7">
+          <button onClick="{{ setGym }}" style="flex:1;padding:9px 0;border:none;background:#14120E;color:#fff;font:700 11px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer">Gym</button>
+          <button onClick="{{ setSport }}" style="flex:1;padding:9px 0;border:none;background:#fff;color:#6D685F;font:700 11px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer">Sport</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding-top:14px;border-top:1px solid #E3DFD7">
+          <div style="display:flex;flex-direction:column;gap:4px"><span style="font:500 10px/1 'IBM Plex Mono';letter-spacing:.1em;text-transform:uppercase;color:#9A948A">Mode</span><strong style="font:700 13px/1 'Archivo'">Gym</strong></div>
+          <div style="display:flex;flex-direction:column;gap:4px;text-align:right"><span style="font:500 10px/1 'IBM Plex Mono';letter-spacing:.1em;text-transform:uppercase;color:#9A948A">Streak</span><strong style="font:700 13px/1 'Archivo';color:#E8442A">12 d</strong></div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- CONTENT -->
+    <div style="flex:1;height:920px;overflow-y:auto;background:#F5F3EF">
+
+      <!-- ---------- HOME ---------- -->
+      <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+      <div>
+        <section style="position:relative;height:520px;overflow:hidden;background:#14120E">
+          <img src="frontend/assets/images/home/deadlift.webp" alt="Athlete deadlifting in gym" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 35%">
+          <div style="position:absolute;inset:0;background:linear-gradient(90deg,rgba(12,11,9,.92) 0%,rgba(12,11,9,.72) 45%,rgba(12,11,9,.15) 100%)"></div>
+          <div style="position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:24px 48px">
+            <span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.65)">Tuesday · 12 August</span>
+            <span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.65)">Week 6 of 12 · Hypertrophy block</span>
+          </div>
+          <div style="position:relative;z-index:2;height:100%;display:flex;flex-direction:column;justify-content:center;gap:26px;padding:0 48px;max-width:820px">
+            <span style="font:600 12px/1 'IBM Plex Mono';letter-spacing:.24em;text-transform:uppercase;color:#E8442A">Today's training</span>
+            <h1 style="margin:0;font:800 76px/0.94 'Archivo';letter-spacing:-.035em;color:#fff">Upper Body<br>Strength</h1>
+            <div style="display:flex;gap:34px;align-items:center">
+              <div style="display:flex;flex-direction:column;gap:6px"><span style="font:800 30px/1 'Archivo';color:#fff">45</span><span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.55)">Minutes</span></div>
+              <div style="width:1px;height:38px;background:rgba(255,255,255,.2)"></div>
+              <div style="display:flex;flex-direction:column;gap:6px"><span style="font:800 30px/1 'Archivo';color:#fff">6</span><span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.55)">Exercises</span></div>
+              <div style="width:1px;height:38px;background:rgba(255,255,255,.2)"></div>
+              <div style="display:flex;flex-direction:column;gap:6px"><span style="font:800 30px/1 'Archivo';color:#fff">7.4k</span><span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.55)">Est. volume kg</span></div>
+            </div>
+            <div style="display:flex;gap:12px;align-items:center">
+              <button onClick="{{ openWorkout }}" style="padding:20px 40px;white-space:nowrap;border:none;background:#E8442A;color:#fff;font:800 15px/1 'Archivo';letter-spacing:.08em;text-transform:uppercase;cursor:pointer" style-hover="background:#C7331C">Start workout</button>
+              <button onClick="{{ goPlanner }}" style="padding:20px 32px;white-space:nowrap;border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;font:700 15px/1 'Archivo';letter-spacing:.08em;text-transform:uppercase;cursor:pointer" style-hover="background:rgba(255,255,255,.1)">View plan</button>
+            </div>
+          </div>
+        </section>
+
+        <section style="display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1px solid #E3DFD7;background:#fff">
+          <div style="padding:32px 48px;border-right:1px solid #E3DFD7;display:flex;flex-direction:column;gap:18px">
+            <span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:#9A948A">This week</span>
+            <div style="display:flex;align-items:flex-end;gap:10px">
+              <sc-for list="{{ week }}" as="d" hint-placeholder-count="7">
+                <div style="display:flex;flex-direction:column;align-items:center;gap:8px;flex:1">
+                  <sc-if value="{{ d.done }}" hint-placeholder-val="{{ true }}"><span style="width:100%;height:46px;background:#E8442A"></span></sc-if>
+                  <sc-if value="{{ d.today }}" hint-placeholder-val="{{ true }}"><span style="width:100%;height:46px;background:#fff;border:1.5px solid #E8442A"></span></sc-if>
+                  <sc-if value="{{ d.empty }}" hint-placeholder-val="{{ true }}"><span style="width:100%;height:46px;background:#EDEAE4"></span></sc-if>
+                  <span style="font:500 10px/1 'IBM Plex Mono';letter-spacing:.08em;color:#9A948A">{{ d.label }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <span style="font:500 13px/1.4 'Archivo';color:#6D685F">4 of 5 sessions done · 12-day streak</span>
+          </div>
+          <div style="padding:32px 48px;border-right:1px solid #E3DFD7;display:flex;flex-direction:column;gap:14px">
+            <span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:#9A948A">Training volume · 7 days</span>
+            <div style="display:flex;align-items:baseline;gap:8px"><span style="font:800 54px/1 'Archivo';letter-spacing:-.03em">28,940</span><span style="font:600 15px/1 'Archivo';color:#6D685F">kg</span></div>
+            <span style="font:500 13px/1.4 'Archivo';color:#E8442A">↑ 9% vs last week</span>
+          </div>
+          <div style="padding:32px 48px;display:flex;flex-direction:column;gap:14px">
+            <span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:#9A948A">Latest personal record</span>
+            <div style="display:flex;align-items:baseline;gap:8px"><span style="font:800 54px/1 'Archivo';letter-spacing:-.03em">82.5</span><span style="font:600 15px/1 'Archivo';color:#6D685F">kg × 5</span></div>
+            <span style="font:500 13px/1.4 'Archivo';color:#6D685F">Bench press · 4 days ago</span>
+          </div>
+        </section>
+
+        <section style="padding:44px 48px;display:grid;grid-template-columns:1.55fr 1fr;gap:48px">
+          <div style="display:flex;flex-direction:column;gap:20px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;border-bottom:1px solid #D8D3CA;padding-bottom:12px">
+              <h2 style="margin:0;font:800 22px/1 'Archivo';letter-spacing:-.02em">Today's exercises</h2>
+              <button onClick="{{ goPlanner }}" style="border:none;background:none;font:700 12px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;color:#E8442A;cursor:pointer">Full plan</button>
+            </div>
+            <div style="display:flex;flex-direction:column">
+              <sc-for list="{{ exercises }}" as="ex" hint-placeholder-count="6">
+                <div onClick="{{ openWorkout }}" style="display:flex;align-items:center;gap:20px;padding:14px 0;border-bottom:1px solid #E3DFD7;cursor:pointer" style-hover="background:#EFECE6">
+                  <div role="img" aria-label="{{ ex.name }}" style="width:96px;height:68px;background-color:#DDD8D0;background-size:cover;background-position:center;background-image:{{ ex.bg }}"></div>
+                  <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+                    <span style="font:700 17px/1 'Archivo';letter-spacing:-.01em">{{ ex.name }}</span>
+                    <span style="font:500 12px/1 'IBM Plex Mono';letter-spacing:.08em;text-transform:uppercase;color:#9A948A">{{ ex.meta }}</span>
+                  </div>
+                  <span style="font:700 16px/1 'Archivo';color:#14120E">{{ ex.sets }}</span>
+                  <span style="width:70px;text-align:right;font:500 13px/1 'IBM Plex Mono';color:#9A948A">{{ ex.last }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:32px">
+            <div style="display:flex;flex-direction:column;gap:14px;border-top:2px solid #14120E;padding-top:16px">
+              <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:#14120E">Coach's note</span>
+              <p style="margin:0;font:400 17px/1.55 'Archivo';color:#38352F;text-wrap:pretty">Your bench press is up 7.5 kg over four weeks and recovery looks good. Add 2.5 kg to today's working sets and keep the last set in reserve.</p>
+              <button onClick="{{ goCoach }}" style="align-self:flex-start;padding:13px 22px;border:1px solid #14120E;background:transparent;font:700 12px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer" style-hover="background:#14120E;color:#fff">View recommendation</button>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:14px;border-top:1px solid #D8D3CA;padding-top:16px">
+              <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:#9A948A">Recovery</span>
+              <div style="display:flex;align-items:baseline;gap:10px"><span style="font:800 46px/1 'Archivo';letter-spacing:-.03em">86</span><span style="font:600 14px/1 'Archivo';color:#6D685F">Ready to train</span></div>
+              <div style="height:6px;background:#E3DFD7"><div style="height:6px;width:86%;background:#E8442A;transform-origin:left;animation:fcTick .8s ease-out"></div></div>
+              <span style="font:400 13px/1.5 'Archivo';color:#6D685F">Sleep 7h 40m · Soreness mild · Load moderate</span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:12px;border-top:1px solid #D8D3CA;padding-top:16px">
+              <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:#9A948A">Nutrition today</span>
+              <div style="display:flex;justify-content:space-between;font:400 14px/1 'Archivo';color:#38352F"><span>Calories</span><strong style="font-weight:700">1,840 / 2,400</strong></div>
+              <div style="display:flex;justify-content:space-between;font:400 14px/1 'Archivo';color:#38352F"><span>Protein</span><strong style="font-weight:700">126 / 165 g</strong></div>
+              <div style="display:flex;justify-content:space-between;font:400 14px/1 'Archivo';color:#38352F"><span>Carbs</span><strong style="font-weight:700">198 / 260 g</strong></div>
+            </div>
+          </div>
+        </section>
+      </div>
+      </sc-if>
+
+      <!-- ---------- COACH ---------- -->
+      <sc-if value="{{ isCoach }}" hint-placeholder-val="{{ true }}">
+      <div style="height:920px;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:26px 48px;border-bottom:1px solid #E3DFD7;background:#fff">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:#9A948A">Coach</span>
+            <h2 style="margin:0;font:800 26px/1 'Archivo';letter-spacing:-.02em">Marcus · Strength coach</h2>
+          </div>
+          <div style="display:flex;gap:28px;align-items:center">
+            <div style="display:flex;flex-direction:column;gap:4px"><span style="font:500 10px/1 'IBM Plex Mono';letter-spacing:.14em;text-transform:uppercase;color:#9A948A">Readiness</span><strong style="font:700 18px/1 'Archivo'">86</strong></div>
+            <div style="display:flex;flex-direction:column;gap:4px"><span style="font:500 10px/1 'IBM Plex Mono';letter-spacing:.14em;text-transform:uppercase;color:#9A948A">Session</span><strong style="font:700 18px/1 'Archivo'">Not started</strong></div>
+            <button onClick="{{ openWorkout }}" style="padding:14px 26px;border:none;background:#E8442A;color:#fff;font:800 12px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer">Start workout</button>
+          </div>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:36px 48px;display:flex;flex-direction:column;gap:26px;max-width:900px;width:100%;margin:0 auto">
+          <div style="display:flex;flex-direction:column;gap:10px;max-width:640px">
+            <span style="font:500 10px/1 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:#9A948A">Coach · 08:12</span>
+            <p style="margin:0;padding:18px 22px;background:#fff;border:1px solid #E3DFD7;font:400 16px/1.55 'Archivo';color:#26241F">Morning. You slept 7h 40m and soreness is mild — that's a green light. Today is upper body strength, and I've added 2.5 kg to your bench working sets.</p>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;align-self:flex-end;align-items:flex-end">
+            <span style="font:500 10px/1 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:#9A948A">You · 08:14</span>
+            <p style="margin:0;padding:18px 22px;background:#14120E;color:#fff;font:400 16px/1.55 'Archivo'">My right shoulder feels tight. Can we swap the overhead press?</p>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px;max-width:640px">
+            <span style="font:500 10px/1 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:#9A948A">Coach · 08:14</span>
+            <p style="margin:0;padding:18px 22px;background:#fff;border:1px solid #E3DFD7;font:400 16px/1.55 'Archivo';color:#26241F">Swapped it for landmine press — same push pattern, friendlier shoulder angle. Keep the load at 30 kg today.</p>
+            <div style="display:flex;align-items:center;gap:16px;padding:14px;background:#fff;border:1px solid #E3DFD7">
+              <img src="frontend/assets/images/home/boxing.webp" alt="Landmine press demonstration" style="width:104px;height:74px;object-fit:cover">
+              <div style="flex:1;display:flex;flex-direction:column;gap:5px"><span style="font:700 16px/1 'Archivo'">Landmine Press</span><span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.08em;text-transform:uppercase;color:#9A948A">Shoulders · Push</span></div>
+              <span style="font:700 15px/1 'Archivo'">3 × 10</span>
+              <button onClick="{{ openWorkout }}" style="padding:12px 20px;border:1px solid #14120E;background:transparent;font:700 11px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer" style-hover="background:#14120E;color:#fff">Open</button>
+            </div>
+          </div>
+        </div>
+        <div style="padding:18px 48px;border-top:1px solid #E3DFD7;background:#fff;display:flex;gap:12px;align-items:center;max-width:900px;width:100%;margin:0 auto">
+          <input placeholder="Ask your coach…" style="flex:1;padding:16px 18px;border:1px solid #D8D3CA;background:#F5F3EF;font:400 15px/1 'Archivo';color:#14120E;outline:none">
+          <button style="padding:16px 26px;border:none;background:#14120E;color:#fff;font:700 12px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer">Send</button>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ---------- PLANNER ---------- -->
+      <sc-if value="{{ isPlanner }}" hint-placeholder-val="{{ true }}">
+      <div style="padding:40px 48px;display:flex;flex-direction:column;gap:28px">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;border-bottom:1px solid #D8D3CA;padding-bottom:20px">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:#9A948A">Weekly planner</span>
+            <h1 style="margin:0;font:800 44px/1 'Archivo';letter-spacing:-.03em">Your training pool</h1>
+            <span style="font:400 15px/1 'Archivo';color:#6D685F">4 of 5 sessions completed this week</span>
+          </div>
+          <button style="padding:15px 26px;border:1px solid #14120E;background:transparent;font:700 12px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer" style-hover="background:#14120E;color:#fff">Regenerate plan</button>
+        </div>
+        <div style="height:4px;background:#E3DFD7"><div style="height:4px;width:80%;background:#E8442A"></div></div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px">
+          <sc-for list="{{ sessions }}" as="s" hint-placeholder-count="6">
+            <div onClick="{{ openWorkout }}" style="background:#fff;border:1px solid #E3DFD7;cursor:pointer;display:flex;flex-direction:column" style-hover="border-color:#14120E">
+              <div style="position:relative;height:180px;overflow:hidden">
+                <div role="img" aria-label="{{ s.name }}" style="position:absolute;inset:0;background-color:#DDD8D0;background-size:cover;background-position:center;background-image:{{ s.bg }}"></div>
+                <span style="position:absolute;top:12px;left:12px;padding:6px 10px;background:#14120E;color:#fff;font:600 10px/1 'IBM Plex Mono';letter-spacing:.14em;text-transform:uppercase">{{ s.day }}</span>
+              </div>
+              <div style="padding:20px;display:flex;flex-direction:column;gap:10px">
+                <span style="font:700 20px/1.15 'Archivo';letter-spacing:-.02em">{{ s.name }}</span>
+                <span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.1em;text-transform:uppercase;color:#9A948A">{{ s.meta }}</span>
+                <span style="font:700 12px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;color:#E8442A">{{ s.status }}</span>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ---------- RECOVERY ---------- -->
+      <sc-if value="{{ isRecovery }}" hint-placeholder-val="{{ true }}">
+      <div style="padding:40px 48px;display:grid;grid-template-columns:1.3fr 1fr;gap:56px">
+        <div style="display:flex;flex-direction:column;gap:28px">
+          <div style="display:flex;flex-direction:column;gap:10px;border-bottom:1px solid #D8D3CA;padding-bottom:20px">
+            <span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:#9A948A">Daily check-in</span>
+            <h1 style="margin:0;font:800 44px/1 'Archivo';letter-spacing:-.03em">Recovery</h1>
+            <span style="font:400 15px/1 'Archivo';color:#6D685F">Log how you feel so your coach adjusts today's session.</span>
+          </div>
+          <sc-for list="{{ recoveryQs }}" as="q" hint-placeholder-count="5">
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <span style="font:700 14px/1 'Archivo';letter-spacing:-.01em">{{ q.label }}</span>
+              <div style="display:flex;gap:8px">
+                <sc-for list="{{ q.opts }}" as="o" hint-placeholder-count="5">
+                  <sc-if value="{{ o.on }}" hint-placeholder-val="{{ true }}"><button style="flex:1;padding:15px 6px;border:1px solid #14120E;background:#14120E;color:#fff;font:600 13px/1 'Archivo';cursor:pointer">{{ o.t }}</button></sc-if>
+                  <sc-if value="{{ o.off }}" hint-placeholder-val="{{ true }}"><button style="flex:1;padding:15px 6px;border:1px solid #D8D3CA;background:#fff;color:#4A463F;font:500 13px/1 'Archivo';cursor:pointer" style-hover="border-color:#14120E">{{ o.t }}</button></sc-if>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+          <button style="align-self:flex-start;padding:19px 36px;border:none;background:#E8442A;color:#fff;font:800 13px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer">Calculate recovery score</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:30px">
+          <div style="background:#14120E;color:#fff;padding:34px;display:flex;flex-direction:column;gap:12px">
+            <span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.55)">Today's score</span>
+            <div style="display:flex;align-items:baseline;gap:12px"><span style="font:800 84px/1 'Archivo';letter-spacing:-.04em">86</span><span style="font:700 16px/1 'Archivo';color:#E8442A">Green</span></div>
+            <div style="height:6px;background:rgba(255,255,255,.16)"><div style="height:6px;width:86%;background:#E8442A"></div></div>
+            <p style="margin:6px 0 0;font:400 15px/1.55 'Archivo';color:rgba(255,255,255,.75)">Well recovered. Train at full intensity and push the top set.</p>
+          </div>
+          <div style="display:flex;flex-direction:column">
+            <sc-for list="{{ recoveryMetrics }}" as="m" hint-placeholder-count="4">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;padding:16px 0;border-bottom:1px solid #E3DFD7">
+                <span style="font:500 13px/1 'Archivo';color:#6D685F">{{ m.k }}</span><strong style="font:700 16px/1 'Archivo'">{{ m.v }}</strong>
+              </div>
+            </sc-for>
+          </div>
+          <div style="border-top:2px solid #14120E;padding-top:16px;display:flex;flex-direction:column;gap:10px">
+            <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase">Coach's note</span>
+            <p style="margin:0;font:400 16px/1.55 'Archivo';color:#38352F">Two hard sessions back to back. Keep tomorrow's lower body work at RPE 7 and get to bed before 23:30.</p>
+          </div>
+        </div>
+      </div>
+      <div style="padding:0 48px 44px;display:grid;grid-template-columns:1.3fr 1fr;gap:56px">
+        <div style="display:flex;flex-direction:column;gap:20px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;border-bottom:1px solid #D8D3CA;padding-bottom:12px">
+            <h2 style="margin:0;font:800 22px/1 'Archivo';letter-spacing:-.02em">Readiness · last 14 days</h2>
+            <span style="font:500 12px/1 'IBM Plex Mono';color:#6D685F">Avg 79 · today 86</span>
+          </div>
+          <div style="display:flex;align-items:flex-end;gap:8px;height:160px;border-bottom:1px solid #E3DFD7;padding-bottom:8px">
+            <sc-for list="{{ readinessBars }}" as="r" hint-placeholder-count="14">
+              <div style="flex:1;height:100%;display:flex;align-items:flex-end">
+                <sc-if value="{{ r.high }}" hint-placeholder-val="{{ true }}"><span style="width:100%;background:#14120E;height:{{ r.h }}"></span></sc-if>
+                <sc-if value="{{ r.low }}" hint-placeholder-val="{{ false }}"><span style="width:100%;background:#C9C3B9;height:{{ r.h }}"></span></sc-if>
+                <sc-if value="{{ r.now }}" hint-placeholder-val="{{ false }}"><span style="width:100%;background:#E8442A;height:{{ r.h }}"></span></sc-if>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;justify-content:space-between;font:500 11px/1 'IBM Plex Mono';color:#9A948A"><span>30 Jul</span><span>6 Aug</span><span>Today</span></div>
+
+          <div style="display:flex;align-items:baseline;justify-content:space-between;border-bottom:1px solid #D8D3CA;padding:20px 0 12px">
+            <h2 style="margin:0;font:800 22px/1 'Archivo';letter-spacing:-.02em">Muscle group recovery</h2>
+            <span style="font:500 12px/1 'IBM Plex Mono';color:#9A948A">Since last session</span>
+          </div>
+          <div style="display:flex;flex-direction:column">
+            <sc-for list="{{ muscleRecovery }}" as="m" hint-placeholder-count="6">
+              <div style="display:grid;grid-template-columns:150px 1fr 90px 70px;align-items:center;gap:18px;padding:14px 0;border-bottom:1px solid #E3DFD7">
+                <span style="font:600 15px/1 'Archivo'">{{ m.name }}</span>
+                <div style="height:6px;background:#E3DFD7">
+                  <sc-if value="{{ m.ready }}" hint-placeholder-val="{{ true }}"><div style="height:6px;background:#14120E;width:{{ m.w }}"></div></sc-if>
+                  <sc-if value="{{ m.loaded }}" hint-placeholder-val="{{ false }}"><div style="height:6px;background:#E8442A;width:{{ m.w }}"></div></sc-if>
+                </div>
+                <span style="font:500 12px/1 'IBM Plex Mono';letter-spacing:.06em;text-transform:uppercase;color:#6D685F">{{ m.state }}</span>
+                <span style="text-align:right;font:500 12px/1 'IBM Plex Mono';color:#9A948A">{{ m.last }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:22px">
+          <h2 style="margin:0;font:800 22px/1 'Archivo';letter-spacing:-.02em;border-bottom:1px solid #D8D3CA;padding-bottom:12px">Recent check-ins</h2>
+          <sc-for list="{{ checkins }}" as="c" hint-placeholder-count="5">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;padding-bottom:12px;border-bottom:1px solid #E3DFD7">
+              <div style="display:flex;flex-direction:column;gap:5px">
+                <span style="font:700 15px/1 'Archivo'">{{ c.day }}</span>
+                <span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.06em;text-transform:uppercase;color:#9A948A">{{ c.detail }}</span>
+              </div>
+              <span style="font:800 22px/1 'Archivo'">{{ c.score }}</span>
+            </div>
+          </sc-for>
+          <div style="display:flex;flex-direction:column;gap:10px;padding-top:8px">
+            <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:#9A948A">What moves your score</span>
+            <p style="margin:0;font:400 15px/1.55 'Archivo';color:#38352F">Sleep duration carries the most weight, then soreness, then yesterday's load. Two nights under 6h drops you into yellow regardless of how fresh you feel.</p>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ---------- PROGRESS ---------- -->
+      <sc-if value="{{ isProgress }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;flex-direction:column">
+        <div style="padding:40px 48px 24px;border-bottom:1px solid #D8D3CA">
+          <span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:#9A948A">Last 12 weeks</span>
+          <h1 style="margin:10px 0 0;font:800 44px/1 'Archivo';letter-spacing:-.03em">Progress</h1>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid #E3DFD7;background:#fff">
+          <sc-for list="{{ progressStats }}" as="p" hint-placeholder-count="4">
+            <div style="padding:28px 48px;border-right:1px solid #E3DFD7;display:flex;flex-direction:column;gap:10px">
+              <span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.14em;text-transform:uppercase;color:#9A948A">{{ p.k }}</span>
+              <span style="font:800 44px/1 'Archivo';letter-spacing:-.03em">{{ p.v }}</span>
+              <span style="font:500 13px/1 'Archivo';color:#6D685F">{{ p.sub }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="padding:40px 48px;display:grid;grid-template-columns:1.4fr 1fr;gap:48px">
+          <div style="display:flex;flex-direction:column;gap:22px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;border-bottom:1px solid #D8D3CA;padding-bottom:12px">
+              <h2 style="margin:0;font:800 22px/1 'Archivo';letter-spacing:-.02em">Bench press · estimated 1RM</h2>
+              <span style="font:500 12px/1 'IBM Plex Mono';color:#E8442A">+7.5 kg / 4 weeks</span>
+            </div>
+            <div style="display:flex;align-items:flex-end;gap:12px;height:220px;padding-bottom:26px;position:relative;border-bottom:1px solid #E3DFD7">
+              <sc-for list="{{ strengthBars }}" as="b" hint-placeholder-count="12">
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;justify-content:flex-end;height:100%">
+                  <span style="width:100%;background:#14120E;height:{{ b.h }}"></span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:flex;justify-content:space-between;font:500 11px/1 'IBM Plex Mono';color:#9A948A"><span>W1</span><span>W6</span><span>W12</span></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:26px">
+            <div style="display:flex;flex-direction:column;gap:14px">
+              <h3 style="margin:0;font:800 18px/1 'Archivo';letter-spacing:-.02em;border-bottom:1px solid #D8D3CA;padding-bottom:12px">Personal records</h3>
+              <sc-for list="{{ prs }}" as="r" hint-placeholder-count="4">
+                <div style="display:flex;justify-content:space-between;align-items:baseline;padding:12px 0;border-bottom:1px solid #E3DFD7">
+                  <span style="font:500 14px/1 'Archivo';color:#4A463F">{{ r.k }}</span><strong style="font:700 17px/1 'Archivo'">{{ r.v }}</strong>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:14px">
+              <h3 style="margin:0;font:800 18px/1 'Archivo';letter-spacing:-.02em;border-bottom:1px solid #D8D3CA;padding-bottom:12px">Recent workouts</h3>
+              <sc-for list="{{ recent }}" as="w" hint-placeholder-count="4">
+                <div style="display:flex;justify-content:space-between;align-items:baseline;padding:12px 0;border-bottom:1px solid #E3DFD7">
+                  <div style="display:flex;flex-direction:column;gap:4px"><span style="font:700 15px/1 'Archivo'">{{ w.name }}</span><span style="font:500 11px/1 'IBM Plex Mono';color:#9A948A">{{ w.when }}</span></div>
+                  <span style="font:500 13px/1 'IBM Plex Mono';color:#6D685F">{{ w.vol }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ---------- CALORIES ---------- -->
+      <sc-if value="{{ isCalories }}" hint-placeholder-val="{{ true }}">
+      <div style="padding:40px 48px;display:grid;grid-template-columns:1.25fr 1fr;gap:52px">
+        <div style="display:flex;flex-direction:column;gap:26px">
+          <div style="border-bottom:1px solid #D8D3CA;padding-bottom:20px">
+            <span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:#9A948A">Nutrition</span>
+            <h1 style="margin:10px 0 8px;font:800 44px/1 'Archivo';letter-spacing:-.03em">Calorie counter</h1>
+            <span style="font:400 15px/1 'Archivo';color:#6D685F">Type what you ate, or upload a photo.</span>
+          </div>
+          <div style="display:flex;border:1px solid #D8D3CA;width:fit-content">
+            <button style="padding:12px 24px;border:none;background:#14120E;color:#fff;font:700 12px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer">Type food</button>
+            <button style="padding:12px 24px;border:none;background:#fff;color:#6D685F;font:700 12px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer">Photo</button>
+          </div>
+          <textarea placeholder="e.g. 2 rotis with dal, 1 cup rice, 1 banana…" style="width:100%;height:130px;padding:18px;border:1px solid #D8D3CA;background:#fff;font:400 15px/1.5 'Archivo';color:#14120E;resize:none;outline:none"></textarea>
+          <button style="align-self:flex-start;padding:18px 34px;border:none;background:#E8442A;color:#fff;font:800 13px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer">Analyze calories</button>
+          <div style="display:flex;flex-direction:column;gap:0;border-top:1px solid #D8D3CA;padding-top:8px">
+            <sc-for list="{{ meals }}" as="m" hint-placeholder-count="3">
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 0;border-bottom:1px solid #E3DFD7">
+                <div style="display:flex;flex-direction:column;gap:5px"><span style="font:700 16px/1 'Archivo'">{{ m.name }}</span><span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.08em;text-transform:uppercase;color:#9A948A">{{ m.macros }}</span></div>
+                <span style="font:800 20px/1 'Archivo'">{{ m.kcal }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:28px">
+          <div style="background:#14120E;color:#fff;padding:34px;display:flex;flex-direction:column;gap:16px">
+            <span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.55)">Today</span>
+            <div style="display:flex;align-items:baseline;gap:10px"><span style="font:800 72px/1 'Archivo';letter-spacing:-.04em">1,840</span><span style="font:600 15px/1 'Archivo';color:rgba(255,255,255,.6)">/ 2,400 kcal</span></div>
+            <div style="height:6px;background:rgba(255,255,255,.16)"><div style="height:6px;width:77%;background:#E8442A"></div></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:20px">
+            <sc-for list="{{ macros }}" as="m" hint-placeholder-count="3">
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;justify-content:space-between;font:500 13px/1 'Archivo';color:#4A463F"><span>{{ m.k }}</span><strong style="font-weight:700;color:#14120E">{{ m.v }}</strong></div>
+                <div style="height:4px;background:#E3DFD7"><div style="height:4px;width:{{ m.w }};background:#14120E"></div></div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="border-top:2px solid #14120E;padding-top:16px;display:flex;flex-direction:column;gap:10px">
+            <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase">Coach's note</span>
+            <p style="margin:0;font:400 16px/1.55 'Archivo';color:#38352F">You're 39 g short on protein with one meal left. A 200 g chicken breast or 250 g paneer closes the gap.</p>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ---------- THEMES ---------- -->
+      <sc-if value="{{ isThemes }}" hint-placeholder-val="{{ true }}">
+      <div style="padding:40px 48px;display:flex;flex-direction:column;gap:30px">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;border-bottom:1px solid #D8D3CA;padding-bottom:20px">
+          <div><span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:#9A948A">Appearance</span><h1 style="margin:10px 0 8px;font:800 44px/1 'Archivo';letter-spacing:-.03em">Themes</h1><span style="font:400 15px/1 'Archivo';color:#6D685F">Pick a theme. It restyles the whole app.</span></div>
+          <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;border:1px solid #D8D3CA;background:#fff">
+            <div style="display:flex;flex-direction:column;gap:4px"><strong style="font:700 13px/1 'Archivo'">Auto theme</strong><span style="font:400 12px/1 'Archivo';color:#9A948A">Dark during workouts</span></div>
+            <span style="width:44px;height:24px;background:#E8442A;position:relative;display:inline-block"><i style="position:absolute;top:3px;right:3px;width:18px;height:18px;background:#fff;display:block"></i></span>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:22px">
+          <sc-for list="{{ themes }}" as="t" hint-placeholder-count="5">
+            <div style="border:1px solid #E3DFD7;background:#fff;cursor:pointer" style-hover="border-color:#14120E">
+              <div style="height:130px;display:flex">
+                <span style="flex:2;background:{{ t.a }}"></span><span style="flex:1;background:{{ t.b }}"></span><span style="flex:1;background:{{ t.c }}"></span>
+              </div>
+              <div style="padding:18px;display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;align-items:baseline;justify-content:space-between">
+                  <span style="font:700 17px/1 'Archivo'">{{ t.name }}</span>
+                  <sc-if value="{{ t.current }}" hint-placeholder-val="{{ false }}"><span style="padding:5px 9px;background:#14120E;color:#fff;font:600 10px/1 'IBM Plex Mono';letter-spacing:.12em;text-transform:uppercase">In use</span></sc-if>
+                </div>
+                <span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.08em;text-transform:uppercase;color:#9A948A">{{ t.desc }}</span>
+                <span style="font:400 13px/1.45 'Archivo';color:#6D685F">{{ t.note }}</span>
+                <div style="display:flex;gap:6px;padding-top:6px">
+                  <span style="width:20px;height:20px;background:{{ t.a }};border:1px solid #E3DFD7"></span>
+                  <span style="width:20px;height:20px;background:{{ t.b }};border:1px solid #E3DFD7"></span>
+                  <span style="width:20px;height:20px;background:{{ t.c }};border:1px solid #E3DFD7"></span>
+                  <span style="width:20px;height:20px;background:{{ t.d }};border:1px solid #E3DFD7"></span>
+                </div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:40px;padding-top:12px;border-top:1px solid #D8D3CA">
+          <div style="display:flex;flex-direction:column;gap:20px">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:#9A948A">Atmosphere</span>
+              <h3 style="margin:0;font:800 20px/1.2 'Archivo';letter-spacing:-.02em">Motion, glow and particle feel</h3>
+            </div>
+            <sc-for list="{{ atmosphere }}" as="a" hint-placeholder-count="3">
+              <div style="display:flex;flex-direction:column;gap:9px">
+                <div style="display:flex;justify-content:space-between;font:500 13px/1 'Archivo';color:#4A463F"><span>{{ a.k }}</span><strong style="font-weight:700;color:#14120E">{{ a.v }}</strong></div>
+                <div style="position:relative;height:3px;background:#E3DFD7">
+                  <div style="height:3px;background:#14120E;width:{{ a.w }}"></div>
+                  <span style="position:absolute;top:-6px;left:{{ a.w }};width:15px;height:15px;background:#fff;border:1.5px solid #14120E;transform:translateX(-50%)"></span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:20px">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:#9A948A">Layout</span>
+              <h3 style="margin:0;font:800 20px/1.2 'Archivo';letter-spacing:-.02em">Information density</h3>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <button style="min-height:56px;padding:0 18px;border:1px solid #D8D3CA;background:#fff;font:500 15px/1 'Archivo';color:#38352F;text-align:left;cursor:pointer" style-hover="border-color:#14120E">Compact <span style="color:#9A948A">· more on screen</span></button>
+              <button style="min-height:56px;padding:0 18px;border:1px solid #14120E;background:#14120E;color:#fff;font:700 15px/1 'Archivo';text-align:left;cursor:pointer">Standard <span style="color:rgba(255,255,255,.6)">· recommended</span></button>
+              <button style="min-height:56px;padding:0 18px;border:1px solid #D8D3CA;background:#fff;font:500 15px/1 'Archivo';color:#38352F;text-align:left;cursor:pointer" style-hover="border-color:#14120E">Focus <span style="color:#9A948A">· one thing at a time</span></button>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:20px">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:#9A948A">Auto theme</span>
+              <h3 style="margin:0;font:800 20px/1.2 'Archivo';letter-spacing:-.02em">When it switches by itself</h3>
+            </div>
+            <div style="display:flex;flex-direction:column">
+              <sc-for list="{{ autoRules }}" as="r" hint-placeholder-count="3">
+                <div style="display:flex;flex-direction:column;gap:5px;padding:14px 0;border-bottom:1px solid #E3DFD7">
+                  <span style="font:700 14px/1 'Archivo'">{{ r.k }}</span>
+                  <span style="font:400 13px/1.45 'Archivo';color:#6D685F">{{ r.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ---------- PROFILE ---------- -->
+      <sc-if value="{{ isProfile }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;flex-direction:column">
+        <div style="position:relative;height:260px;overflow:hidden;background:#14120E">
+          <img src="frontend/assets/images/home/hero_athlete.webp" alt="Athlete portrait" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%">
+          <div style="position:absolute;inset:0;background:linear-gradient(90deg,rgba(12,11,9,.9),rgba(12,11,9,.35))"></div>
+          <div style="position:relative;z-index:2;height:100%;display:flex;flex-direction:column;justify-content:flex-end;gap:10px;padding:0 48px 30px">
+            <span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.6)">Account</span>
+            <h1 style="margin:0;font:800 46px/1 'Archivo';letter-spacing:-.03em;color:#fff">Aamir Khan</h1>
+            <span style="font:500 14px/1 'Archivo';color:rgba(255,255,255,.75)">Muscle gain · Intermediate · 4 days / week</span>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid #E3DFD7;background:#fff">
+          <sc-for list="{{ bodyStats }}" as="b" hint-placeholder-count="4">
+            <div style="padding:24px 48px;border-right:1px solid #E3DFD7;display:flex;flex-direction:column;gap:8px">
+              <span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.14em;text-transform:uppercase;color:#9A948A">{{ b.k }}</span>
+              <span style="font:800 34px/1 'Archivo';letter-spacing:-.02em">{{ b.v }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="padding:40px 48px;display:grid;grid-template-columns:1.4fr 1fr;gap:56px">
+          <div style="display:flex;flex-direction:column;gap:26px">
+            <h2 style="margin:0;font:800 22px/1 'Archivo';letter-spacing:-.02em;border-bottom:1px solid #D8D3CA;padding-bottom:12px">Your details</h2>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px 32px">
+              <sc-for list="{{ profileFields }}" as="f" hint-placeholder-count="10">
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <label style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.14em;text-transform:uppercase;color:#9A948A">{{ f.k }}</label>
+                  <input value="{{ f.v }}" style="padding:15px 16px;border:1px solid #D8D3CA;background:#fff;font:500 15px/1 'Archivo';color:#14120E;outline:none">
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:flex;gap:12px;align-items:center">
+              <button style="padding:19px 36px;border:none;background:#E8442A;color:#fff;font:800 13px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer" style-hover="background:#C7331C">Save changes</button>
+              <button style="padding:19px 30px;border:1px solid #D8D3CA;background:transparent;font:700 13px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;color:#6D685F;cursor:pointer" style-hover="border-color:#14120E;color:#14120E">Log out</button>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:30px">
+            <div style="display:flex;flex-direction:column;gap:14px;border-top:2px solid #14120E;padding-top:16px">
+              <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase">Athlete level</span>
+              <div style="display:flex;align-items:baseline;gap:10px"><span style="font:800 40px/1 'Archivo';letter-spacing:-.03em">Athlete</span><span style="font:600 14px/1 'Archivo';color:#6D685F">1,240 XP</span></div>
+              <div style="height:6px;background:#E3DFD7"><div style="height:6px;width:62%;background:#E8442A"></div></div>
+              <span style="font:400 13px/1.5 'Archivo';color:#6D685F">760 XP to Beast · every completed session is +100</span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:14px;border-top:1px solid #D8D3CA;padding-top:16px">
+              <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:#9A948A">Training profile</span>
+              <sc-for list="{{ profileBars }}" as="p" hint-placeholder-count="3">
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <div style="display:flex;justify-content:space-between;font:500 13px/1 'Archivo';color:#4A463F"><span>{{ p.k }}</span><strong style="font-weight:700;color:#14120E">{{ p.v }}</strong></div>
+                  <div style="height:4px;background:#E3DFD7"><div style="height:4px;background:#14120E;width:{{ p.w }}"></div></div>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:12px;border-top:1px solid #D8D3CA;padding-top:16px">
+              <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:#9A948A">Sport mode</span>
+              <div style="display:flex;align-items:baseline;justify-content:space-between"><span style="font:700 18px/1 'Archivo'">Cricket · Batsman</span><span style="font:500 12px/1 'IBM Plex Mono';color:#E8442A">Active</span></div>
+              <span style="font:400 13px/1.5 'Archivo';color:#6D685F">Weekly matches · focus on power and agility. Your plan adds rotational work on Wednesdays.</span>
+              <button style="align-self:flex-start;padding:13px 22px;border:1px solid #14120E;background:transparent;font:700 12px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer" style-hover="background:#14120E;color:#fff">Edit sport setup</button>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:12px;border-top:1px solid #D8D3CA;padding-top:16px">
+              <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:#9A948A">Badges earned</span>
+              <sc-for list="{{ profileBadges }}" as="b" hint-placeholder-count="4">
+                <div style="display:flex;align-items:baseline;justify-content:space-between;padding-bottom:10px;border-bottom:1px solid #E3DFD7">
+                  <span style="font:600 14px/1 'Archivo'">{{ b.k }}</span><span style="font:500 12px/1 'IBM Plex Mono';color:#9A948A">{{ b.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+    </div>
+
+    <!-- ===== WORKOUT MODE (dark overlay) ===== -->
+    <sc-if value="{{ workoutOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;z-index:50;background:#0C0B09;color:#fff;display:flex;flex-direction:column;animation:fcIn .25s ease-out">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 40px;border-bottom:1px solid rgba(255,255,255,.12)">
+        <div style="display:flex;align-items:center;gap:22px">
+          <span style="font:800 14px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase">Upper Body Strength</span>
+          <span style="font:500 12px/1 'IBM Plex Mono';color:rgba(255,255,255,.5)">Exercise 2 of 6</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:18px">
+          <span style="font:600 20px/1 'IBM Plex Mono'">24:16</span>
+          <div style="display:flex;border:1px solid rgba(255,255,255,.2)">
+            <sc-if value="{{ modeLog }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ setLog }}" style="padding:10px 18px;border:none;background:#fff;color:#0C0B09;font:700 11px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer">Log sets</button>
+              <button onClick="{{ setCam }}" style="padding:10px 18px;border:none;background:transparent;color:rgba(255,255,255,.7);font:700 11px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer">Form camera</button>
+            </sc-if>
+            <sc-if value="{{ modeCam }}" hint-placeholder-val="{{ false }}">
+              <button onClick="{{ setLog }}" style="padding:10px 18px;border:none;background:transparent;color:rgba(255,255,255,.7);font:700 11px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer">Log sets</button>
+              <button onClick="{{ setCam }}" style="padding:10px 18px;border:none;background:#fff;color:#0C0B09;font:700 11px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer">Form camera</button>
+            </sc-if>
+          </div>
+          <button onClick="{{ closeWorkout }}" style="padding:13px 22px;border:1px solid rgba(255,255,255,.3);background:transparent;color:#fff;font:700 11px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer" style-hover="background:rgba(255,255,255,.12)">End workout</button>
+        </div>
+      </div>
+
+      <!-- LOG STATE -->
+      <sc-if value="{{ modeLog }}" hint-placeholder-val="{{ true }}">
+      <div style="flex:1;display:grid;grid-template-columns:1.25fr 1fr;overflow:hidden">
+        <div style="padding:36px 40px;display:flex;flex-direction:column;gap:26px;overflow-y:auto">
+          <div style="display:flex;gap:26px;align-items:flex-start">
+            <img src="frontend/assets/images/home/luxury_gym.webp" alt="Bench press demonstration" style="width:300px;height:200px;object-fit:cover;background:#1C1A18">
+            <div style="display:flex;flex-direction:column;gap:12px;padding-top:4px">
+              <h1 style="margin:0;font:800 46px/1 'Archivo';letter-spacing:-.03em;text-transform:uppercase">Bench Press</h1>
+              <span style="font:500 12px/1 'IBM Plex Mono';letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.55)">Chest · Compound</span>
+              <span style="font:400 15px/1 'Archivo';color:rgba(255,255,255,.6)">Previous: 60 kg × 10</span>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column">
+            <div style="display:grid;grid-template-columns:70px 1fr 1fr 90px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.16);font:600 11px/1 'IBM Plex Mono';letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.45)">
+              <span>Set</span><span>Weight</span><span>Reps</span><span style="text-align:right">Done</span>
+            </div>
+            <sc-for list="{{ sets }}" as="s" hint-placeholder-count="3">
+              <div style="display:grid;grid-template-columns:70px 1fr 1fr 90px;align-items:center;padding:20px 0;border-bottom:1px solid rgba(255,255,255,.1)">
+                <span style="font:700 17px/1 'Archivo';color:rgba(255,255,255,.55)">{{ s.n }}</span>
+                <div style="display:flex;align-items:baseline;gap:6px"><span style="font:800 34px/1 'Archivo'">{{ s.kg }}</span><span style="font:500 13px/1 'Archivo';color:rgba(255,255,255,.5)">kg</span></div>
+                <div style="display:flex;align-items:baseline;gap:6px"><span style="font:800 34px/1 'Archivo'">{{ s.reps }}</span><span style="font:500 13px/1 'Archivo';color:rgba(255,255,255,.5)">reps</span></div>
+                <div style="display:flex;justify-content:flex-end">
+                  <sc-if value="{{ s.done }}" hint-placeholder-val="{{ true }}"><button onClick="{{ s.toggle }}" style="width:56px;height:56px;border:none;background:#E8442A;color:#fff;font:700 20px/1 'Archivo';cursor:pointer">✓</button></sc-if>
+                  <sc-if value="{{ s.pending }}" hint-placeholder-val="{{ true }}"><button onClick="{{ s.toggle }}" style="width:56px;height:56px;border:1px solid rgba(255,255,255,.3);background:transparent;color:rgba(255,255,255,.5);font:700 20px/1 'Archivo';cursor:pointer" style-hover="border-color:#fff;color:#fff">✓</button></sc-if>
+                </div>
+              </div>
+            </sc-for>
+            <button onClick="{{ addSet }}" style="margin-top:18px;align-self:flex-start;padding:16px 28px;border:1px solid rgba(255,255,255,.3);background:transparent;color:#fff;font:700 12px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer" style-hover="background:rgba(255,255,255,.12)">+ Add set</button>
+          </div>
+        </div>
+
+        <div style="border-left:1px solid rgba(255,255,255,.12);display:flex;flex-direction:column">
+          <div style="padding:36px 34px;border-bottom:1px solid rgba(255,255,255,.12);display:flex;flex-direction:column;gap:16px;background:#141210">
+            <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.2em;text-transform:uppercase;color:#E8442A">Rest</span>
+            <span style="font:600 84px/1 'IBM Plex Mono';letter-spacing:-.02em">01:24</span>
+            <div style="height:5px;background:rgba(255,255,255,.16)"><div style="height:5px;width:62%;background:#E8442A"></div></div>
+            <div style="display:flex;gap:10px">
+              <button style="flex:1;padding:16px;border:1px solid rgba(255,255,255,.3);background:transparent;color:#fff;font:700 12px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer">Skip rest</button>
+              <button style="flex:1;padding:16px;border:1px solid rgba(255,255,255,.3);background:transparent;color:#fff;font:700 12px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer">+30s</button>
+            </div>
+          </div>
+          <div style="flex:1;padding:30px 34px;display:flex;flex-direction:column;gap:14px;overflow-y:auto">
+            <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.45)">Up next</span>
+            <sc-for list="{{ queue }}" as="q" hint-placeholder-count="5">
+              <div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.1)">
+                <span style="width:24px;font:500 12px/1 'IBM Plex Mono';color:rgba(255,255,255,.4)">{{ q.n }}</span>
+                <span style="flex:1;font:600 15px/1 'Archivo'">{{ q.name }}</span>
+                <span style="font:500 12px/1 'IBM Plex Mono';color:rgba(255,255,255,.45)">{{ q.sets }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="padding:24px 34px;border-top:1px solid rgba(255,255,255,.12);display:flex;gap:12px">
+            <button style="flex:1;padding:20px;border:1px solid rgba(255,255,255,.3);background:transparent;color:#fff;font:700 12px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer">Skip exercise</button>
+            <button style="flex:1.4;padding:20px;border:none;background:#E8442A;color:#fff;font:800 12px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer">Next exercise</button>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- CAMERA STATE -->
+      <sc-if value="{{ modeCam }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:grid;grid-template-columns:1.5fr 1fr;overflow:hidden">
+        <div style="position:relative;background:#000;overflow:hidden">
+          <img src="frontend/assets/images/home/runner.webp" alt="Live camera view of athlete training" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.85">
+          <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.35),rgba(0,0,0,.1) 40%,rgba(0,0,0,.7))"></div>
+          <div style="position:absolute;top:22px;left:26px;display:flex;align-items:center;gap:10px;padding:8px 14px;background:rgba(232,68,42,.92);font:700 11px/1 'Archivo';letter-spacing:.14em;text-transform:uppercase"><span style="width:7px;height:7px;background:#fff;border-radius:50%"></span>Live form analysis</div>
+          <div style="position:absolute;left:26px;bottom:26px;right:26px;display:flex;align-items:flex-end;justify-content:space-between">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.7)">Reps this set</span>
+              <span style="font:800 108px/0.9 'Archivo';letter-spacing:-.04em">8<span style="font:600 30px/1 'Archivo';color:rgba(255,255,255,.55)"> / 10</span></span>
+            </div>
+            <div style="padding:16px 22px;background:rgba(12,11,9,.75);border:1px solid rgba(255,255,255,.2);display:flex;flex-direction:column;gap:6px">
+              <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.6)">Cue</span>
+              <span style="font:700 18px/1.2 'Archivo'">Keep elbows tucked at 45°</span>
+            </div>
+          </div>
+        </div>
+        <div style="border-left:1px solid rgba(255,255,255,.12);display:flex;flex-direction:column">
+          <div style="padding:32px 34px;border-bottom:1px solid rgba(255,255,255,.12);display:flex;flex-direction:column;gap:10px">
+            <h2 style="margin:0;font:800 32px/1 'Archivo';letter-spacing:-.02em;text-transform:uppercase">Bench Press</h2>
+            <span style="font:500 12px/1 'IBM Plex Mono';letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5)">Set 2 of 3 · 60 kg</span>
+          </div>
+          <div style="padding:32px 34px;display:flex;flex-direction:column;gap:22px;border-bottom:1px solid rgba(255,255,255,.12)">
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;justify-content:space-between;font:600 11px/1 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.5)"><span>Form accuracy</span><span>94%</span></div>
+              <div style="height:5px;background:rgba(255,255,255,.16)"><div style="height:5px;width:94%;background:#E8442A"></div></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;justify-content:space-between;font:600 11px/1 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.5)"><span>Tempo consistency</span><span>88%</span></div>
+              <div style="height:5px;background:rgba(255,255,255,.16)"><div style="height:5px;width:88%;background:#fff"></div></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;justify-content:space-between;font:600 11px/1 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.5)"><span>Depth</span><span>Full</span></div>
+              <div style="height:5px;background:rgba(255,255,255,.16)"><div style="height:5px;width:100%;background:#fff"></div></div>
+            </div>
+          </div>
+          <div style="flex:1;padding:30px 34px;display:flex;flex-direction:column;gap:12px;overflow-y:auto">
+            <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.45)">Coach, live</span>
+            <p style="margin:0;font:400 16px/1.55 'Archivo';color:rgba(255,255,255,.82)">Bar path is straight and depth is consistent. Slow the eccentric to three seconds on the last two reps.</p>
+          </div>
+          <div style="padding:24px 34px;border-top:1px solid rgba(255,255,255,.12);display:flex;gap:12px">
+            <button onClick="{{ setLog }}" style="flex:1;padding:20px;border:1px solid rgba(255,255,255,.3);background:transparent;color:#fff;font:700 12px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer">Log set</button>
+            <button style="flex:1.4;padding:20px;border:none;background:#E8442A;color:#fff;font:800 12px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer">Complete set</button>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+    </div>
+    </sc-if>
+  </div>
+
+  <!-- ================= MOBILE ================= -->
+  <div style="width:430px;flex:none;display:flex;flex-direction:column;gap:14px;align-items:center">
+    <div style="position:relative;width:414px;height:868px;background:#14120E;border-radius:54px;padding:13px;box-shadow:0 24px 60px rgba(20,18,14,.28)">
+      <div style="position:relative;width:388px;height:842px;border-radius:42px;overflow:hidden;background:#F5F3EF;display:flex;flex-direction:column">
+        <div style="position:absolute;top:0;left:0;right:0;height:52px;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:0 28px;pointer-events:none">
+          <span style="font:600 14px/1 'Archivo';color:{{ statusColor }}">9:41</span>
+          <span style="width:112px;height:30px;background:#14120E;border-radius:16px;margin-top:4px"></span>
+          <span style="font:600 13px/1 'Archivo';color:{{ statusColor }}">▮▮▮</span>
+        </div>
+
+        <div style="flex:1;overflow-y:auto;position:relative">
+          <!-- MOBILE HOME -->
+          <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+          <div>
+            <section style="position:relative;height:430px;overflow:hidden;background:#14120E">
+              <img src="frontend/assets/images/home/deadlift.webp" alt="Athlete deadlifting" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%">
+              <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(12,11,9,.55) 0%,rgba(12,11,9,.25) 35%,rgba(12,11,9,.95) 100%)"></div>
+              <div style="position:relative;z-index:2;height:100%;display:flex;flex-direction:column;justify-content:flex-end;gap:16px;padding:0 22px 24px">
+                <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.22em;text-transform:uppercase;color:#E8442A">Today's training</span>
+                <h1 style="margin:0;font:800 42px/0.96 'Archivo';letter-spacing:-.035em;color:#fff">Upper Body<br>Strength</h1>
+                <div style="display:flex;gap:20px;align-items:center">
+                  <span style="font:500 12px/1 'IBM Plex Mono';letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.7)">45 min</span>
+                  <span style="width:1px;height:14px;background:rgba(255,255,255,.3)"></span>
+                  <span style="font:500 12px/1 'IBM Plex Mono';letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.7)">6 exercises</span>
+                </div>
+              </div>
+            </section>
+            <div style="padding:20px 22px 0">
+              <button onClick="{{ openWorkout }}" style="width:100%;min-height:60px;border:none;background:#E8442A;color:#fff;font:800 15px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer">Start workout</button>
+            </div>
+            <div style="padding:26px 22px;display:flex;flex-direction:column;gap:12px;border-bottom:1px solid #E3DFD7">
+              <span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:#9A948A">This week · 4 of 5</span>
+              <div style="display:flex;gap:8px;align-items:flex-end">
+                <sc-for list="{{ week }}" as="d" hint-placeholder-count="7">
+                  <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px">
+                    <sc-if value="{{ d.done }}" hint-placeholder-val="{{ true }}"><span style="width:100%;height:42px;background:#E8442A"></span></sc-if>
+                    <sc-if value="{{ d.today }}" hint-placeholder-val="{{ true }}"><span style="width:100%;height:42px;background:#fff;border:1.5px solid #E8442A"></span></sc-if>
+                    <sc-if value="{{ d.empty }}" hint-placeholder-val="{{ true }}"><span style="width:100%;height:42px;background:#E3DFD7"></span></sc-if>
+                    <span style="font:500 10px/1 'IBM Plex Mono';color:#9A948A">{{ d.label }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="padding:24px 22px;border-bottom:1px solid #E3DFD7;display:flex;flex-direction:column;gap:12px">
+              <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:#14120E">Coach's note</span>
+              <p style="margin:0;font:400 16px/1.5 'Archivo';color:#38352F">Bench is up 7.5 kg in four weeks. Add 2.5 kg to today's working sets.</p>
+            </div>
+            <div style="padding:24px 22px 30px;display:flex;flex-direction:column;gap:14px">
+              <span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:#9A948A">Today's exercises</span>
+              <sc-for list="{{ exercises }}" as="ex" hint-placeholder-count="6">
+                <div onClick="{{ openWorkout }}" style="display:flex;align-items:center;gap:14px;padding-bottom:14px;border-bottom:1px solid #E3DFD7;cursor:pointer">
+                  <div role="img" aria-label="{{ ex.name }}" style="width:72px;height:54px;background-color:#DDD8D0;background-size:cover;background-position:center;background-image:{{ ex.bg }}"></div>
+                  <div style="flex:1;display:flex;flex-direction:column;gap:5px"><span style="font:700 16px/1 'Archivo'">{{ ex.name }}</span><span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.06em;text-transform:uppercase;color:#9A948A">{{ ex.meta }}</span></div>
+                  <span style="font:700 15px/1 'Archivo'">{{ ex.sets }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          </sc-if>
+
+          <!-- MOBILE OTHER TABS -->
+          <sc-if value="{{ isCoach }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:64px 22px 24px;display:flex;flex-direction:column;gap:20px">
+            <div style="display:flex;flex-direction:column;gap:6px;border-bottom:1px solid #D8D3CA;padding-bottom:16px"><span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:#9A948A">Coach</span><h1 style="margin:0;font:800 32px/1 'Archivo';letter-spacing:-.03em">Marcus</h1></div>
+            <p style="margin:0;padding:16px 18px;background:#fff;border:1px solid #E3DFD7;font:400 15px/1.55 'Archivo';color:#26241F">Morning. Recovery is green — today is upper body strength and I've added 2.5 kg to your bench sets.</p>
+            <p style="margin:0;padding:16px 18px;background:#14120E;color:#fff;font:400 15px/1.55 'Archivo';align-self:flex-end;max-width:80%">My right shoulder feels tight.</p>
+            <div style="display:flex;align-items:center;gap:12px;padding:12px;background:#fff;border:1px solid #E3DFD7">
+              <img src="frontend/assets/images/home/boxing.webp" alt="Landmine press" style="width:76px;height:56px;object-fit:cover">
+              <div style="flex:1;display:flex;flex-direction:column;gap:4px"><span style="font:700 15px/1 'Archivo'">Landmine Press</span><span style="font:500 10px/1 'IBM Plex Mono';letter-spacing:.08em;text-transform:uppercase;color:#9A948A">Swapped in · 3 × 10</span></div>
+            </div>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ isPlanner }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:64px 22px 24px;display:flex;flex-direction:column;gap:18px">
+            <div style="display:flex;flex-direction:column;gap:6px;border-bottom:1px solid #D8D3CA;padding-bottom:16px"><span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:#9A948A">Weekly planner</span><h1 style="margin:0;font:800 32px/1 'Archivo';letter-spacing:-.03em">Training pool</h1></div>
+            <sc-for list="{{ sessions }}" as="s" hint-placeholder-count="6">
+              <div onClick="{{ openWorkout }}" style="position:relative;height:150px;overflow:hidden;cursor:pointer;background:#14120E">
+                <div role="img" aria-label="{{ s.name }}" style="position:absolute;inset:0;background-color:#14120E;background-size:cover;background-position:center;background-image:{{ s.bg }}"></div>
+                <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(12,11,9,.15),rgba(12,11,9,.9))"></div>
+                <div style="position:relative;z-index:2;height:100%;display:flex;flex-direction:column;justify-content:flex-end;gap:6px;padding:16px">
+                  <span style="font:600 10px/1 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:#E8442A">{{ s.day }} · {{ s.status }}</span>
+                  <span style="font:800 24px/1 'Archivo';color:#fff;letter-spacing:-.02em">{{ s.name }}</span>
+                  <span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.7)">{{ s.meta }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ isRecovery }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:64px 22px 24px;display:flex;flex-direction:column;gap:22px">
+            <div style="background:#14120E;color:#fff;padding:24px;display:flex;flex-direction:column;gap:10px">
+              <span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.55)">Today's score</span>
+              <div style="display:flex;align-items:baseline;gap:10px"><span style="font:800 64px/1 'Archivo';letter-spacing:-.04em">86</span><span style="font:700 14px/1 'Archivo';color:#E8442A">Green</span></div>
+              <div style="height:5px;background:rgba(255,255,255,.16)"><div style="height:5px;width:86%;background:#E8442A"></div></div>
+            </div>
+            <sc-for list="{{ recoveryQs }}" as="q" hint-placeholder-count="5">
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <span style="font:700 14px/1 'Archivo'">{{ q.label }}</span>
+                <div style="display:flex;gap:6px">
+                  <sc-for list="{{ q.opts }}" as="o" hint-placeholder-count="5">
+                    <sc-if value="{{ o.on }}" hint-placeholder-val="{{ true }}"><button style="flex:1;min-height:48px;padding:6px 2px;border:1px solid #14120E;background:#14120E;color:#fff;font:600 12px/1 'Archivo';cursor:pointer">{{ o.t }}</button></sc-if>
+                    <sc-if value="{{ o.off }}" hint-placeholder-val="{{ true }}"><button style="flex:1;min-height:48px;padding:6px 2px;border:1px solid #D8D3CA;background:#fff;color:#4A463F;font:500 12px/1 'Archivo';cursor:pointer">{{ o.t }}</button></sc-if>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+            <div style="display:flex;flex-direction:column;gap:12px;border-top:1px solid #D8D3CA;padding-top:18px">
+              <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:#9A948A">Muscle group recovery</span>
+              <sc-for list="{{ muscleRecovery }}" as="m" hint-placeholder-count="6">
+                <div style="display:flex;align-items:center;gap:12px">
+                  <span style="width:104px;font:600 14px/1 'Archivo'">{{ m.name }}</span>
+                  <div style="flex:1;height:5px;background:#E3DFD7">
+                    <sc-if value="{{ m.ready }}" hint-placeholder-val="{{ true }}"><div style="height:5px;background:#14120E;width:{{ m.w }}"></div></sc-if>
+                    <sc-if value="{{ m.loaded }}" hint-placeholder-val="{{ false }}"><div style="height:5px;background:#E8442A;width:{{ m.w }}"></div></sc-if>
+                  </div>
+                  <span style="width:56px;text-align:right;font:500 11px/1 'IBM Plex Mono';text-transform:uppercase;color:#9A948A">{{ m.state }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:12px;border-top:1px solid #D8D3CA;padding-top:18px">
+              <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:#9A948A">Recent check-ins</span>
+              <sc-for list="{{ checkins }}" as="c" hint-placeholder-count="5">
+                <div style="display:flex;align-items:baseline;justify-content:space-between;padding-bottom:10px;border-bottom:1px solid #E3DFD7">
+                  <div style="display:flex;flex-direction:column;gap:4px"><span style="font:700 14px/1 'Archivo'">{{ c.day }}</span><span style="font:500 10px/1 'IBM Plex Mono';text-transform:uppercase;color:#9A948A">{{ c.detail }}</span></div>
+                  <span style="font:800 19px/1 'Archivo'">{{ c.score }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ isProgress }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:64px 22px 24px;display:flex;flex-direction:column;gap:22px">
+            <div style="display:flex;flex-direction:column;gap:6px;border-bottom:1px solid #D8D3CA;padding-bottom:16px"><span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:#9A948A">Last 12 weeks</span><h1 style="margin:0;font:800 32px/1 'Archivo';letter-spacing:-.03em">Progress</h1></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+              <sc-for list="{{ progressStats }}" as="p" hint-placeholder-count="4">
+                <div style="display:flex;flex-direction:column;gap:6px"><span style="font:500 10px/1 'IBM Plex Mono';letter-spacing:.14em;text-transform:uppercase;color:#9A948A">{{ p.k }}</span><span style="font:800 34px/1 'Archivo';letter-spacing:-.02em">{{ p.v }}</span><span style="font:500 12px/1 'Archivo';color:#6D685F">{{ p.sub }}</span></div>
+              </sc-for>
+            </div>
+            <div style="display:flex;align-items:flex-end;gap:6px;height:150px;border-bottom:1px solid #E3DFD7;padding-bottom:8px">
+              <sc-for list="{{ strengthBars }}" as="b" hint-placeholder-count="12">
+                <span style="flex:1;background:#14120E;height:{{ b.h }}"></span>
+              </sc-for>
+            </div>
+            <sc-for list="{{ prs }}" as="r" hint-placeholder-count="4">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;padding-bottom:12px;border-bottom:1px solid #E3DFD7"><span style="font:500 14px/1 'Archivo';color:#4A463F">{{ r.k }}</span><strong style="font:700 16px/1 'Archivo'">{{ r.v }}</strong></div>
+            </sc-for>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ isCalories }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:64px 22px 24px;display:flex;flex-direction:column;gap:22px">
+            <div style="background:#14120E;color:#fff;padding:24px;display:flex;flex-direction:column;gap:12px">
+              <span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.55)">Today</span>
+              <div style="display:flex;align-items:baseline;gap:8px"><span style="font:800 54px/1 'Archivo';letter-spacing:-.04em">1,840</span><span style="font:600 13px/1 'Archivo';color:rgba(255,255,255,.6)">/ 2,400 kcal</span></div>
+              <div style="height:5px;background:rgba(255,255,255,.16)"><div style="height:5px;width:77%;background:#E8442A"></div></div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button style="flex:1;min-height:52px;border:1px solid #14120E;background:#14120E;color:#fff;font:700 12px/1 'Archivo';letter-spacing:.08em;text-transform:uppercase">Type food</button>
+              <button style="flex:1;min-height:52px;border:1px solid #D8D3CA;background:#fff;color:#6D685F;font:700 12px/1 'Archivo';letter-spacing:.08em;text-transform:uppercase">Photo</button>
+            </div>
+            <sc-for list="{{ meals }}" as="m" hint-placeholder-count="3">
+              <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:14px;border-bottom:1px solid #E3DFD7">
+                <div style="display:flex;flex-direction:column;gap:5px"><span style="font:700 15px/1 'Archivo'">{{ m.name }}</span><span style="font:500 10px/1 'IBM Plex Mono';letter-spacing:.08em;text-transform:uppercase;color:#9A948A">{{ m.macros }}</span></div>
+                <span style="font:800 18px/1 'Archivo'">{{ m.kcal }}</span>
+              </div>
+            </sc-for>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ isThemes }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:64px 22px 24px;display:flex;flex-direction:column;gap:16px">
+            <div style="display:flex;flex-direction:column;gap:6px;border-bottom:1px solid #D8D3CA;padding-bottom:16px"><span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:#9A948A">Appearance</span><h1 style="margin:0;font:800 32px/1 'Archivo';letter-spacing:-.03em">Themes</h1></div>
+            <sc-for list="{{ themes }}" as="t" hint-placeholder-count="5">
+              <div style="border:1px solid #E3DFD7;background:#fff;display:flex;align-items:center;gap:14px;padding:12px">
+                <span style="display:flex;width:84px;height:56px"><i style="flex:2;background:{{ t.a }}"></i><i style="flex:1;background:{{ t.b }}"></i><i style="flex:1;background:{{ t.c }}"></i></span>
+                <div style="display:flex;flex-direction:column;gap:5px"><span style="font:700 15px/1 'Archivo'">{{ t.name }}</span><span style="font:500 10px/1 'IBM Plex Mono';letter-spacing:.08em;text-transform:uppercase;color:#9A948A">{{ t.desc }}</span></div>
+              </div>
+            </sc-for>
+            <div style="display:flex;flex-direction:column;gap:16px;border-top:1px solid #D8D3CA;padding-top:18px">
+              <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:#9A948A">Atmosphere</span>
+              <sc-for list="{{ atmosphere }}" as="a" hint-placeholder-count="3">
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <div style="display:flex;justify-content:space-between;font:500 13px/1 'Archivo';color:#4A463F"><span>{{ a.k }}</span><strong style="font-weight:700;color:#14120E">{{ a.v }}</strong></div>
+                  <div style="position:relative;height:3px;background:#E3DFD7"><div style="height:3px;background:#14120E;width:{{ a.w }}"></div><span style="position:absolute;top:-7px;left:{{ a.w }};width:17px;height:17px;background:#fff;border:1.5px solid #14120E;transform:translateX(-50%)"></span></div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px;border-top:1px solid #D8D3CA;padding-top:18px">
+              <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:#9A948A">Auto theme</span>
+              <sc-for list="{{ autoRules }}" as="r" hint-placeholder-count="3">
+                <div style="display:flex;flex-direction:column;gap:5px;padding-bottom:12px;border-bottom:1px solid #E3DFD7"><span style="font:700 14px/1 'Archivo'">{{ r.k }}</span><span style="font:400 13px/1.45 'Archivo';color:#6D685F">{{ r.v }}</span></div>
+              </sc-for>
+            </div>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ isProfile }}" hint-placeholder-val="{{ false }}">
+          <div>
+            <div style="position:relative;height:250px;background:#14120E">
+              <img src="frontend/assets/images/home/hero_athlete.webp" alt="Athlete portrait" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 25%">
+              <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(12,11,9,.35),rgba(12,11,9,.92))"></div>
+              <div style="position:relative;z-index:2;height:100%;display:flex;flex-direction:column;justify-content:flex-end;gap:8px;padding:0 22px 20px">
+                <span style="font:500 10px/1 'IBM Plex Mono';letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.6)">Account</span>
+                <h1 style="margin:0;font:800 32px/1 'Archivo';letter-spacing:-.03em;color:#fff">Aamir Khan</h1>
+                <span style="font:500 12px/1 'Archivo';color:rgba(255,255,255,.75)">Muscle gain · Intermediate</span>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #E3DFD7;background:#fff">
+              <sc-for list="{{ bodyStats }}" as="b" hint-placeholder-count="4">
+                <div style="padding:18px 22px;border-right:1px solid #E3DFD7;border-bottom:1px solid #E3DFD7;display:flex;flex-direction:column;gap:6px"><span style="font:500 10px/1 'IBM Plex Mono';letter-spacing:.14em;text-transform:uppercase;color:#9A948A">{{ b.k }}</span><span style="font:800 26px/1 'Archivo'">{{ b.v }}</span></div>
+              </sc-for>
+            </div>
+            <div style="padding:22px;display:flex;flex-direction:column;gap:16px">
+              <div style="display:flex;flex-direction:column;gap:10px;border-bottom:1px solid #D8D3CA;padding-bottom:18px">
+                <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:#9A948A">Athlete level</span>
+                <div style="display:flex;align-items:baseline;gap:8px"><span style="font:800 32px/1 'Archivo';letter-spacing:-.03em">Athlete</span><span style="font:600 13px/1 'Archivo';color:#6D685F">1,240 XP</span></div>
+                <div style="height:5px;background:#E3DFD7"><div style="height:5px;width:62%;background:#E8442A"></div></div>
+                <span style="font:400 12px/1.5 'Archivo';color:#6D685F">760 XP to Beast</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px;border-bottom:1px solid #D8D3CA;padding-bottom:18px">
+                <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:#9A948A">Sport mode</span>
+                <div style="display:flex;align-items:baseline;justify-content:space-between"><span style="font:700 16px/1 'Archivo'">Cricket · Batsman</span><span style="font:500 11px/1 'IBM Plex Mono';color:#E8442A">Active</span></div>
+                <span style="font:400 13px/1.5 'Archivo';color:#6D685F">Weekly matches · power and agility focus</span>
+              </div>
+              <sc-for list="{{ profileFields }}" as="f" hint-placeholder-count="10">
+                <div style="display:flex;flex-direction:column;gap:7px"><label style="font:500 10px/1 'IBM Plex Mono';letter-spacing:.14em;text-transform:uppercase;color:#9A948A">{{ f.k }}</label><input value="{{ f.v }}" style="min-height:50px;padding:0 14px;border:1px solid #D8D3CA;background:#fff;font:500 15px/1 'Archivo';color:#14120E;outline:none"></div>
+              </sc-for>
+              <button style="min-height:60px;border:none;background:#E8442A;color:#fff;font:800 13px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer">Save changes</button>
+              <div style="display:flex;flex-direction:column;gap:10px;border-top:1px solid #D8D3CA;padding-top:18px">
+                <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:#9A948A">Badges earned</span>
+                <sc-for list="{{ profileBadges }}" as="b" hint-placeholder-count="4">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;padding-bottom:10px;border-bottom:1px solid #E3DFD7"><span style="font:600 14px/1 'Archivo'">{{ b.k }}</span><span style="font:500 11px/1 'IBM Plex Mono';color:#9A948A">{{ b.v }}</span></div>
+                </sc-for>
+              </div>
+              <button style="min-height:56px;border:1px solid #D8D3CA;background:transparent;font:700 12px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;color:#6D685F;cursor:pointer">Log out</button>
+            </div>
+          </div>
+          </sc-if>
+        </div>
+
+        <!-- MOBILE BOTTOM NAV -->
+        <nav style="display:flex;background:#FFFFFF;border-top:1px solid #E3DFD7;padding:8px 4px 22px">
+          <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="8">
+            <sc-if value="{{ n.active }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ n.go }}" style="flex:1;min-width:0;min-height:46px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;background:none;border:none;cursor:pointer;padding:2px 0">
+                <span style="width:18px;height:3px;background:#E8442A"></span>
+                <small style="font:700 9px/1 'Archivo';letter-spacing:.04em;color:#14120E">{{ n.short }}</small>
+              </button>
+            </sc-if>
+            <sc-if value="{{ n.inactive }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ n.go }}" style="flex:1;min-width:0;min-height:46px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;background:none;border:none;cursor:pointer;padding:2px 0">
+                <span style="width:18px;height:3px;background:#D8D3CA"></span>
+                <small style="font:600 9px/1 'Archivo';letter-spacing:.04em;color:#9A948A">{{ n.short }}</small>
+              </button>
+            </sc-if>
+          </sc-for>
+        </nav>
+
+        <!-- MOBILE WORKOUT MODE -->
+        <sc-if value="{{ workoutOpen }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;inset:0;z-index:30;background:#0C0B09;color:#fff;display:flex;flex-direction:column;animation:fcIn .25s ease-out">
+          <div style="padding:60px 22px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.12)">
+            <span style="font:600 18px/1 'IBM Plex Mono'">24:16</span>
+            <div style="display:flex;border:1px solid rgba(255,255,255,.2)">
+              <sc-if value="{{ modeLog }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ setLog }}" style="padding:9px 12px;border:none;background:#fff;color:#0C0B09;font:700 10px/1 'Archivo';letter-spacing:.08em;text-transform:uppercase">Sets</button>
+                <button onClick="{{ setCam }}" style="padding:9px 12px;border:none;background:transparent;color:rgba(255,255,255,.7);font:700 10px/1 'Archivo';letter-spacing:.08em;text-transform:uppercase">Camera</button>
+              </sc-if>
+              <sc-if value="{{ modeCam }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ setLog }}" style="padding:9px 12px;border:none;background:transparent;color:rgba(255,255,255,.7);font:700 10px/1 'Archivo';letter-spacing:.08em;text-transform:uppercase">Sets</button>
+                <button onClick="{{ setCam }}" style="padding:9px 12px;border:none;background:#fff;color:#0C0B09;font:700 10px/1 'Archivo';letter-spacing:.08em;text-transform:uppercase">Camera</button>
+              </sc-if>
+            </div>
+            <button onClick="{{ closeWorkout }}" style="padding:10px 14px;border:1px solid rgba(255,255,255,.3);background:transparent;color:#fff;font:700 10px/1 'Archivo';letter-spacing:.08em;text-transform:uppercase;cursor:pointer">End</button>
+          </div>
+
+          <sc-if value="{{ modeLog }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column">
+            <img src="frontend/assets/images/home/luxury_gym.webp" alt="Bench press" style="width:100%;height:180px;object-fit:cover">
+            <div style="padding:20px 22px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid rgba(255,255,255,.12)">
+              <h1 style="margin:0;font:800 34px/1 'Archivo';letter-spacing:-.03em;text-transform:uppercase">Bench Press</h1>
+              <span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.55)">Chest · Compound · Prev 60 kg × 10</span>
+            </div>
+            <div style="padding:8px 22px 20px">
+              <sc-for list="{{ sets }}" as="s" hint-placeholder-count="3">
+                <div style="display:grid;grid-template-columns:44px 1fr 1fr 64px;align-items:center;padding:16px 0;border-bottom:1px solid rgba(255,255,255,.1)">
+                  <span style="font:700 15px/1 'Archivo';color:rgba(255,255,255,.5)">{{ s.n }}</span>
+                  <div style="display:flex;align-items:baseline;gap:4px"><span style="font:800 30px/1 'Archivo'">{{ s.kg }}</span><span style="font:500 12px/1 'Archivo';color:rgba(255,255,255,.5)">kg</span></div>
+                  <div style="display:flex;align-items:baseline;gap:4px"><span style="font:800 30px/1 'Archivo'">{{ s.reps }}</span><span style="font:500 12px/1 'Archivo';color:rgba(255,255,255,.5)">reps</span></div>
+                  <div style="display:flex;justify-content:flex-end">
+                    <sc-if value="{{ s.done }}" hint-placeholder-val="{{ true }}"><button onClick="{{ s.toggle }}" style="width:52px;height:52px;border:none;background:#E8442A;color:#fff;font:700 19px/1 'Archivo';cursor:pointer">✓</button></sc-if>
+                    <sc-if value="{{ s.pending }}" hint-placeholder-val="{{ true }}"><button onClick="{{ s.toggle }}" style="width:52px;height:52px;border:1px solid rgba(255,255,255,.3);background:transparent;color:rgba(255,255,255,.5);font:700 19px/1 'Archivo';cursor:pointer">✓</button></sc-if>
+                  </div>
+                </div>
+              </sc-for>
+              <button onClick="{{ addSet }}" style="width:100%;margin-top:16px;min-height:56px;border:1px solid rgba(255,255,255,.3);background:transparent;color:#fff;font:700 12px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase;cursor:pointer">+ Add set</button>
+            </div>
+          </div>
+          <div style="padding:18px 22px 26px;border-top:1px solid rgba(255,255,255,.12);background:#141210;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between"><span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.2em;text-transform:uppercase;color:#E8442A">Rest</span><span style="font:600 40px/1 'IBM Plex Mono'">01:24</span></div>
+            <div style="height:5px;background:rgba(255,255,255,.16)"><div style="height:5px;width:62%;background:#E8442A"></div></div>
+            <div style="display:flex;gap:10px">
+              <button style="flex:1;min-height:56px;border:1px solid rgba(255,255,255,.3);background:transparent;color:#fff;font:700 12px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase">Skip rest</button>
+              <button style="flex:1.3;min-height:56px;border:none;background:#E8442A;color:#fff;font:800 12px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase">Next exercise</button>
+            </div>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ modeCam }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:1;display:flex;flex-direction:column">
+            <div style="position:relative;flex:1;background:#000;overflow:hidden">
+              <img src="frontend/assets/images/home/runner.webp" alt="Live camera view" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.85">
+              <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.3),rgba(0,0,0,.05) 40%,rgba(0,0,0,.85))"></div>
+              <div style="position:absolute;top:16px;left:18px;display:flex;align-items:center;gap:8px;padding:7px 12px;background:rgba(232,68,42,.92);font:700 10px/1 'Archivo';letter-spacing:.14em;text-transform:uppercase"><span style="width:6px;height:6px;background:#fff;border-radius:50%"></span>Live form</div>
+              <div style="position:absolute;left:18px;right:18px;bottom:18px;display:flex;flex-direction:column;gap:10px">
+                <span style="font:600 10px/1 'IBM Plex Mono';letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.7)">Reps this set</span>
+                <span style="font:800 78px/0.9 'Archivo';letter-spacing:-.04em">8<span style="font:600 22px/1 'Archivo';color:rgba(255,255,255,.55)"> / 10</span></span>
+                <span style="font:700 16px/1.25 'Archivo'">Keep elbows tucked at 45°</span>
+              </div>
+            </div>
+            <div style="padding:18px 22px 26px;display:flex;flex-direction:column;gap:14px;border-top:1px solid rgba(255,255,255,.12)">
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;justify-content:space-between;font:600 10px/1 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.5)"><span>Form accuracy</span><span>94%</span></div>
+                <div style="height:5px;background:rgba(255,255,255,.16)"><div style="height:5px;width:94%;background:#E8442A"></div></div>
+              </div>
+              <div style="display:flex;gap:10px">
+                <button onClick="{{ setLog }}" style="flex:1;min-height:56px;border:1px solid rgba(255,255,255,.3);background:transparent;color:#fff;font:700 12px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase">Log set</button>
+                <button style="flex:1.3;min-height:56px;border:none;background:#E8442A;color:#fff;font:800 12px/1 'Archivo';letter-spacing:.1em;text-transform:uppercase">Complete set</button>
+              </div>
+            </div>
+          </div>
+          </sc-if>
+        </div>
+        </sc-if>
+      </div>
+    </div>
+    <span style="font:500 11px/1 'IBM Plex Mono';letter-spacing:.14em;text-transform:uppercase;color:#9A948A">Same tabs, same flows — mobile</span>
+  </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#E8442A&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#E8442A&quot;,&quot;#D6FF3D&quot;,&quot;#0A5CFF&quot;,&quot;#111111&quot;]}}">
+const IMG = "frontend/assets/images/home/";
+class Component extends DCLogic {
+  state = {
+    tab: "home",
+    workoutOpen: false,
+    wMode: "log",
+    sets: [
+      { kg: 60, reps: 10, done: true },
+      { kg: 60, reps: 10, done: false },
+      { kg: 65, reps: 8, done: false }
+    ]
+  };
+
+  go = (t) => () => this.setState({ tab: t });
+
+  renderVals() {
+    const t = this.state.tab;
+    const tabs = [
+      ["home", "Home", "Home"], ["chat", "Coach", "Coach"], ["planner", "Planner", "Plan"],
+      ["recovery", "Recovery", "Recov"], ["progress", "Progress", "Progr"], ["calories", "Calories", "Cals"],
+      ["visualos", "Themes", "Theme"], ["profile", "Profile", "You"]
+    ];
+    const accent = this.props.accent ?? "#E8442A";
+    const R = a => a.map(o => ({ ...o, ready: true, bg: 'url("' + o.img + '")' }));
+    const weekRaw = [["Mon", 1], ["Tue", 2], ["Wed", 1], ["Thu", 0], ["Fri", 1], ["Sat", 1], ["Sun", 0]];
+    return {
+      accent,
+      statusColor: t === "profile" || t === "home" ? "#14120E" : "#14120E",
+      navItems: tabs.map(([k, label, short]) => ({
+        key: k, label, short, active: t === k, inactive: t !== k, go: this.go(k)
+      })),
+      isHome: t === "home", isCoach: t === "chat", isPlanner: t === "planner",
+      isRecovery: t === "recovery", isProgress: t === "progress", isCalories: t === "calories",
+      isThemes: t === "visualos", isProfile: t === "profile",
+
+      goPlanner: this.go("planner"), goCoach: this.go("chat"),
+      setGym: () => {}, setSport: () => {},
+
+      workoutOpen: this.state.workoutOpen,
+      openWorkout: () => this.setState({ workoutOpen: true }),
+      closeWorkout: () => this.setState({ workoutOpen: false }),
+      modeLog: this.state.wMode === "log", modeCam: this.state.wMode === "cam",
+      setLog: () => this.setState({ wMode: "log" }), setCam: () => this.setState({ wMode: "cam" }),
+
+      sets: this.state.sets.map((s, i) => ({
+        n: i + 1, kg: s.kg, reps: s.reps, done: s.done, pending: !s.done,
+        toggle: () => this.setState(st => ({ sets: st.sets.map((x, j) => j === i ? { ...x, done: !x.done } : x) }))
+      })),
+      addSet: () => this.setState(st => ({ sets: [...st.sets, { kg: 65, reps: 8, done: false }] })),
+
+      week: weekRaw.map(([label, s]) => ({ label, done: s === 1, today: s === 2, empty: s === 0 })),
+
+      exercises: R([
+        { name: "Bench Press", meta: "Chest · Compound", sets: "4 × 8", last: "60 kg", img: IMG + "luxury_gym.webp" },
+        { name: "Incline Dumbbell Press", meta: "Chest · Push", sets: "3 × 10", last: "22.5 kg", img: IMG + "gym_portrait.webp" },
+        { name: "Barbell Row", meta: "Back · Compound", sets: "4 × 8", last: "70 kg", img: IMG + "deadlift.webp" },
+        { name: "Lat Pulldown", meta: "Back · Pull", sets: "3 × 12", last: "55 kg", img: IMG + "hero_athlete.webp" },
+        { name: "Landmine Press", meta: "Shoulders · Push", sets: "3 × 10", last: "30 kg", img: IMG + "boxing.webp" },
+        { name: "Cable Curl", meta: "Arms · Isolation", sets: "3 × 12", last: "25 kg", img: IMG + "runner.webp" }
+      ]),
+
+      sessions: R([
+        { day: "Mon", name: "Lower Body Power", meta: "50 min · 6 exercises", status: "Completed", img: IMG + "deadlift.webp" },
+        { day: "Tue", name: "Upper Body Strength", meta: "45 min · 6 exercises", status: "Today", img: IMG + "luxury_gym.webp" },
+        { day: "Wed", name: "Conditioning", meta: "30 min · 5 rounds", status: "Scheduled", img: IMG + "boxing.webp" },
+        { day: "Thu", name: "Rest / Mobility", meta: "20 min · 8 drills", status: "Scheduled", img: IMG + "gym_portrait.webp" },
+        { day: "Fri", name: "Pull Focus", meta: "45 min · 6 exercises", status: "Scheduled", img: IMG + "hero_athlete.webp" },
+        { day: "Sat", name: "Zone 2 Run", meta: "40 min · steady", status: "Scheduled", img: IMG + "runner.webp" }
+      ]),
+
+      recoveryQs: [
+        { label: "Sleep last night", opts: ["≤4h", "5–6h", "6–7h", "7–8h", "8h+"].map((x, i) => ({ t: x, on: i === 3, off: i !== 3 })) },
+        { label: "Sleep quality", opts: ["Terrible", "Poor", "OK", "Good", "Great"].map((x, i) => ({ t: x, on: i === 3, off: i !== 3 })) },
+        { label: "Energy level", opts: ["Empty", "Low", "Average", "Fresh", "Charged"].map((x, i) => ({ t: x, on: i === 3, off: i !== 3 })) },
+        { label: "Muscle soreness", opts: ["Severe", "Heavy", "Moderate", "Mild", "None"].map((x, i) => ({ t: x, on: i === 3, off: i !== 3 })) },
+        { label: "Yesterday's load", opts: ["Rest", "Light", "Moderate", "Hard", "Max"].map((x, i) => ({ t: x, on: i === 2, off: i !== 2 })) }
+      ],
+      recoveryMetrics: [
+        { k: "Sleep", v: "7h 40m" }, { k: "Soreness", v: "Mild" },
+        { k: "Nervous system", v: "Stable" }, { k: "Readiness trend", v: "↑ 4 pts" }
+      ],
+
+      progressStats: [
+        { k: "Current streak", v: "12", sub: "Best: 21 days" },
+        { k: "Workouts", v: "58", sub: "Last 12 weeks" },
+        { k: "Training time", v: "41h", sub: "2,460 minutes" },
+        { k: "Bodyweight", v: "78.4", sub: "kg · ↓1.2 this month" }
+      ],
+      strengthBars: [46, 52, 50, 58, 62, 60, 68, 72, 70, 78, 84, 92].map(h => ({ h: h + "%" })),
+      prs: [
+        { k: "Bench press", v: "82.5 kg × 5" }, { k: "Back squat", v: "120 kg × 3" },
+        { k: "Deadlift", v: "160 kg × 1" }, { k: "Longest streak", v: "21 days" }
+      ],
+      recent: [
+        { name: "Lower Body Power", when: "Yesterday · 52 min", vol: "9,180 kg" },
+        { name: "Pull Focus", when: "3 days ago · 44 min", vol: "6,420 kg" },
+        { name: "Conditioning", when: "4 days ago · 31 min", vol: "—" },
+        { name: "Upper Body Strength", when: "6 days ago · 47 min", vol: "7,240 kg" }
+      ],
+
+      meals: [
+        { name: "Oats, whey, banana", macros: "P 38 · C 62 · F 9", kcal: "480" },
+        { name: "Chicken rice bowl", macros: "P 52 · C 78 · F 14", kcal: "690" },
+        { name: "Paneer wrap", macros: "P 36 · C 58 · F 22", kcal: "670" }
+      ],
+      macros: [
+        { k: "Protein", v: "126 / 165 g", w: "76%" },
+        { k: "Carbs", v: "198 / 260 g", w: "76%" },
+        { k: "Fat", v: "45 / 70 g", w: "64%" }
+      ],
+
+      themes: [
+        { name: "Chalk", desc: "Off-white · default", note: "Paper surfaces, near-black type, one accent. Reads well in bright gyms.", current: true, a: "#F5F3EF", b: "#FFFFFF", c: "#14120E", d: accent },
+        { name: "Carbon", desc: "Matte black", note: "Graphite surfaces with silver hairlines. What workout mode uses.", current: false, a: "#141210", b: "#26241F", c: "#8A857C", d: accent },
+        { name: "Platform", desc: "Warm grey", note: "Softer contrast for long sessions of reading and planning.", current: false, a: "#E6E2DA", b: "#F4F1EB", c: "#3A362F", d: "#B9B2A6" },
+        { name: "Signal", desc: "High contrast", note: "Maximum legibility — accent-forward, for outdoor and bright light.", current: false, a: accent, b: "#FFFFFF", c: "#14120E", d: "#F5F3EF" },
+        { name: "Field", desc: "Cool neutral", note: "Slightly cooler greys. Pairs with the camera view in form analysis.", current: false, a: "#EDEFEF", b: "#FFFFFF", c: "#1B1F1F", d: "#7C8582" }
+      ],
+      atmosphere: [
+        { k: "Motion", v: "Subtle", w: "38%" },
+        { k: "Contrast", v: "High", w: "78%" },
+        { k: "Haptics", v: "On, medium", w: "56%" }
+      ],
+      autoRules: [
+        { k: "During a workout", v: "Switches to Carbon so the screen stays readable under gym lights and at arm's length." },
+        { k: "Form camera", v: "Switches to Field — cooler greys keep the camera feed the brightest thing on screen." },
+        { k: "Everywhere else", v: "Returns to Chalk, your chosen theme." }
+      ],
+
+      readinessBars: [64, 70, 58, 72, 76, 62, 80, 74, 68, 82, 78, 71, 84, 86].map((v, i) => ({
+        h: v + "%", now: i === 13, high: i !== 13 && v >= 70, low: i !== 13 && v < 70
+      })),
+      muscleRecovery: [
+        { name: "Chest", w: "42%", state: "Loaded", last: "Today", ready: false, loaded: true },
+        { name: "Back", w: "48%", state: "Loaded", last: "Today", ready: false, loaded: true },
+        { name: "Shoulders", w: "72%", state: "Ready", last: "3 days", ready: true, loaded: false },
+        { name: "Arms", w: "66%", state: "Ready", last: "2 days", ready: true, loaded: false },
+        { name: "Quads / Glutes", w: "88%", state: "Ready", last: "Yesterday", ready: true, loaded: false },
+        { name: "Core", w: "94%", state: "Ready", last: "4 days", ready: true, loaded: false }
+      ],
+      checkins: [
+        { day: "Today", detail: "Sleep 7h 40m · soreness mild", score: "86" },
+        { day: "Yesterday", detail: "Sleep 6h 50m · soreness moderate", score: "74" },
+        { day: "Sunday", detail: "Sleep 8h 10m · rest day", score: "91" },
+        { day: "Saturday", detail: "Sleep 6h 20m · load hard", score: "68" },
+        { day: "Friday", detail: "Sleep 7h 30m · soreness mild", score: "82" }
+      ],
+
+      profileBars: [
+        { k: "Consistency", v: "4.2 sessions / wk", w: "84%" },
+        { k: "Strength base", v: "Intermediate", w: "62%" },
+        { k: "Mobility work", v: "Below target", w: "34%" }
+      ],
+      profileBadges: [
+        { k: "Consistency Master", v: "21-day streak" },
+        { k: "Volume King", v: "30,000 kg in a week" },
+        { k: "Form Perfectionist", v: "95% accuracy" },
+        { k: "First 50", v: "50 sessions logged" }
+      ],
+
+      bodyStats: [
+        { k: "Weight", v: "78.4 kg" }, { k: "Height", v: "178 cm" },
+        { k: "BMI", v: "24.8" }, { k: "Days / week", v: "4" }
+      ],
+      profileFields: [
+        { k: "Name", v: "Aamir Khan" }, { k: "Age", v: "27" },
+        { k: "Gender", v: "Male" }, { k: "Weight (kg)", v: "78.4" },
+        { k: "Height (cm)", v: "178" }, { k: "Days / week", v: "4 days" },
+        { k: "Goal", v: "Muscle gain" }, { k: "Level", v: "Intermediate" },
+        { k: "Workout place", v: "Gym" }, { k: "Injuries", v: "Right shoulder — tight" }
+      ],
+      queue: [
+        { n: "01", name: "Bench Press", sets: "4 × 8" },
+        { n: "02", name: "Incline DB Press", sets: "3 × 10" },
+        { n: "03", name: "Barbell Row", sets: "4 × 8" },
+        { n: "04", name: "Lat Pulldown", sets: "3 × 12" },
+        { n: "05", name: "Cable Curl", sets: "3 × 12" }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

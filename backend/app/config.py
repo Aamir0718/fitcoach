@@ -44,9 +44,13 @@ class Settings(BaseSettings):
     EMAIL_FROM: str = "FitCoach AI <noreply@fitcoach.ai>"
 
     # AI
+    # NOTE: Groq retired the Llama 3.x text/vision models that used to live here
+    # (both now 404). openai/gpt-oss-120b is the current general-purpose model
+    # on Groq; see _ai()'s reasoning_effort handling in ai_service.py for why
+    # that specific model needs it.
     GROQ_API_KEY: str = ""
-    GROQ_MODEL: str = "llama-3.3-70b-versatile"
-    GROQ_VISION_MODEL: str = "llama-3.2-11b-vision-preview"  # Vision-capable model for image analysis
+    GROQ_MODEL: str = "openai/gpt-oss-120b"
+    GROQ_VISION_MODEL: str = "openai/gpt-oss-120b"  # no vision-capable model currently on Groq; unused today (use_vision is never set True)
     USDA_API_KEY: str = ""  # USDA FoodData Central API key for nutrition data
     
     # Redis
@@ -74,6 +78,13 @@ class Settings(BaseSettings):
     # Storage
     STORAGE_BACKEND: str = "local"
     UPLOAD_DIR: str = "./uploads"
+
+    # Camera form-scoring thresholds (0-100 precision score) — the frontend's
+    # skeleton overlay turns green at/above GOOD, amber at/above WARN, red
+    # below that. Configurable here (env override) instead of hardcoded in
+    # ghost-trainer.js so this can be tuned without a frontend deploy.
+    FORM_SCORE_GOOD_THRESHOLD: int = 40
+    FORM_SCORE_WARN_THRESHOLD: int = 20
 
     @property
     def is_production(self) -> bool:

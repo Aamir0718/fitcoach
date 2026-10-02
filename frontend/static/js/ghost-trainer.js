@@ -69,15 +69,34 @@ function briefFor(pattern) {
   return EXERCISE_BRIEFS[pattern] || EXERCISE_BRIEFS.full_body_generic;
 }
 
-// Green at 60%+ — a real rep with recognizable form should read as "good",
-// not just a textbook-perfect one. The old 82% floor combined with the
-// stability score's penalty on fast/dynamic movement meant green was
-// rarely reachable even when the exercise was being done correctly.
+// Thresholds default here but are overwritten from the backend (see
+// loadFormConfig below) — GET /api/config/camera — so they can be tuned
+// without a frontend deploy. Defaults mirror Settings.FORM_SCORE_*_THRESHOLD.
 const SCORE_STATES = [
-  { min: 60, key: "good", color: "rgb(16, 185, 129)", glow: "rgba(16, 185, 129, .42)" },
-  { min: 35, key: "warn", color: "rgb(245, 158, 11)", glow: "rgba(245, 158, 11, .42)" },
+  { min: 40, key: "good", color: "rgb(16, 185, 129)", glow: "rgba(16, 185, 129, .42)" },
+  { min: 20, key: "warn", color: "rgb(245, 158, 11)", glow: "rgba(245, 158, 11, .42)" },
   { min: 0, key: "poor", color: "rgb(239, 68, 68)", glow: "rgba(239, 68, 68, .42)" },
 ];
+
+let formConfigPromise = null;
+function loadFormConfig() {
+  if (formConfigPromise) return formConfigPromise;
+  formConfigPromise = (async () => {
+    try {
+      const res = await fetch(`${window.API || ""}/api/config/camera`);
+      if (!res.ok) return;
+      const cfg = await res.json();
+      const good = SCORE_STATES.find((s) => s.key === "good");
+      const warn = SCORE_STATES.find((s) => s.key === "warn");
+      if (typeof cfg.form_score_good_threshold === "number") good.min = cfg.form_score_good_threshold;
+      if (typeof cfg.form_score_warn_threshold === "number") warn.min = cfg.form_score_warn_threshold;
+    } catch (e) {
+      // Offline/unreachable — keep the defaults above.
+    }
+  })();
+  return formConfigPromise;
+}
+loadFormConfig();
 
 const state = {
   status: "idle", // "idle", "loading", "running", "error"
@@ -169,6 +188,9 @@ function cacheEls() {
 // back to the weekly-plan pool (marks it done on finish).
 async function startWithExercises(exercises, label, slotKey) {
   if (!exercises || !exercises.length) return;
+  // Bounded wait so the very first session of a page load still gets the
+  // backend-configured thresholds instead of racing the fetch in loadFormConfig().
+  await Promise.race([loadFormConfig(), new Promise((r) => setTimeout(r, 800))]);
   cacheEls();
   state.activeSlotKey = slotKey || null;
   state.sessionLabel = label || "Workout";
@@ -706,27 +728,49 @@ function drawAngleLabels(ctx, landmarks, angles, width, height, scoreState) {
 // Maps every angle key any of the 13 movement-pattern analyzers can return
 // (see ghost-form-analysis.js) to a screen label + landmark anchor, so the
 // on-screen degree readout works for all of them, not just squat/pushup/curl.
+// Every angle key below used to anchor its on-screen label to a HARDCODED
+// left-or-right landmark, regardless of which side the analyzer actually
+// read the angle from — now that analyzers pick whichever side is visible
+// (ghost-form-analysis.js's side-aware rewrite), a value computed from the
+// right knee could still get its label pinned to the left knee's position.
+// pickVisible() resolves each anchor to whichever of its left/right
+// landmark pair actually has the higher visibility, so the label lands on
+// the joint the camera can actually see, independent of which side fed the
+// number.
+function pickVisible(landmarks, idxA, idxB) {
+  const a = landmarks[idxA], b = landmarks[idxB];
+  if (!a) return b;
+  if (!b) return a;
+  const va = a.visibility ?? 1, vb = b.visibility ?? 1;
+  return va >= vb ? a : b;
+}
+
 function angleLabelAnchors(landmarks, angles) {
+  const kneePt = pickVisible(landmarks, LM_ACTUAL.LEFT_KNEE, LM_ACTUAL.RIGHT_KNEE);
+  const elbowPt = pickVisible(landmarks, LM_ACTUAL.LEFT_ELBOW, LM_ACTUAL.RIGHT_ELBOW);
+  const hipPt = pickVisible(landmarks, LM_ACTUAL.LEFT_HIP, LM_ACTUAL.RIGHT_HIP);
+  const shoulderPt = pickVisible(landmarks, LM_ACTUAL.LEFT_SHOULDER, LM_ACTUAL.RIGHT_SHOULDER);
+  const anklePt = pickVisible(landmarks, LM_ACTUAL.LEFT_ANKLE, LM_ACTUAL.RIGHT_ANKLE);
   const anchors = [
-    { key: "leftElbow",    name: "ELBOW", point: LM_ACTUAL.LEFT_ELBOW,    dx: -38, dy: -22 },
-    { key: "rightElbow",   name: "ELBOW", point: LM_ACTUAL.RIGHT_ELBOW,   dx: 38,  dy: -22 },
-    { key: "leftKnee",     name: "KNEE",  point: LM_ACTUAL.LEFT_KNEE,     dx: -34, dy: 24 },
-    { key: "rightKnee",    name: "KNEE",  point: LM_ACTUAL.RIGHT_KNEE,    dx: 34,  dy: 24 },
-    { key: "workingKnee",  name: "KNEE",  point: LM_ACTUAL.LEFT_KNEE,     dx: -34, dy: 24 },
-    { key: "leftHip",      name: "HIP",   point: LM_ACTUAL.LEFT_HIP,      dx: -34, dy: -24 },
-    { key: "rightHip",     name: "HIP",   point: LM_ACTUAL.RIGHT_HIP,     dx: 34,  dy: -24 },
-    { key: "leftShoulder", name: "SHLD",  point: LM_ACTUAL.LEFT_SHOULDER, dx: -38, dy: -24 },
-    { key: "rightShoulder",name: "SHLD",  point: LM_ACTUAL.RIGHT_SHOULDER,dx: 38,  dy: -24 },
-    { key: "bodyLine",     name: "LINE",  point: LM_ACTUAL.LEFT_HIP,      dx: -34, dy: -24 },
-    { key: "torso",        name: "TORSO", point: LM_ACTUAL.LEFT_HIP,      dx: -34, dy: -24 },
-    { key: "rightRaise",   name: "RAISE", point: LM_ACTUAL.RIGHT_SHOULDER,dx: 38,  dy: -24 },
-    { key: "leftRaise",    name: "RAISE", point: LM_ACTUAL.LEFT_SHOULDER, dx: -38, dy: -24 },
-    { key: "heelLift",     name: "HEEL",  point: LM_ACTUAL.LEFT_ANKLE,    dx: -34, dy: 24 },
-    { key: "twist",        name: "TWIST", point: LM_ACTUAL.LEFT_SHOULDER, dx: -38, dy: -24 },
-    { key: "posture",      name: "POSE",  point: LM_ACTUAL.LEFT_HIP,      dx: -34, dy: -24 },
+    { key: "leftElbow",    name: "ELBOW", point: elbowPt,    dx: -38, dy: -22 },
+    { key: "rightElbow",   name: "ELBOW", point: elbowPt,    dx: 38,  dy: -22 },
+    { key: "leftKnee",     name: "KNEE",  point: kneePt,     dx: -34, dy: 24 },
+    { key: "rightKnee",    name: "KNEE",  point: kneePt,     dx: 34,  dy: 24 },
+    { key: "workingKnee",  name: "KNEE",  point: kneePt,     dx: -34, dy: 24 },
+    { key: "leftHip",      name: "HIP",   point: hipPt,      dx: -34, dy: -24 },
+    { key: "rightHip",     name: "HIP",   point: hipPt,      dx: 34,  dy: -24 },
+    { key: "leftShoulder", name: "SHLD",  point: shoulderPt, dx: -38, dy: -24 },
+    { key: "rightShoulder",name: "SHLD",  point: shoulderPt, dx: 38,  dy: -24 },
+    { key: "bodyLine",     name: "LINE",  point: hipPt,      dx: -34, dy: -24 },
+    { key: "torso",        name: "TORSO", point: hipPt,      dx: -34, dy: -24 },
+    { key: "rightRaise",   name: "RAISE", point: shoulderPt, dx: 38,  dy: -24 },
+    { key: "leftRaise",    name: "RAISE", point: shoulderPt, dx: -38, dy: -24 },
+    { key: "heelLift",     name: "HEEL",  point: anklePt,    dx: -34, dy: 24 },
+    { key: "twist",        name: "TWIST", point: shoulderPt, dx: -38, dy: -24 },
+    { key: "posture",      name: "POSE",  point: hipPt,      dx: -34, dy: -24 },
   ];
   return anchors
-    .map((a) => ({ name: a.name, value: angles[a.key], point: landmarks[a.point], dx: a.dx, dy: a.dy }))
+    .map((a) => ({ name: a.name, value: angles[a.key], point: a.point, dx: a.dx, dy: a.dy }))
     .filter((label) => Number.isFinite(label.value));
 }
 

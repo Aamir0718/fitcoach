@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.database import create_tables
-from app.routers import auth, profile, workouts, recovery, progress, nutrition, ai_coach
+from app.routers import auth, profile, workouts, recovery, progress, nutrition, ai_coach, config as config_router
 
 # ── Sentry (production error tracking) ────────────────────────────────────────
 if settings.SENTRY_DSN and sentry_sdk:
@@ -105,6 +105,7 @@ app.include_router(recovery.router)
 app.include_router(progress.router)
 app.include_router(nutrition.router)
 app.include_router(ai_coach.router)
+app.include_router(config_router.router)
 
 
 # ── Health check ───────────────────────────────────────────────────────────────

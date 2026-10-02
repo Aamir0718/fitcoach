@@ -112,17 +112,22 @@ async def _ai(messages: list[dict], temperature: float = 0.7, max_tokens: int = 
     try:
         model = settings.GROQ_VISION_MODEL if use_vision else settings.GROQ_MODEL
         logger.info(f"Calling Groq API with model={model}, messages={len(messages)}, max_tokens={max_tokens}, use_vision={use_vision}")
+        kwargs = dict(model=model, messages=messages, temperature=temperature, max_tokens=max_tokens)
+        if "gpt-oss" in model:
+            # gpt-oss is a reasoning model — it spends max_tokens on hidden
+            # chain-of-thought first, so short replies can finish_reason="length"
+            # with empty content before it ever writes the answer. Keeping
+            # reasoning low leaves the budget for the actual reply.
+            kwargs["reasoning_effort"] = "low"
         resp = await asyncio.wait_for(
-            _groq.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            ),
+            _groq.chat.completions.create(**kwargs),
             timeout=15,  # Longer timeout for vision analysis
         )
-        content = resp.choices[0].message.content.strip()
+        content = (resp.choices[0].message.content or "").strip()
         logger.info(f"Groq API response received: {len(content)} chars")
+        if not content:
+            logger.warning(f"Groq API returned empty content (finish_reason={resp.choices[0].finish_reason})")
+            return "", "api_error"
         return content, "none"
     except asyncio.TimeoutError:
         logger.warning("Groq API timeout")
@@ -788,6 +793,8 @@ User profile:
 {f'- Recent training history: {memory_context}' if memory_context else ''}
 
 CRITICAL RESPONSE GUIDELINES:
+- Answer what the user actually asked, directly and simply — a plain question gets a plain answer first.
+- Don't default to a workout pitch or plan suggestion unless they asked about training, or it's a natural follow-up to what they asked.
 - Default response: 2-5 short sentences (max 80-120 words)
 - Only go longer if user explicitly asks for detailed explanation
 - Use bullet points when listing items
@@ -795,7 +802,7 @@ CRITICAL RESPONSE GUIDELINES:
 - Never write huge paragraphs
 - Be conversational and friendly like a real coach
 - Use their name occasionally to personalize
-- End with a follow-up question when appropriate
+- End with a follow-up question when appropriate, but only if it fits the topic they raised
 - Use suitable emojis sparingly (💪🔥🥗🏃😄)
 - Practical advice only, no scientific jargon
 - Respect injuries — avoid suggesting harmful exercises"""
@@ -924,7 +931,6 @@ async def analyze_food_ai(food_description: str = "", image_base64: str | None =
             }
 
         logger.info(f"YOLO detected: {detected_foods}")
-
         # Multiple boxes of the same class (e.g. 2 rotis) count as multiple
         # portions rather than being collapsed into a single default serving.
         counts = Counter(detected_foods)
