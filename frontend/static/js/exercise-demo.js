@@ -110,12 +110,12 @@
     if (has(name, ["incline"])) support = "bench-incline";
     else if (has(name, ["decline"])) support = "bench-decline";
     else if (has(name, ["bench press", "flat dumbbell", "chest press", "lying"])) support = "bench-flat";
-    else if (has(name, ["seated", "machine", "leg press", "hack squat", "leg extension", "leg curl", "lat pulldown", "cable", "row"])) support = "seated";
+    else if (has(name, ["seated", "machine", "leg press", "hack squat", "leg extension", "leg curl", "lat pulldown"])) support = "seated";
     else if (has(name, ["plank", "push-up", "push up", "crunch", "sit-up", "leg raise", "hollow", "bird dog", "mountain climber", "burpee"])) support = "floor";
 
     var implement = "none";
     if (has(name, ["barbell"])) implement = "barbell";
-    else if (has(name, ["dumbbell"])) implement = "dumbbells";
+    else if (has(name, ["dumbbell", "goblet"])) implement = "dumbbells";
     else if (has(name, ["kettlebell"])) implement = "kettlebell";
     else if (has(name, ["cable", "pushdown", "pulldown", "face pull", "pallof", "seated row", "cable row"])) implement = "cable";
     else if (has(name, ["band", "resistance band"])) implement = "band";
@@ -341,6 +341,14 @@
       working: { hip: { x: 150, y: 122 }, torsoAngle: 154, legL: standingLegs(15, 70), legR: standingLegs(15, 70), armL: { shoulderAngle: 105, elbowAngle: 60 }, armR: { shoulderAngle: 105, elbowAngle: 60 } },
       hold: 0.1,
     },
+    // Leg press / hack squat / leg extension — a distinct machine position,
+    // not a standing squat, even though it shares the same knee/hip flexion
+    // idea. Selected by support === "seated" in createInstance below.
+    squat_seated: {
+      ready: { hip: { x: 90, y: 110 }, torsoAngle: 220, legL: standingLegs(95, 15), legR: standingLegs(95, 15), armL: { shoulderAngle: 230, elbowAngle: 230 }, armR: { shoulderAngle: 230, elbowAngle: 230 } },
+      working: { hip: { x: 90, y: 110 }, torsoAngle: 220, legL: standingLegs(95, 70), legR: standingLegs(95, 70), armL: { shoulderAngle: 230, elbowAngle: 230 }, armR: { shoulderAngle: 230, elbowAngle: 230 } },
+      hold: 0.1,
+    },
     cardio_generic: {
       ready: { hip: { x: 150, y: 116 }, torsoAngle: 176, legL: standingLegs(350, 300), legR: standingLegs(20, 330), armL: { shoulderAngle: 80, elbowAngle: 90 }, armR: { shoulderAngle: 280, elbowAngle: 260 } },
       working: { hip: { x: 150, y: 108 }, torsoAngle: 170, legL: standingLegs(60, 300), legR: standingLegs(330, 30), armL: { shoulderAngle: 200, elbowAngle: 260 }, armR: { shoulderAngle: 80, elbowAngle: 90 } },
@@ -413,18 +421,89 @@
     } };
   }
 
+  function kettlebellAt(g, x, y) {
+    var body = svgEl("circle", { cx: x, cy: y + 4, r: 9, fill: COLOR.accent });
+    var handle = svgEl("path", { fill: "none", stroke: COLOR.steel, "stroke-width": 3 });
+    function setHandle(nx, ny) {
+      handle.setAttribute("d", "M " + (nx - 5) + " " + (ny - 2) + " Q " + nx + " " + (ny - 10) + " " + (nx + 5) + " " + (ny - 2));
+    }
+    setHandle(x, y);
+    g.appendChild(body); g.appendChild(handle);
+    return { reposition: function (nx, ny) { body.setAttribute("cx", nx); body.setAttribute("cy", ny + 4); setHandle(nx, ny); } };
+  }
+
+  // Fixed (non-arm-driven) barbell resting across the shoulders/back — used
+  // for barbell squats, where the hands only steady the bar rather than
+  // carry it through the rep, so animating it off the wrist (as bench/curl
+  // do) would be wrong.
+  function shoulderBarAt(g, x, y) {
+    var line = svgEl("line", { x1: x - 34, y1: y, x2: x + 34, y2: y, stroke: COLOR.steel, "stroke-width": 7, "stroke-linecap": "round" });
+    var p1 = svgEl("circle", { cx: x - 30, cy: y, r: 10, fill: COLOR.accent, stroke: COLOR.dark, "stroke-width": 2, "stroke-opacity": 0.5 });
+    var p2 = svgEl("circle", { cx: x + 30, cy: y, r: 10, fill: COLOR.accent, stroke: COLOR.dark, "stroke-width": 2, "stroke-opacity": 0.5 });
+    g.appendChild(line); g.appendChild(p1); g.appendChild(p2);
+    return { reposition: function (nx, ny) {
+      line.setAttribute("x1", nx - 34); line.setAttribute("y1", ny); line.setAttribute("x2", nx + 34); line.setAttribute("y2", ny);
+      p1.setAttribute("cx", nx - 30); p1.setAttribute("cy", ny);
+      p2.setAttribute("cx", nx + 30); p2.setAttribute("cy", ny);
+    } };
+  }
+
+  // Seated leg-machine platform (leg press / hack squat / leg extension) —
+  // these are NOT the same exercise as a standing squat and must not render
+  // identically to one, even though they share the "squat" knee/hip pattern.
+  function legMachineAt(g) {
+    var add_ = function (tag, attrs) { var n = svgEl(tag, attrs); g.appendChild(n); return n; };
+    add_("rect", { x: 70, y: 150, width: 46, height: 10, rx: 3, fill: COLOR.bench }); // seat
+    add_("rect", { x: 70, y: 70, width: 10, height: 90, rx: 3, fill: COLOR.bench, opacity: 0.85 }); // backrest
+    add_("rect", { x: 190, y: 60, width: 10, height: 100, rx: 3, fill: COLOR.bench, opacity: 0.85 }); // footplate frame
+    add_("rect", { x: 170, y: 55, width: 46, height: 10, rx: 3, fill: COLOR.steel, opacity: 0.9 }); // footplate
+  }
+
   // ── One playing demo instance ────────────────────────────────────────────
+  // This is where deriveParams()'s stance/support/implement actually change
+  // what gets drawn — previously those were computed and never consumed, so
+  // e.g. every squat-pattern exercise rendered byte-identical regardless of
+  // being a barbell back squat, a bodyweight squat, or a seated leg press.
   function createInstance(svg, exercise) {
     var params = deriveParams(exercise);
-    var poses = PATTERN_POSES[params.pattern] || PATTERN_POSES.full_body_generic;
+
+    // Leg press / hack squat / leg extension are a different machine
+    // position, not a standing squat, even though the knee/hip motion is
+    // the same pattern — swap the whole pose set, not just the equipment.
+    var useSeatedSquat = params.pattern === "squat" && params.support === "seated";
+    var poseKey = useSeatedSquat ? "squat_seated" : params.pattern;
+    var poses = PATTERN_POSES[poseKey] || PATTERN_POSES.full_body_generic;
+
     var skeleton = buildSkeleton(svg);
     var equip = buildEquipment(svg, params);
+    if (useSeatedSquat) legMachineAt(equip.g);
+
+    // A barbell squat holds the bar fixed across the shoulders — it doesn't
+    // travel with the hands through the rep the way a press or curl does,
+    // so it's a separate shoulder-anchored prop, not a wrist-anchored one.
+    var shoulderProp = (params.pattern === "squat" && !useSeatedSquat && params.implement === "barbell")
+      ? { type: "shoulderBar", inst: null } : null;
 
     var handProp = null;
-    if (params.implement === "barbell" && params.pattern !== "squat" && params.pattern !== "hip_hinge") {
-      handProp = { type: "barbell", inst: null };
-    } else if (params.implement === "dumbbells" || (params.implement === "none" && (params.pattern === "elbow_flexion" || params.pattern === "lateral_raise"))) {
-      handProp = { type: "dumbbell", inst: null };
+    if (!useSeatedSquat && !shoulderProp) {
+      if (params.implement === "barbell") handProp = { type: "barbell" };
+      else if (params.implement === "dumbbells") handProp = { type: "dumbbell" };
+      else if (params.implement === "kettlebell") handProp = { type: "kettlebell" };
+      else if (params.implement === "none" && (params.pattern === "elbow_flexion" || params.pattern === "lateral_raise" || params.pattern === "squat")) {
+        // Unspecified implement on a pattern that's visually empty-handed
+        // otherwise reads as "holding nothing" with no cue at all — default
+        // to a light dumbbell rather than leave it ambiguous. Genuinely
+        // bodyweight-only names (push-up, pull-up, bodyweight squat) still
+        // show nothing: "none" here only fires for implement-ambiguous ones.
+        handProp = /bodyweight|push-up|push up|pull-up|pull up|chin-up|chin up|air squat/i.test(exercise && exercise.name || "") ? null : { type: "dumbbell" };
+      }
+    }
+
+    function propAt(type, g, x, y) {
+      if (type === "barbell") return barbellAt(g, x, y);
+      if (type === "dumbbell") return dumbbellAt(g, x, y);
+      if (type === "kettlebell") return kettlebellAt(g, x, y);
+      return shoulderBarAt(g, x, y);
     }
 
     function frame(t) {
@@ -438,10 +517,12 @@
         equip.nodes.cable.setAttribute("y2", points.wristL.y);
       }
       if (handProp) {
-        if (!handProp.inst) {
-          handProp.inst = handProp.type === "barbell" ? barbellAt(equip.g, points.wristL.x, points.wristL.y) : dumbbellAt(equip.g, points.wristL.x, points.wristL.y);
-        }
+        if (!handProp.inst) handProp.inst = propAt(handProp.type, equip.g, points.wristL.x, points.wristL.y);
         handProp.inst.reposition(points.wristL.x, points.wristL.y);
+      }
+      if (shoulderProp) {
+        if (!shoulderProp.inst) shoulderProp.inst = propAt("shoulderBar", equip.g, points.shoulder.x, points.shoulder.y);
+        shoulderProp.inst.reposition(points.shoulder.x, points.shoulder.y);
       }
     }
 
