@@ -706,27 +706,49 @@ function drawAngleLabels(ctx, landmarks, angles, width, height, scoreState) {
 // Maps every angle key any of the 13 movement-pattern analyzers can return
 // (see ghost-form-analysis.js) to a screen label + landmark anchor, so the
 // on-screen degree readout works for all of them, not just squat/pushup/curl.
+// Every angle key below used to anchor its on-screen label to a HARDCODED
+// left-or-right landmark, regardless of which side the analyzer actually
+// read the angle from — now that analyzers pick whichever side is visible
+// (ghost-form-analysis.js's side-aware rewrite), a value computed from the
+// right knee could still get its label pinned to the left knee's position.
+// pickVisible() resolves each anchor to whichever of its left/right
+// landmark pair actually has the higher visibility, so the label lands on
+// the joint the camera can actually see, independent of which side fed the
+// number.
+function pickVisible(landmarks, idxA, idxB) {
+  const a = landmarks[idxA], b = landmarks[idxB];
+  if (!a) return b;
+  if (!b) return a;
+  const va = a.visibility ?? 1, vb = b.visibility ?? 1;
+  return va >= vb ? a : b;
+}
+
 function angleLabelAnchors(landmarks, angles) {
+  const kneePt = pickVisible(landmarks, LM_ACTUAL.LEFT_KNEE, LM_ACTUAL.RIGHT_KNEE);
+  const elbowPt = pickVisible(landmarks, LM_ACTUAL.LEFT_ELBOW, LM_ACTUAL.RIGHT_ELBOW);
+  const hipPt = pickVisible(landmarks, LM_ACTUAL.LEFT_HIP, LM_ACTUAL.RIGHT_HIP);
+  const shoulderPt = pickVisible(landmarks, LM_ACTUAL.LEFT_SHOULDER, LM_ACTUAL.RIGHT_SHOULDER);
+  const anklePt = pickVisible(landmarks, LM_ACTUAL.LEFT_ANKLE, LM_ACTUAL.RIGHT_ANKLE);
   const anchors = [
-    { key: "leftElbow",    name: "ELBOW", point: LM_ACTUAL.LEFT_ELBOW,    dx: -38, dy: -22 },
-    { key: "rightElbow",   name: "ELBOW", point: LM_ACTUAL.RIGHT_ELBOW,   dx: 38,  dy: -22 },
-    { key: "leftKnee",     name: "KNEE",  point: LM_ACTUAL.LEFT_KNEE,     dx: -34, dy: 24 },
-    { key: "rightKnee",    name: "KNEE",  point: LM_ACTUAL.RIGHT_KNEE,    dx: 34,  dy: 24 },
-    { key: "workingKnee",  name: "KNEE",  point: LM_ACTUAL.LEFT_KNEE,     dx: -34, dy: 24 },
-    { key: "leftHip",      name: "HIP",   point: LM_ACTUAL.LEFT_HIP,      dx: -34, dy: -24 },
-    { key: "rightHip",     name: "HIP",   point: LM_ACTUAL.RIGHT_HIP,     dx: 34,  dy: -24 },
-    { key: "leftShoulder", name: "SHLD",  point: LM_ACTUAL.LEFT_SHOULDER, dx: -38, dy: -24 },
-    { key: "rightShoulder",name: "SHLD",  point: LM_ACTUAL.RIGHT_SHOULDER,dx: 38,  dy: -24 },
-    { key: "bodyLine",     name: "LINE",  point: LM_ACTUAL.LEFT_HIP,      dx: -34, dy: -24 },
-    { key: "torso",        name: "TORSO", point: LM_ACTUAL.LEFT_HIP,      dx: -34, dy: -24 },
-    { key: "rightRaise",   name: "RAISE", point: LM_ACTUAL.RIGHT_SHOULDER,dx: 38,  dy: -24 },
-    { key: "leftRaise",    name: "RAISE", point: LM_ACTUAL.LEFT_SHOULDER, dx: -38, dy: -24 },
-    { key: "heelLift",     name: "HEEL",  point: LM_ACTUAL.LEFT_ANKLE,    dx: -34, dy: 24 },
-    { key: "twist",        name: "TWIST", point: LM_ACTUAL.LEFT_SHOULDER, dx: -38, dy: -24 },
-    { key: "posture",      name: "POSE",  point: LM_ACTUAL.LEFT_HIP,      dx: -34, dy: -24 },
+    { key: "leftElbow",    name: "ELBOW", point: elbowPt,    dx: -38, dy: -22 },
+    { key: "rightElbow",   name: "ELBOW", point: elbowPt,    dx: 38,  dy: -22 },
+    { key: "leftKnee",     name: "KNEE",  point: kneePt,     dx: -34, dy: 24 },
+    { key: "rightKnee",    name: "KNEE",  point: kneePt,     dx: 34,  dy: 24 },
+    { key: "workingKnee",  name: "KNEE",  point: kneePt,     dx: -34, dy: 24 },
+    { key: "leftHip",      name: "HIP",   point: hipPt,      dx: -34, dy: -24 },
+    { key: "rightHip",     name: "HIP",   point: hipPt,      dx: 34,  dy: -24 },
+    { key: "leftShoulder", name: "SHLD",  point: shoulderPt, dx: -38, dy: -24 },
+    { key: "rightShoulder",name: "SHLD",  point: shoulderPt, dx: 38,  dy: -24 },
+    { key: "bodyLine",     name: "LINE",  point: hipPt,      dx: -34, dy: -24 },
+    { key: "torso",        name: "TORSO", point: hipPt,      dx: -34, dy: -24 },
+    { key: "rightRaise",   name: "RAISE", point: shoulderPt, dx: 38,  dy: -24 },
+    { key: "leftRaise",    name: "RAISE", point: shoulderPt, dx: -38, dy: -24 },
+    { key: "heelLift",     name: "HEEL",  point: anklePt,    dx: -34, dy: 24 },
+    { key: "twist",        name: "TWIST", point: shoulderPt, dx: -38, dy: -24 },
+    { key: "posture",      name: "POSE",  point: hipPt,      dx: -34, dy: -24 },
   ];
   return anchors
-    .map((a) => ({ name: a.name, value: angles[a.key], point: landmarks[a.point], dx: a.dx, dy: a.dy }))
+    .map((a) => ({ name: a.name, value: angles[a.key], point: a.point, dx: a.dx, dy: a.dy }))
     .filter((label) => Number.isFinite(label.value));
 }
 

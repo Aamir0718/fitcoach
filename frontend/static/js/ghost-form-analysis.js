@@ -29,51 +29,59 @@ function resolvePattern(exercise) {
   return PATTERN_ALIASES[exercise] || exercise || "full_body_generic";
 }
 
-// ── Per-pattern joint sets used for the visibility/reliability check ──────────
-const KEY_JOINTS = {
-  squat: [
-    LM_ACTUAL.LEFT_HIP, LM_ACTUAL.LEFT_KNEE, LM_ACTUAL.LEFT_ANKLE,
-    LM_ACTUAL.RIGHT_HIP, LM_ACTUAL.RIGHT_KNEE, LM_ACTUAL.RIGHT_ANKLE,
-    LM_ACTUAL.LEFT_SHOULDER,
-  ],
-  lunge: [
-    LM_ACTUAL.LEFT_HIP, LM_ACTUAL.LEFT_KNEE, LM_ACTUAL.LEFT_ANKLE,
-    LM_ACTUAL.RIGHT_HIP, LM_ACTUAL.RIGHT_KNEE, LM_ACTUAL.RIGHT_ANKLE,
-  ],
-  hip_hinge: [
-    LM_ACTUAL.LEFT_SHOULDER, LM_ACTUAL.LEFT_HIP, LM_ACTUAL.LEFT_KNEE,
-    LM_ACTUAL.RIGHT_HIP, LM_ACTUAL.RIGHT_KNEE,
-  ],
-  horizontal_push: [
-    LM_ACTUAL.LEFT_SHOULDER, LM_ACTUAL.LEFT_ELBOW, LM_ACTUAL.LEFT_WRIST,
-    LM_ACTUAL.RIGHT_SHOULDER, LM_ACTUAL.RIGHT_ELBOW, LM_ACTUAL.RIGHT_WRIST,
-    LM_ACTUAL.LEFT_HIP, LM_ACTUAL.LEFT_ANKLE,
-  ],
-  vertical_push: [
-    LM_ACTUAL.LEFT_SHOULDER, LM_ACTUAL.LEFT_ELBOW, LM_ACTUAL.LEFT_WRIST,
-    LM_ACTUAL.RIGHT_SHOULDER, LM_ACTUAL.RIGHT_ELBOW, LM_ACTUAL.RIGHT_WRIST, LM_ACTUAL.LEFT_HIP,
-  ],
-  horizontal_pull: [
-    LM_ACTUAL.LEFT_SHOULDER, LM_ACTUAL.LEFT_ELBOW, LM_ACTUAL.LEFT_WRIST,
-    LM_ACTUAL.RIGHT_SHOULDER, LM_ACTUAL.RIGHT_ELBOW, LM_ACTUAL.RIGHT_WRIST, LM_ACTUAL.LEFT_HIP,
-  ],
-  vertical_pull: [
-    LM_ACTUAL.LEFT_SHOULDER, LM_ACTUAL.LEFT_ELBOW, LM_ACTUAL.LEFT_WRIST,
-    LM_ACTUAL.RIGHT_SHOULDER, LM_ACTUAL.RIGHT_ELBOW, LM_ACTUAL.RIGHT_WRIST, LM_ACTUAL.LEFT_HIP,
-  ],
-  elbow_flexion: [LM_ACTUAL.RIGHT_SHOULDER, LM_ACTUAL.RIGHT_ELBOW, LM_ACTUAL.RIGHT_WRIST, LM_ACTUAL.RIGHT_HIP],
-  elbow_extension: [LM_ACTUAL.RIGHT_SHOULDER, LM_ACTUAL.RIGHT_ELBOW, LM_ACTUAL.RIGHT_WRIST, LM_ACTUAL.RIGHT_HIP],
-  lateral_raise: [
-    LM_ACTUAL.RIGHT_SHOULDER, LM_ACTUAL.RIGHT_ELBOW, LM_ACTUAL.RIGHT_HIP,
-    LM_ACTUAL.LEFT_SHOULDER, LM_ACTUAL.LEFT_ELBOW, LM_ACTUAL.LEFT_HIP,
-  ],
-  calf_raise: [LM_ACTUAL.LEFT_KNEE, LM_ACTUAL.LEFT_ANKLE, LM_ACTUAL.RIGHT_KNEE, LM_ACTUAL.RIGHT_ANKLE],
-  core_isometric: [LM_ACTUAL.LEFT_SHOULDER, LM_ACTUAL.LEFT_HIP, LM_ACTUAL.LEFT_ANKLE],
-  core_flex: [LM_ACTUAL.LEFT_SHOULDER, LM_ACTUAL.LEFT_HIP, LM_ACTUAL.LEFT_KNEE],
-  core_rotation: [LM_ACTUAL.LEFT_SHOULDER, LM_ACTUAL.RIGHT_SHOULDER, LM_ACTUAL.LEFT_HIP, LM_ACTUAL.RIGHT_HIP],
-  cardio_generic: [LM_ACTUAL.LEFT_SHOULDER, LM_ACTUAL.LEFT_HIP, LM_ACTUAL.LEFT_KNEE, LM_ACTUAL.RIGHT_HIP, LM_ACTUAL.RIGHT_KNEE],
-  full_body_generic: [LM_ACTUAL.LEFT_SHOULDER, LM_ACTUAL.LEFT_HIP, LM_ACTUAL.LEFT_KNEE, LM_ACTUAL.RIGHT_HIP, LM_ACTUAL.RIGHT_KNEE],
+// ── Side-aware joint model ──────────────────────────────────────────────────
+// Previously every analyzer hardcoded LEFT_* (or, for the arm-isolation
+// patterns, RIGHT_*) landmarks, and checkPoseReliability demanded BOTH sides
+// at once — so a side-on camera view (the only view that actually reads
+// knee/hip flexion correctly) always failed visibility, since the far leg
+// is inherently occluded from that angle. pickSide() resolves "shoulder",
+// "hip", etc. to whichever physical side is requested, with the other side
+// available as opp* for the handful of checks that are genuinely bilateral
+// (knee-collapse width, left/right raise symmetry) — those checks run only
+// when the opposite side is actually visible (visOK below), so a side-on
+// view silently skips a front-view-only check instead of false-firing it.
+function pickSide(lm, side) {
+  const s = side === "right" ? "RIGHT_" : "LEFT_";
+  const o = side === "right" ? "LEFT_" : "RIGHT_";
+  return {
+    side,
+    shoulder: lm[LM_ACTUAL[s + "SHOULDER"]], elbow: lm[LM_ACTUAL[s + "ELBOW"]], wrist: lm[LM_ACTUAL[s + "WRIST"]],
+    hip: lm[LM_ACTUAL[s + "HIP"]], knee: lm[LM_ACTUAL[s + "KNEE"]], ankle: lm[LM_ACTUAL[s + "ANKLE"]],
+    oppShoulder: lm[LM_ACTUAL[o + "SHOULDER"]], oppElbow: lm[LM_ACTUAL[o + "ELBOW"]], oppWrist: lm[LM_ACTUAL[o + "WRIST"]],
+    oppHip: lm[LM_ACTUAL[o + "HIP"]], oppKnee: lm[LM_ACTUAL[o + "KNEE"]], oppAnkle: lm[LM_ACTUAL[o + "ANKLE"]],
+  };
+}
+
+function visOK(pt) {
+  return !!pt && (pt.visibility === undefined || pt.visibility >= VISIBILITY_THRESHOLD);
+}
+
+// Generic joint KEYS (not landmark indices) needed from a SINGLE side for
+// that pattern to be analyzable — checked against left, then right.
+const SIDE_JOINT_KEYS = {
+  squat: ["shoulder", "hip", "knee", "ankle"],
+  lunge: ["hip", "knee", "ankle"],
+  hip_hinge: ["shoulder", "hip", "knee"],
+  horizontal_push: ["shoulder", "elbow", "wrist", "hip", "ankle"],
+  vertical_push: ["shoulder", "elbow", "wrist", "hip"],
+  horizontal_pull: ["shoulder", "elbow", "wrist", "hip"],
+  vertical_pull: ["shoulder", "elbow", "wrist"],
+  elbow_flexion: ["shoulder", "elbow", "wrist", "hip"],
+  elbow_extension: ["shoulder", "elbow", "wrist", "hip"],
+  lateral_raise: ["shoulder", "elbow", "hip"],
+  calf_raise: ["knee", "ankle"],
+  core_isometric: ["shoulder", "hip", "ankle"],
+  core_flex: ["shoulder", "hip", "knee"],
+  cardio_generic: ["shoulder", "hip", "knee"],
+  full_body_generic: ["shoulder", "hip", "knee"],
 };
+// core_rotation is a genuine exception: it measures shoulder-width-vs-hip-
+// width, which is meaningless from a single side — it keeps the old
+// both-sides-required check further down, by design, not by oversight.
+const BOTH_SIDES_REQUIRED = new Set(["core_rotation"]);
+const CORE_ROTATION_JOINTS = [
+  LM_ACTUAL.LEFT_SHOULDER, LM_ACTUAL.RIGHT_SHOULDER, LM_ACTUAL.LEFT_HIP, LM_ACTUAL.RIGHT_HIP,
+];
 
 let lastSmoothedLandmarks = null;
 const ALPHA = 0.35;
@@ -106,16 +114,32 @@ function smoothLandmarks(current) {
 // athlete still tracks.
 const VISIBILITY_THRESHOLD = 0.35;
 
-function checkPoseReliability(landmarks, pattern) {
-  const joints = KEY_JOINTS[pattern] || [];
-  for (const j of joints) {
-    const lm = landmarks[j];
-    if (!lm) return false;
-    if (lm.visibility !== undefined && lm.visibility < VISIBILITY_THRESHOLD) {
-      return false;
-    }
+function sideHasAllJoints(p, keys) {
+  for (const k of keys) {
+    if (!visOK(p[k])) return false;
   }
   return true;
+}
+
+// Returns { ok, side } — side is "left"/"right" for everything the figure
+// can be read from one side, or "both" for the few genuinely-bilateral
+// patterns. Tries left first (matches the old default so a front-facing
+// user with both sides visible sees no behavior change), then right — so a
+// side-on view now succeeds using whichever side the camera actually sees,
+// instead of requiring both.
+function checkPoseReliability(landmarks, pattern) {
+  if (BOTH_SIDES_REQUIRED.has(pattern)) {
+    for (const j of CORE_ROTATION_JOINTS) {
+      if (!visOK(landmarks[j])) return { ok: false };
+    }
+    return { ok: true, side: "both" };
+  }
+  const keys = SIDE_JOINT_KEYS[pattern] || ["shoulder", "hip", "knee"];
+  const left = pickSide(landmarks, "left");
+  if (sideHasAllJoints(left, keys)) return { ok: true, side: "left" };
+  const right = pickSide(landmarks, "right");
+  if (sideHasAllJoints(right, keys)) return { ok: true, side: "right" };
+  return { ok: false };
 }
 
 function newRepState() {
@@ -146,9 +170,10 @@ function analyze({ landmarks, exercise }) {
   const smoothed = smoothLandmarks(landmarks);
   if (!smoothed) return null;
 
-  // 2. Validate pose confidence and visibility
-  const reliable = checkPoseReliability(smoothed, pattern);
-  if (!reliable) {
+  // 2. Validate pose confidence and visibility — on whichever side is
+  // actually in frame, not both at once (see checkPoseReliability above).
+  const reliability = checkPoseReliability(smoothed, pattern);
+  if (!reliability.ok) {
     return {
       primaryAngle: 0,
       exercise: pattern,
@@ -163,7 +188,7 @@ function analyze({ landmarks, exercise }) {
   }
 
   const analyzer = ANALYZERS[pattern] || analyzeFullBodyGeneric;
-  return analyzer(smoothed);
+  return analyzer(smoothed, reliability.side);
 }
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
@@ -193,17 +218,17 @@ function average(values, fallback) {
 // depthPct, precision, angles }. Direction of "good rep" ROM is handled centrally
 // in tick() via PATTERN_ROM below — analyzers just report the current joint angle.
 
-function analyzeSquat(lm) {
-  const hip = lm[LM_ACTUAL.LEFT_HIP];
-  const rightHip = lm[LM_ACTUAL.RIGHT_HIP];
-  const knee = lm[LM_ACTUAL.LEFT_KNEE];
-  const rightKnee = lm[LM_ACTUAL.RIGHT_KNEE];
-  const ankle = lm[LM_ACTUAL.LEFT_ANKLE];
-  const rightAnkle = lm[LM_ACTUAL.RIGHT_ANKLE];
-  const shoulder = lm[LM_ACTUAL.LEFT_SHOULDER];
+function analyzeSquat(lm, side) {
+  const p = pickSide(lm, side || "left");
+  const { hip, knee, ankle, shoulder, oppKnee, oppHip, oppAnkle } = p;
+  const oppVisible = visOK(oppHip) && visOK(oppKnee) && visOK(oppAnkle);
 
   const kneeAngle = angleDeg(hip, knee, ankle);
-  const rightKneeAngle = angleDeg(rightHip, rightKnee, rightAnkle);
+  // Only a real second reading when the far leg is actually visible (a
+  // front/3-quarter view) — in a true side-on view it's occluded, and
+  // averaging in a near-arbitrary occluded-landmark angle would silently
+  // drag the precision score around. Fall back to the primary angle.
+  const rightKneeAngle = oppVisible ? angleDeg(oppHip, oppKnee, oppAnkle) : kneeAngle;
   const hipAngle = angleDeg(shoulder, hip, knee);
   const torsoLean = hipAngle;
   const cues = [];
@@ -215,12 +240,18 @@ function analyzeSquat(lm) {
     good = false;
     errors.push("leaning_torso");
   }
-  const kneeWidth = Math.abs(knee.x - rightKnee.x);
-  const ankleWidth = Math.abs(ankle.x - rightAnkle.x);
-  if (kneeWidth < ankleWidth * 0.68) {
-    cues.push("Push knees out");
-    good = false;
-    errors.push("knee_collapse");
+  // Knee-collapse (valgus) is a FRONT-view check — comparing left/right knee
+  // separation against ankle separation is meaningless foreshortened from
+  // the side, where it would read as near-zero and false-fire every rep.
+  // Only run it when the far leg is actually visible.
+  if (oppVisible) {
+    const kneeWidth = Math.abs(knee.x - oppKnee.x);
+    const ankleWidth = Math.abs(ankle.x - oppAnkle.x);
+    if (kneeWidth < ankleWidth * 0.68) {
+      cues.push("Push knees out");
+      good = false;
+      errors.push("knee_collapse");
+    }
   }
   if (Math.abs(knee.x - ankle.x) > 0.08) {
     cues.push("Keep knees over toes");
@@ -242,22 +273,25 @@ function analyzeSquat(lm) {
 
   return {
     primaryAngle: kneeAngle, exercise: "squat", phase, good, cues, errors, depthPct, precision,
+    side: p.side,
     angles: { leftKnee: kneeAngle, rightKnee: rightKneeAngle, leftHip: hipAngle },
   };
 }
 
-function analyzeLunge(lm) {
+function analyzeLunge(lm, side) {
   // Track whichever leg is currently more bent as the "working" (front) leg —
   // a single 2D camera can't reliably tell front from back leg otherwise.
-  const hip = lm[LM_ACTUAL.LEFT_HIP], rightHip = lm[LM_ACTUAL.RIGHT_HIP];
-  const knee = lm[LM_ACTUAL.LEFT_KNEE], rightKnee = lm[LM_ACTUAL.RIGHT_KNEE];
-  const ankle = lm[LM_ACTUAL.LEFT_ANKLE], rightAnkle = lm[LM_ACTUAL.RIGHT_ANKLE];
-  const shoulder = lm[LM_ACTUAL.LEFT_SHOULDER];
+  // Primary side drives the fallback shoulder reading (lunge's visibility
+  // key set doesn't require shoulder, so grab it defensively).
+  const p = pickSide(lm, side || "left");
+  const { hip, knee, ankle, oppHip, oppKnee, oppAnkle } = p;
+  const shoulder = p.shoulder || p.oppShoulder;
+  const oppVisible = visOK(oppHip) && visOK(oppKnee) && visOK(oppAnkle);
 
-  const leftAngle = angleDeg(hip, knee, ankle);
-  const rightAngle = angleDeg(rightHip, rightKnee, rightAnkle);
-  const kneeAngle = Math.min(leftAngle, rightAngle);
-  const hipAngle = angleDeg(shoulder, hip, knee);
+  const primaryAngle = angleDeg(hip, knee, ankle);
+  const oppAngle = oppVisible ? angleDeg(oppHip, oppKnee, oppAnkle) : primaryAngle;
+  const kneeAngle = Math.min(primaryAngle, oppAngle);
+  const hipAngle = shoulder ? angleDeg(shoulder, hip, knee) : 165; // 165 = neutral/upright fallback, never flags a fault
   const cues = [];
   let good = true;
   const errors = [];
@@ -278,19 +312,17 @@ function analyzeLunge(lm) {
 
   return {
     primaryAngle: kneeAngle, exercise: "lunge", phase, good, cues, errors, depthPct, precision,
+    side: p.side,
     angles: { workingKnee: kneeAngle, leftHip: hipAngle },
   };
 }
 
-function analyzeHipHinge(lm) {
-  const shoulder = lm[LM_ACTUAL.LEFT_SHOULDER];
-  const hip = lm[LM_ACTUAL.LEFT_HIP];
-  const knee = lm[LM_ACTUAL.LEFT_KNEE];
-  const rightHip = lm[LM_ACTUAL.RIGHT_HIP];
-  const rightKnee = lm[LM_ACTUAL.RIGHT_KNEE];
+function analyzeHipHinge(lm, side) {
+  const p = pickSide(lm, side || "left");
+  const { shoulder, hip, knee, ankle } = p;
 
   const hipAngle = angleDeg(shoulder, hip, knee);
-  const kneeAngle = angleDeg(hip, knee, lm[LM_ACTUAL.LEFT_ANKLE]);
+  const kneeAngle = angleDeg(hip, knee, ankle);
   const cues = [];
   let good = true;
   const errors = [];
@@ -311,22 +343,18 @@ function analyzeHipHinge(lm) {
 
   return {
     primaryAngle: hipAngle, exercise: "hip_hinge", phase, good, cues, errors, depthPct, precision,
+    side: p.side,
     angles: { leftHip: hipAngle, leftKnee: kneeAngle },
   };
 }
 
-function analyzeHorizontalPush(lm) {
-  const shoulder = lm[LM_ACTUAL.LEFT_SHOULDER];
-  const rightShoulder = lm[LM_ACTUAL.RIGHT_SHOULDER];
-  const elbow = lm[LM_ACTUAL.LEFT_ELBOW];
-  const rightElbow = lm[LM_ACTUAL.RIGHT_ELBOW];
-  const wrist = lm[LM_ACTUAL.LEFT_WRIST];
-  const rightWrist = lm[LM_ACTUAL.RIGHT_WRIST];
-  const hip = lm[LM_ACTUAL.LEFT_HIP];
-  const ankle = lm[LM_ACTUAL.LEFT_ANKLE];
+function analyzeHorizontalPush(lm, side) {
+  const p = pickSide(lm, side || "left");
+  const { shoulder, elbow, wrist, hip, ankle, oppShoulder, oppElbow, oppWrist } = p;
+  const oppVisible = visOK(oppShoulder) && visOK(oppElbow) && visOK(oppWrist);
 
   const elbowAngle = angleDeg(shoulder, elbow, wrist);
-  const rightElbowAngle = angleDeg(rightShoulder, rightElbow, rightWrist);
+  const rightElbowAngle = oppVisible ? angleDeg(oppShoulder, oppElbow, oppWrist) : elbowAngle;
   const bodyLine = angleDeg(shoulder, hip, ankle);
   const cues = [];
   let good = true;
@@ -357,22 +385,19 @@ function analyzeHorizontalPush(lm) {
 
   return {
     primaryAngle: elbowAngle, exercise: "horizontal_push", phase, good, cues, errors, depthPct, precision,
+    side: p.side,
     angles: { leftElbow: elbowAngle, rightElbow: rightElbowAngle, leftHip: bodyLine },
   };
 }
 
-function analyzeVerticalPush(lm) {
-  const shoulder = lm[LM_ACTUAL.LEFT_SHOULDER];
-  const rightShoulder = lm[LM_ACTUAL.RIGHT_SHOULDER];
-  const elbow = lm[LM_ACTUAL.LEFT_ELBOW];
-  const rightElbow = lm[LM_ACTUAL.RIGHT_ELBOW];
-  const wrist = lm[LM_ACTUAL.LEFT_WRIST];
-  const rightWrist = lm[LM_ACTUAL.RIGHT_WRIST];
-  const hip = lm[LM_ACTUAL.LEFT_HIP];
+function analyzeVerticalPush(lm, side) {
+  const p = pickSide(lm, side || "left");
+  const { shoulder, elbow, wrist, hip, knee, oppShoulder, oppElbow, oppWrist } = p;
+  const oppVisible = visOK(oppShoulder) && visOK(oppElbow) && visOK(oppWrist);
 
   const elbowAngle = angleDeg(shoulder, elbow, wrist);
-  const rightElbowAngle = angleDeg(rightShoulder, rightElbow, rightWrist);
-  const torsoLean = angleDeg(lm[LM_ACTUAL.LEFT_KNEE] || hip, hip, shoulder);
+  const rightElbowAngle = oppVisible ? angleDeg(oppShoulder, oppElbow, oppWrist) : elbowAngle;
+  const torsoLean = angleDeg(knee || hip, hip, shoulder);
   const cues = [];
   let good = true;
   const errors = [];
@@ -393,22 +418,19 @@ function analyzeVerticalPush(lm) {
 
   return {
     primaryAngle: elbowAngle, exercise: "vertical_push", phase, good, cues, errors, depthPct, precision,
+    side: p.side,
     angles: { leftElbow: elbowAngle, rightElbow: rightElbowAngle },
   };
 }
 
-function analyzeHorizontalPull(lm) {
-  const shoulder = lm[LM_ACTUAL.LEFT_SHOULDER];
-  const rightShoulder = lm[LM_ACTUAL.RIGHT_SHOULDER];
-  const elbow = lm[LM_ACTUAL.LEFT_ELBOW];
-  const rightElbow = lm[LM_ACTUAL.RIGHT_ELBOW];
-  const wrist = lm[LM_ACTUAL.LEFT_WRIST];
-  const rightWrist = lm[LM_ACTUAL.RIGHT_WRIST];
-  const hip = lm[LM_ACTUAL.LEFT_HIP];
+function analyzeHorizontalPull(lm, side) {
+  const p = pickSide(lm, side || "left");
+  const { shoulder, elbow, wrist, hip, knee, oppShoulder, oppElbow, oppWrist } = p;
+  const oppVisible = visOK(oppShoulder) && visOK(oppElbow) && visOK(oppWrist);
 
   const elbowAngle = angleDeg(shoulder, elbow, wrist);
-  const rightElbowAngle = angleDeg(rightShoulder, rightElbow, rightWrist);
-  const torsoLean = angleDeg(lm[LM_ACTUAL.LEFT_KNEE] || hip, hip, shoulder);
+  const rightElbowAngle = oppVisible ? angleDeg(oppShoulder, oppElbow, oppWrist) : elbowAngle;
+  const torsoLean = angleDeg(knee || hip, hip, shoulder);
   const cues = [];
   let good = true;
   const errors = [];
@@ -429,20 +451,18 @@ function analyzeHorizontalPull(lm) {
 
   return {
     primaryAngle: elbowAngle, exercise: "horizontal_pull", phase, good, cues, errors, depthPct, precision,
+    side: p.side,
     angles: { leftElbow: elbowAngle, rightElbow: rightElbowAngle },
   };
 }
 
-function analyzeVerticalPull(lm) {
-  const shoulder = lm[LM_ACTUAL.LEFT_SHOULDER];
-  const rightShoulder = lm[LM_ACTUAL.RIGHT_SHOULDER];
-  const elbow = lm[LM_ACTUAL.LEFT_ELBOW];
-  const rightElbow = lm[LM_ACTUAL.RIGHT_ELBOW];
-  const wrist = lm[LM_ACTUAL.LEFT_WRIST];
-  const rightWrist = lm[LM_ACTUAL.RIGHT_WRIST];
+function analyzeVerticalPull(lm, side) {
+  const p = pickSide(lm, side || "left");
+  const { shoulder, elbow, wrist, oppShoulder, oppElbow, oppWrist } = p;
+  const oppVisible = visOK(oppShoulder) && visOK(oppElbow) && visOK(oppWrist);
 
   const elbowAngle = angleDeg(shoulder, elbow, wrist);
-  const rightElbowAngle = angleDeg(rightShoulder, rightElbow, rightWrist);
+  const rightElbowAngle = oppVisible ? angleDeg(oppShoulder, oppElbow, oppWrist) : elbowAngle;
   const cues = [];
   let good = true;
   const errors = [];
@@ -462,15 +482,14 @@ function analyzeVerticalPull(lm) {
 
   return {
     primaryAngle: elbowAngle, exercise: "vertical_pull", phase, good, cues, errors, depthPct, precision,
+    side: p.side,
     angles: { leftElbow: elbowAngle, rightElbow: rightElbowAngle },
   };
 }
 
-function analyzeElbowFlexion(lm) {
-  const shoulder = lm[LM_ACTUAL.RIGHT_SHOULDER];
-  const elbow = lm[LM_ACTUAL.RIGHT_ELBOW];
-  const wrist = lm[LM_ACTUAL.RIGHT_WRIST];
-  const hip = lm[LM_ACTUAL.RIGHT_HIP];
+function analyzeElbowFlexion(lm, side) {
+  const p = pickSide(lm, side || "left");
+  const { shoulder, elbow, wrist, hip } = p;
   const elbowAngle = angleDeg(shoulder, elbow, wrist);
   const shoulderAngle = angleDeg(elbow, shoulder, hip);
   const cues = [];
@@ -498,15 +517,14 @@ function analyzeElbowFlexion(lm) {
   const precision = scoreTargets([targetScore(elbowAngle, 55, 115), targetScore(shoulderAngle, 35, 35)]);
   return {
     primaryAngle: elbowAngle, exercise: "elbow_flexion", phase, good, cues, errors, depthPct, precision,
+    side: p.side,
     angles: { rightElbow: elbowAngle, rightShoulder: shoulderAngle },
   };
 }
 
-function analyzeElbowExtension(lm) {
-  const shoulder = lm[LM_ACTUAL.RIGHT_SHOULDER];
-  const elbow = lm[LM_ACTUAL.RIGHT_ELBOW];
-  const wrist = lm[LM_ACTUAL.RIGHT_WRIST];
-  const hip = lm[LM_ACTUAL.RIGHT_HIP];
+function analyzeElbowExtension(lm, side) {
+  const p = pickSide(lm, side || "left");
+  const { shoulder, elbow, wrist, hip } = p;
   const elbowAngle = angleDeg(shoulder, elbow, wrist);
   const shoulderAngle = angleDeg(elbow, shoulder, hip);
   const cues = [];
@@ -528,20 +546,18 @@ function analyzeElbowExtension(lm) {
   const precision = scoreTargets([targetScore(elbowAngle, 160, 60), targetScore(shoulderAngle, 15, 30)]);
   return {
     primaryAngle: elbowAngle, exercise: "elbow_extension", phase, good, cues, errors, depthPct, precision,
+    side: p.side,
     angles: { rightElbow: elbowAngle, rightShoulder: shoulderAngle },
   };
 }
 
-function analyzeLateralRaise(lm) {
-  const shoulder = lm[LM_ACTUAL.RIGHT_SHOULDER];
-  const elbow = lm[LM_ACTUAL.RIGHT_ELBOW];
-  const hip = lm[LM_ACTUAL.RIGHT_HIP];
-  const leftShoulder = lm[LM_ACTUAL.LEFT_SHOULDER];
-  const leftElbow = lm[LM_ACTUAL.LEFT_ELBOW];
-  const leftHip = lm[LM_ACTUAL.LEFT_HIP];
+function analyzeLateralRaise(lm, side) {
+  const p = pickSide(lm, side || "left");
+  const { shoulder, elbow, hip, oppShoulder, oppElbow, oppHip } = p;
+  const oppVisible = visOK(oppShoulder) && visOK(oppElbow) && visOK(oppHip);
 
   const raiseAngle = angleDeg(hip, shoulder, elbow);
-  const leftRaiseAngle = angleDeg(leftHip, leftShoulder, leftElbow);
+  const oppRaiseAngle = oppVisible ? angleDeg(oppHip, oppShoulder, oppElbow) : raiseAngle;
   const cues = [];
   let good = true;
   const errors = [];
@@ -550,7 +566,11 @@ function analyzeLateralRaise(lm) {
     cues.push("Raise to shoulder height, not above");
     errors.push("too_high");
   }
-  if (Math.abs(raiseAngle - leftRaiseAngle) > 20) {
+  // Only a real symmetry check when the opposite arm is actually visible —
+  // otherwise oppRaiseAngle === raiseAngle by the fallback above, and this
+  // would never fire (harmless — just correctly inert instead of a false
+  // "uneven" report from a nonsense occluded-side angle).
+  if (oppVisible && Math.abs(raiseAngle - oppRaiseAngle) > 20) {
     cues.push("Raise both arms evenly");
     good = false;
     errors.push("uneven_raise");
@@ -561,19 +581,18 @@ function analyzeLateralRaise(lm) {
   const precision = scoreTargets([targetScore(raiseAngle, 80, 40)]);
   return {
     primaryAngle: raiseAngle, exercise: "lateral_raise", phase, good, cues, errors, depthPct, precision,
-    angles: { rightRaise: raiseAngle, leftRaise: leftRaiseAngle },
+    side: p.side,
+    angles: { rightRaise: raiseAngle, leftRaise: oppRaiseAngle },
   };
 }
 
-function analyzeCalfRaise(lm) {
+function analyzeCalfRaise(lm, side) {
   // MediaPipe's 13-point subset here has no foot/toe landmark, so true ankle
   // plantarflexion angle isn't measurable — approximate using the ankle's
   // vertical rise relative to the knee as a heel-lift proxy, scaled to look
   // like a 0-180 "angle" so it can reuse the same rep state machine.
-  const knee = lm[LM_ACTUAL.LEFT_KNEE];
-  const ankle = lm[LM_ACTUAL.LEFT_ANKLE];
-  const rightKnee = lm[LM_ACTUAL.RIGHT_KNEE];
-  const rightAnkle = lm[LM_ACTUAL.RIGHT_ANKLE];
+  const p = pickSide(lm, side || "left");
+  const { knee, ankle } = p;
 
   const lift = clamp((knee.y - ankle.y) * -400, -20, 40); // more negative ankle.y (higher) = bigger lift
   const pseudoAngle = 90 + lift; // baseline ~90, rises toward ~130 at full raise
@@ -585,14 +604,14 @@ function analyzeCalfRaise(lm) {
   const precision = scoreTargets([targetScore(pseudoAngle, 110, 25)]);
   return {
     primaryAngle: pseudoAngle, exercise: "calf_raise", phase, good: true, cues, errors, depthPct, precision,
+    side: p.side,
     angles: { heelLift: pseudoAngle },
   };
 }
 
-function analyzeCoreIsometric(lm) {
-  const shoulder = lm[LM_ACTUAL.LEFT_SHOULDER];
-  const hip = lm[LM_ACTUAL.LEFT_HIP];
-  const ankle = lm[LM_ACTUAL.LEFT_ANKLE];
+function analyzeCoreIsometric(lm, side) {
+  const p = pickSide(lm, side || "left");
+  const { shoulder, hip, ankle } = p;
   const bodyLine = angleDeg(shoulder, hip, ankle);
   const cues = [];
   let good = true;
@@ -607,14 +626,13 @@ function analyzeCoreIsometric(lm) {
   const precision = scoreTargets([targetScore(bodyLine, 178, 25)]);
   return {
     primaryAngle: bodyLine, exercise: "core_isometric", phase: "hold", good, cues, errors,
-    depthPct: good ? 100 : 40, precision, angles: { bodyLine },
+    depthPct: good ? 100 : 40, precision, side: p.side, angles: { bodyLine },
   };
 }
 
-function analyzeCoreFlex(lm) {
-  const shoulder = lm[LM_ACTUAL.LEFT_SHOULDER];
-  const hip = lm[LM_ACTUAL.LEFT_HIP];
-  const knee = lm[LM_ACTUAL.LEFT_KNEE];
+function analyzeCoreFlex(lm, side) {
+  const p = pickSide(lm, side || "left");
+  const { shoulder, hip, knee } = p;
   const torsoAngle = angleDeg(shoulder, hip, knee);
   const cues = [];
   const errors = [];
@@ -630,6 +648,7 @@ function analyzeCoreFlex(lm) {
   const precision = scoreTargets([targetScore(torsoAngle, 110, 45)]);
   return {
     primaryAngle: torsoAngle, exercise: "core_flex", phase, good, cues, errors, depthPct, precision,
+    side: p.side,
     angles: { torso: torsoAngle },
   };
 }
