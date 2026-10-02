@@ -39,9 +39,13 @@ class Settings(BaseSettings):
     EMAIL_FROM: str = "FitCoach AI <noreply@fitcoach.ai>"
 
     # AI
+    # NOTE: Groq retired the Llama 3.x text/vision models that used to live here
+    # (both now 404). openai/gpt-oss-120b is the current general-purpose model
+    # on Groq; see _ai()'s reasoning_effort handling in ai_service.py for why
+    # that specific model needs it.
     GROQ_API_KEY: str = ""
-    GROQ_MODEL: str = "llama-3.3-70b-versatile"
-    GROQ_VISION_MODEL: str = "llama-3.2-11b-vision-preview"  # Vision-capable model for image analysis
+    GROQ_MODEL: str = "openai/gpt-oss-120b"
+    GROQ_VISION_MODEL: str = "openai/gpt-oss-120b"  # no vision-capable model currently on Groq; unused today (use_vision is never set True)
     USDA_API_KEY: str = ""  # USDA FoodData Central API key for nutrition data
     
     # Redis

@@ -152,7 +152,9 @@ async def analyze_food(
         total_calories = result.get('total_calories', 0)
         total_protein = result.get('total_protein', 0)
         total_carbs = result.get('total_carbs', 0)
-        total_fats = result.get('total_fats', 0)
+        # analyze_food_ai returns "total_fat" (singular) — this used to read
+        # "total_fats" and silently logged 0g fat for every meal.
+        total_fats = result.get('total_fat', 0)
         
         # Determine source
         source = "photo" if body.image_base64 else "text"
