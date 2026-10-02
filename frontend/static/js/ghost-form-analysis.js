@@ -95,12 +95,23 @@ function smoothLandmarks(current) {
   return lastSmoothedLandmarks;
 }
 
+// 0.7 was strict enough that normal camera framing (slight angle, one side
+// a little occluded, imperfect lighting) routinely failed this and froze
+// rep counting entirely — "Body not fully visible" firing even when the
+// athlete was doing the exercise correctly. Full per-side tracking (using
+// whichever side IS clearly visible, instead of requiring both) is the
+// real fix and is still pending; this lower threshold is the safe, quick
+// improvement in the meantime — permissive enough that reps count in
+// realistic conditions, not so permissive that a genuinely-out-of-frame
+// athlete still tracks.
+const VISIBILITY_THRESHOLD = 0.35;
+
 function checkPoseReliability(landmarks, pattern) {
   const joints = KEY_JOINTS[pattern] || [];
   for (const j of joints) {
     const lm = landmarks[j];
     if (!lm) return false;
-    if (lm.visibility !== undefined && lm.visibility < 0.7) {
+    if (lm.visibility !== undefined && lm.visibility < VISIBILITY_THRESHOLD) {
       return false;
     }
   }

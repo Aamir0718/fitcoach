@@ -69,9 +69,13 @@ function briefFor(pattern) {
   return EXERCISE_BRIEFS[pattern] || EXERCISE_BRIEFS.full_body_generic;
 }
 
+// Green at 60%+ — a real rep with recognizable form should read as "good",
+// not just a textbook-perfect one. The old 82% floor combined with the
+// stability score's penalty on fast/dynamic movement meant green was
+// rarely reachable even when the exercise was being done correctly.
 const SCORE_STATES = [
-  { min: 82, key: "good", color: "rgb(16, 185, 129)", glow: "rgba(16, 185, 129, .42)" },
-  { min: 62, key: "warn", color: "rgb(245, 158, 11)", glow: "rgba(245, 158, 11, .42)" },
+  { min: 60, key: "good", color: "rgb(16, 185, 129)", glow: "rgba(16, 185, 129, .42)" },
+  { min: 35, key: "warn", color: "rgb(245, 158, 11)", glow: "rgba(245, 158, 11, .42)" },
   { min: 0, key: "poor", color: "rgb(239, 68, 68)", glow: "rgba(239, 68, 68, .42)" },
 ];
 
@@ -129,6 +133,8 @@ function cacheEls() {
   els.timer = document.getElementById("ghost-timer");
   els.brief = document.getElementById("ghost-brief");
   els.liveCue = document.getElementById("ghost-live-cue");
+
+  els.exerciseDemo = document.getElementById("ghost-exercise-demo");
 
   els.workoutProgress = document.getElementById("ghost-workout-progress");
   els.workoutExerciseName = document.getElementById("ghost-workout-exercise-name");
@@ -224,6 +230,13 @@ function loadCurrentWorkoutExercise() {
   if (els.accuracy) els.accuracy.textContent = "100%";
   if (els.accuracyLabel) els.accuracyLabel.textContent = "Textbook execution";
   if (els.brief) els.brief.textContent = activeEx.trainer_tip || briefFor(state.exercise);
+
+  // window.FCDemo guard is load-bearing, not optional: if exercise-demo.js
+  // ever fails to load, the live session must keep working with an empty
+  // (not broken) demo slot rather than throwing here.
+  if (els.exerciseDemo) {
+    els.exerciseDemo.innerHTML = window.FCDemo ? window.FCDemo.renderDemo(activeEx, { size: "hero" }) : "";
+  }
 
   renderWorkoutQueue();
   if (document.getElementById("ghost-workout-layout")?.dataset.ghostMode === "log") renderLogSets();
