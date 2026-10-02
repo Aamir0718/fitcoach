@@ -1478,6 +1478,12 @@ function handleResponse(data) {
       hideWorkoutUI();
       if (data.streak > 0) updateStreak(data.streak);
       break;
+    case "chat":
+      // Plain Q&A reply (not a workout/nutrition/recovery action) — just show
+      // the answer, don't keep pushing the Start Workout / Nutrition /
+      // Recovery row under every unrelated answer.
+      hideQuickActions();
+      break;
     case "workout_all_done":
       workoutActive=false; feedbackMode=true;
       hideWorkoutUI(); showFeedbackButtons();
