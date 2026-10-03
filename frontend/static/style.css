@@ -1524,7 +1524,22 @@ textarea { resize: vertical; line-height: 1.5; }
 /* ============================================================================
    14. COACH (#tab-chat) — chat, not an AI demo.
    ============================================================================ */
-.chat-shell { flex: 1; display: flex; flex-direction: column; min-height: 100vh; background: var(--paper); }
+/* height (not min-height) caps the shell at one viewport so chat-box's
+   flex:1 + overflow-y:auto below actually scrolls internally, instead of
+   the whole shell growing taller than the viewport as messages pile up and
+   dragging the input bar down the page with it. */
+.chat-shell { flex: 1; display: flex; flex-direction: column; height: 100vh; min-height: 0; background: var(--paper); }
+@media (max-width: 720px) {
+  /* The fixed bottom-nav (~76px, same figure .tab-content.active uses
+     elsewhere) sits on top of the page here — without this the shell's
+     full 100vh runs underneath it and the nav covers the input bar. */
+  .chat-shell { height: calc(100vh - 76px); }
+  /* .tab-content.active's own 76px bottom padding (for tabs that rely on
+     normal page scroll) would otherwise stack with the reserve above and
+     leave a dead gap below the input bar — chat-shell already reserves
+     the space it needs. */
+  #tab-chat.tab-content.active { padding-bottom: 0; }
+}
 
 .chat-header {
   display: flex;
@@ -1586,6 +1601,7 @@ textarea { resize: vertical; line-height: 1.5; }
 
 .chat-box {
   flex: 1;
+  min-height: 0; /* flex items default to min-height:auto, which would let content grow the shell instead of scrolling here */
   overflow-y: auto;
   padding: 32px;
   display: flex;
