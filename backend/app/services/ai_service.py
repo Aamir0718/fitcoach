@@ -12,7 +12,6 @@ from typing import Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from groq import AsyncGroq
-from app.services.food_detector import detect_foods
 from app.services.nutrition_service import get_food_nutrition
 from app.config import settings
 from app.models.profile import Profile
