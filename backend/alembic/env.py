@@ -19,8 +19,13 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Override URL from settings (supports env-var overrides)
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL_SYNC)
+# Override URL from settings (supports env-var overrides). configparser
+# treats "%" as its own interpolation syntax, so a password containing a
+# percent-encoded character (e.g. "%40" for "@") breaks set_main_option
+# unless escaped as "%%" first — only affects this stored copy; the actual
+# online-mode connection below passes settings.DATABASE_URL directly and
+# never goes through configparser at all.
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL_SYNC.replace("%", "%%"))
 
 target_metadata = Base.metadata
 
