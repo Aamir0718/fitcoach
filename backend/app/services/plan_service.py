@@ -1445,8 +1445,20 @@ def profile_has_usable_data(profile: Profile) -> bool:
     of whether the onboarding_complete flag was ever explicitly set — covers
     existing/legacy accounts that predate that flag or completed setup through
     another path. Used to self-heal onboarding_complete rather than forcing
-    already-active users back through the onboarding flow."""
-    return bool(profile.name and profile.goal and profile.gender)
+    already-active users back through the onboarding flow.
+
+    Requires every onboarding field, not just name/goal/gender — a profile
+    freshly through goal+gender (step ~6 of a brand new signup) used to
+    satisfy the old 3-field check, which flipped onboarding_complete mid-flow
+    and silently dumped the user into general chat before onboarding
+    (workout_place/days_per_week/injuries/etc.) ever finished.
+    """
+    return bool(
+        profile.name and profile.date_of_birth and profile.gender
+        and profile.height and profile.weight and profile.goal
+        and profile.level and profile.workout_place
+        and profile.days_per_week and profile.injuries
+    )
 
 
 def get_slot(plan: dict, slot_key: str) -> dict | None:
