@@ -2319,8 +2319,8 @@ function skipRestTimer() {
 function skipTimer() { skipRestTimer(); }
 
 // ── VOICE ─────────────────────────────────────────────────────────────
-function speak(text,gender) {
-  if (!window.speechSynthesis) return;
+function speak(text,gender,onDone) {
+  if (!window.speechSynthesis) { if (onDone) onDone(); return; }
   speechSynthesis.cancel();
   const utt=new SpeechSynthesisUtterance(text.replace(/[*_`#]/g,""));
   const voices=speechSynthesis.getVoices();
@@ -2331,6 +2331,7 @@ function speak(text,gender) {
     const mv=voices.find(v=>v.lang==="en-US");
     if(mv) utt.voice=mv;
   }
+  if (onDone) { utt.onend = onDone; utt.onerror = onDone; }
   speechSynthesis.speak(utt);
 }
 function speakResponse(data,gender) {
@@ -2458,12 +2459,23 @@ function handleWakeWordTriggered() {
   setWakeFabState("listening");
 
   const greeting = WAKE_GREETINGS[Math.floor(Math.random() * WAKE_GREETINGS.length)];
-  speak(greeting, currentUser?.gender || onboardingGender);
   showToast("🎙️ " + greeting);
 
-  // Give the spoken greeting a beat to actually start before opening the
-  // mic for the follow-up command — starting both at once talks over itself.
-  setTimeout(captureWakeCommand, 900);
+  // Open the command mic once the greeting actually finishes speaking, not
+  // on a fixed delay — starting it too early (e.g. a blind setTimeout) lets
+  // the recognizer pick up the greeting's own TTS audio instead of the
+  // user on a laptop's built-in speakers+mic (no echo cancellation), which
+  // was quietly eating the whole capture window before the user got a word
+  // in. The capped fallback timer covers browsers where utterance.onend
+  // never fires.
+  let commandStarted = false;
+  const startCommandCapture = () => {
+    if (commandStarted) return;
+    commandStarted = true;
+    captureWakeCommand();
+  };
+  speak(greeting, currentUser?.gender || onboardingGender, startCommandCapture);
+  setTimeout(startCommandCapture, 4000);
 }
 
 function captureWakeCommand() {
