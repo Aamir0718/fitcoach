@@ -19,7 +19,7 @@
       }
     })();
   </script>
-  <link rel="stylesheet" href="/static/style.css?v=20261003c"/>
+  <link rel="stylesheet" href="/static/style.css?v=20261005"/>
   <script>
     window.FC_INITIAL_TAB = "home";
   </script>
@@ -1127,11 +1127,22 @@
           <button class="btn-primary" onclick="analyzeCalories()"><span>Analyze Calories</span><span class="btn-arrow">→</span></button>
         </div>
         <div id="cal-photo-section" class="hidden">
-          <div class="photo-drop" onclick="document.getElementById('food-photo-input').click()">
-            <div class="photo-drop-icon">📷</div>
-            <p>Click to upload food photo</p>
-            <small>JPG, PNG supported</small>
+          <div class="photo-drop-actions">
+            <button type="button" class="photo-drop-btn" onclick="document.getElementById('food-photo-camera-input').click()">
+              <div class="photo-drop-icon">📷</div>
+              <p>Take Photo</p>
+            </button>
+            <button type="button" class="photo-drop-btn" onclick="document.getElementById('food-photo-input').click()">
+              <div class="photo-drop-icon">🖼️</div>
+              <p>Upload from Gallery</p>
+            </button>
           </div>
+          <small class="photo-drop-hint">JPG, PNG supported</small>
+          <!-- capture="environment" opens the rear camera directly on mobile instead
+               of the gallery picker — a separate input from the gallery one below so
+               both actions stay explicit rather than relying on one input's ambiguous
+               browser-dependent camera-vs-gallery prompt. -->
+          <input type="file" id="food-photo-camera-input" accept="image/*" capture="environment" style="display:none" onchange="handleFoodPhoto(event)"/>
           <input type="file" id="food-photo-input" accept="image/*" style="display:none" onchange="handleFoodPhoto(event)"/>
           <div id="photo-preview-wrap" class="hidden">
             <img id="food-photo-preview" class="food-photo-preview" src="" alt="Food preview"/>
@@ -1452,7 +1463,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.js" crossorigin="anonymous"></script>
 <script src="/static/js/exercise-demo.js?v=20261002"></script>
-<script src="/static/script.js?v=20261003b"></script>
+<script src="/static/script.js?v=20261005"></script>
 <script src="/static/js/ghost-pose.js?v=20261002"></script>
 <script src="/static/js/ghost-form-analysis.js?v=20261002"></script>
 <script src="/static/js/ghost-trainer.js?v=20261002"></script><script>

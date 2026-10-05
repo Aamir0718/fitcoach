@@ -2537,6 +2537,10 @@ async function analyzeCalories() {
     console.log(`[Nutrition API] Analyzing text: ${food.substring(0, 50)}...`);
     const data=await apiFetch("/api/nutrition/analyze",{method:"POST",body:JSON.stringify({food})});
     console.log(`[Nutrition API] Response:`, data);
+    // apiFetch only throws for 401/429/5xx — a 400 ("Food not found", etc.)
+    // comes back as normal {detail:"..."} JSON instead of throwing, which
+    // would otherwise render as a blank/broken result card.
+    if (data && data.detail) throw new Error(data.detail);
     showCalResult(_adaptNutritionResult(data));
   }catch(err){
     console.error(`[Nutrition API] Error:`, err);
@@ -2546,10 +2550,40 @@ async function analyzeCalories() {
   finally{showCalLoading(false);}
 }
 function handleFoodPhoto(ev) {
-  const file=ev.target.files[0]; if(!file)return;
-  const r=new FileReader();
-  r.onload=(e)=>{foodPhotoBase64=e.target.result;document.getElementById("food-photo-preview").src=foodPhotoBase64;document.getElementById("photo-preview-wrap").classList.remove("hidden");};
-  r.readAsDataURL(file);
+  const file = ev.target.files[0];
+  ev.target.value = ""; // reset so picking the same file again still fires onchange
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    showToast("⚠️ Please choose an image file");
+    return;
+  }
+  const reader = new FileReader();
+  reader.onerror = () => showToast("⚠️ Couldn't read that file — try again");
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onerror = () => showToast("⚠️ Couldn't read that image — try another one");
+    img.onload = () => {
+      // Downscale before upload — a raw phone photo (often several MB) sent
+      // as base64 JSON is slow/unreliable on mobile networks and well past
+      // what the detector needs; 1024px keeps all the detail that matters.
+      const MAX_DIM = 1024;
+      let { width, height } = img;
+      if (width > MAX_DIM || height > MAX_DIM) {
+        const scale = MAX_DIM / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      foodPhotoBase64 = canvas.toDataURL("image/jpeg", 0.85);
+      document.getElementById("food-photo-preview").src = foodPhotoBase64;
+      document.getElementById("photo-preview-wrap").classList.remove("hidden");
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
 }
 // ── AI CONFIRMATION FLOW ────────────────────────────────────────────────
 let pendingYoloResult = null;
@@ -3096,7 +3130,12 @@ async function analyzePhotoCalories() {
     console.log(`[Nutrition API] Sending request to /api/nutrition/analyze`);
     const data=await apiFetch("/api/nutrition/analyze",{method:"POST",body:JSON.stringify({image_base64:imageBase64})});
     console.log(`[Nutrition API] Response:`, data);
-    
+    // Same gap as analyzeCalories() above — a 400 (e.g. "No recognizable
+    // food detected") comes back as {detail:"..."} instead of throwing, and
+    // used to fall through into opening a confirmation popup for an empty
+    // food name instead of showing a clear error.
+    if (data && data.detail) throw new Error(data.detail);
+
     const detectedFood = data.meal_name || "";
     const score = getFoodConfidence(detectedFood);
     console.log(`[Nutrition AI Confirmation] Detected food: "${detectedFood}", confidence: ${score}%`);

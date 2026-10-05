@@ -909,11 +909,17 @@ async def analyze_food_ai(food_description: str = "", image_base64: str | None =
             ]
         }
 
+    import os
+    import uuid
+    image_path = None
     try:
         image_data = base64.b64decode(image_base64)
-        import os
         os.makedirs("uploads", exist_ok=True)
-        image_path = "uploads/temp.jpg"
+        # Was a hardcoded "uploads/temp.jpg" shared by every request — two
+        # photo analyses overlapping (two users, or one user double-tapping)
+        # could write/read each other's file mid-inference, silently
+        # analyzing the wrong image. Unique name per call fixes that.
+        image_path = f"uploads/food_{uuid.uuid4().hex}.jpg"
         with open(image_path, "wb") as f:
             f.write(image_data)
 
@@ -971,3 +977,9 @@ async def analyze_food_ai(food_description: str = "", image_base64: str | None =
         return {
             "error": f"Nutrition analysis failed: {str(e)}"
         }
+    finally:
+        if image_path:
+            try:
+                os.remove(image_path)
+            except OSError:
+                pass
